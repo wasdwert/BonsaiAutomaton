@@ -1,0 +1,96 @@
+{
+  "schema": [
+    {
+      "name": "growthSpeedMultiplier",
+      "type": "number",
+      "label": "Growth Speed Multiplier",
+      "default": 1.0,
+      "min": 0.5,
+      "max": 4.0,
+      "step": 0.5
+    },
+    {
+      "name": "playerWalkSpeed",
+      "type": "number",
+      "label": "Explorer Move Speed",
+      "default": 220,
+      "min": 120,
+      "max": 400,
+      "step": 20
+    },
+    {
+      "name": "roverBaseBattery",
+      "type": "number",
+      "label": "Rover Base Battery Steps",
+      "default": 50,
+      "min": 20,
+      "max": 100,
+      "step": 5
+    },
+    {
+      "name": "roverBaseCargo",
+      "type": "number",
+      "label": "Rover Base Cargo Capacity (kg)",
+      "default": 5.0,
+      "min": 5.0,
+      "max": 50.0,
+      "step": 2.5
+    },
+    {
+      "name": "solarPeakKw",
+      "type": "number",
+      "label": "Solar Peak Power (kW)",
+      "default": 3.0,
+      "min": 1.0,
+      "max": 10.0,
+      "step": 0.5
+    },
+    {
+      "name": "turbineBaseKw",
+      "type": "number",
+      "label": "Turbine Base Power (kW)",
+      "default": 1.8,
+      "min": 0.5,
+      "max": 6.0,
+      "step": 0.5
+    },
+    {
+      "name": "pumpBaseLps",
+      "type": "number",
+      "label": "Water Pump Flow (L/s)",
+      "default": 2.5,
+      "min": 1.0,
+      "max": 8.0,
+      "step": 0.5
+    },
+    {
+      "name": "digSweetSpotMultiplier",
+      "type": "number",
+      "label": "Dig Sweetspot Width Multiplier",
+      "default": 1.0,
+      "min": 0.5,
+      "max": 2.0,
+      "step": 0.1
+    },
+    {
+      "name": "dayCycleSpeed",
+      "type": "number",
+      "label": "Day / Night Cycle Speed",
+      "default": 1.0,
+      "min": 0.2,
+      "max": 3.0,
+      "step": 0.2
+    }
+  ],
+  "values": {
+    "growthSpeedMultiplier": 1.0,
+    "playerWalkSpeed": 220,
+    "roverBaseBattery": 50,
+    "roverBaseCargo": 15.0,
+    "solarPeakKw": 3.0,
+    "turbineBaseKw": 1.8,
+    "pumpBaseLps": 2.5,
+    "digSweetSpotMultiplier": 1.0,
+    "dayCycleSpeed": 1.0
+  }
+}

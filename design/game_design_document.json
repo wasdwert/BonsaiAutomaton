@@ -1,0 +1,60 @@
+{
+  "title": "Bonsai Automata",
+  "hook": "Cultivate rare automated ancient bonsais",
+  "game_overview": "An idle zen simulation featuring automated power and irrigation grids to grow bonsais to level 100, combined with reaction-based wilderness excursions.",
+  "artstyle": "cozy-wholesome",
+  "genre": "arcade",
+  "winning_condition": "Successfully discover and cultivate the rarest botanical specimen in the wilderness\u2014the Mythic Golden Ginkgo Bonsai\u2014to Level 100 Mastery in your automated sanctuary.",
+  "losing_condition": "None. The game is a relaxing zen experience with no fail state or game over. When the expedition backpack reaches maximum capacity, the player simply cannot carry additional items and returns to the starting campsite portal to transport all gathered resources back to the sanctuary.",
+  "player_mode": "single_player",
+  "supported_orientations": [
+    "landscape",
+    "wide"
+  ],
+  "input_methods": [
+    "touch",
+    "mouse",
+    "keyboard",
+    "dpad"
+  ],
+  "score_options": {
+    "score_type": "points",
+    "score_order": "higher_is_better"
+  },
+  "low_end_device_support": true,
+  "mobile_playable": true,
+  "tv_playable": true,
+  "language": [
+    "en"
+  ],
+  "content_descriptors": [],
+  "controls": [
+    {
+      "input": "Spacebar / Tap Screen / Enter",
+      "action": "Dig action in the radial shovel minigame during excursions."
+    },
+    {
+      "input": "W/A/S/D or Arrow Keys / Virtual Joystick",
+      "action": "Move the botanist explorer across the excursion overworld."
+    },
+    {
+      "input": "Mouse Click / Touch Tap",
+      "action": "Select bonsais to prune, purchase machinery upgrades, and manage inventory slots."
+    },
+    {
+      "input": "E / Inventory Button",
+      "action": "Open inventory and equipment backpack screen."
+    },
+    {
+      "input": "Esc / Tab / Navigation Bar",
+      "action": "Switch between Greenhouse Sanctuary and Wilderness Excursion view."
+    }
+  ],
+  "sections": [
+    {
+      "title": "UI and Menus",
+      "content": "1. Seedling Metadata Reorganization: Seedling cards in Sanctuary Grid Deployment replace the obsolete 'Shape' text with an aligned metadata badge cluster (Maturity rating, Tree type group, and Nature designation) directly beneath the species title. The attribute panel is titled 'Seedling Attributes' and formatted into a clean 2-column layout distinguishing Genetic Potential from Nature Factors. 2. 4-Column Attribute Telemetry & Vertical Clearance: The 'Choose Style to Plant' interface adopts a specialized 4-column layout titled 'Seedling Attributes': Column 1 (Genetic Potential progress bars), Column 2 ('Nature\\nFactor'), Column 3 ('Style\\nFactor'), and Column 4 ('Combined\\nSynergy'). The slim two-line column headers maximize horizontal real estate for progress bars. Vertical margins have been adjusted to prevent contact with the upper style tab bar and bottom action buttons. 3. Two-Decimal Base Aesthetic (BA) Precision: All BA metrics across inspection dashboards, sanctuary interaction HUDs, and inventory profiles strictly display two decimal places (e.g. '4.25 BA'). 4. Harmonized Inspection Architecture: The Bonsai Inspection Menu mirrors the 4-column attribute structure, presenting dual progress bars for GP and CP, slim Nature/Style/Synergy columns with colored directional arrows, and exact 2-decimal attribute BA contributions.",
+      "summary": "Unified 4-Column Attribute Telemetry, Two-Decimal Base Aesthetic Precision, and Ergonomic Viewport Clearance."
+    }
+  ]
+}
