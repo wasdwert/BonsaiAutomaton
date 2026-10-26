@@ -960,6 +960,131 @@ export function getRoverChassisMaxSlots(tier: RoverChassisTier): number {
 export { BonsaiStyleThumbnail };
 
 // =========================================================================
+// QUICK BONSAI RADIAL CROSS MENU COMPONENT (Q / Y CONTROLLER CROSS)
+// =========================================================================
+
+export interface QuickBonsaiRadialMenuProps {
+  bonsai: PlantedBonsai;
+  inventory: SanctuaryInventory;
+  onSell: (id: string) => void;
+  onStore: (id: string) => void;
+  onCompost: (id: string) => void;
+  onClose: () => void;
+}
+
+export function QuickBonsaiRadialMenu({
+  bonsai,
+  inventory,
+  onSell,
+  onStore,
+  onCompost,
+  onClose,
+}: QuickBonsaiRadialMenuProps) {
+  const sellPrice = calculateDonationValue(bonsai);
+  const compostCount = inventory.organic_compost ?? inventory.enrichedCompost ?? 0;
+  const matDef = getMaturityDef(bonsai.maturity);
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs select-none animate-in fade-in zoom-in-95 duration-150">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-72 h-72 sm:w-88 sm:h-88 flex items-center justify-center">
+        {/* Luminous circular backdrop glow */}
+        <div className="absolute inset-2 sm:inset-4 rounded-full border-2 border-emerald-500/40 bg-slate-950/85 shadow-[0_0_50px_rgba(16,185,129,0.35)] pointer-events-none" />
+
+        {/* UP QUADRANT: Quick Sell */}
+        <button
+          onClick={() => {
+            onSell(bonsai.id);
+            onClose();
+          }}
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-36 sm:w-44 py-2 sm:py-2.5 px-2 rounded-2xl bg-gradient-to-b from-amber-950 via-slate-900 to-slate-950 border-2 border-amber-400 text-amber-200 shadow-xl hover:scale-105 active:scale-95 transition-all flex flex-col items-center gap-0.5 group cursor-pointer">
+          <span className="text-[9px] sm:text-[10px] font-mono font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+            <span>⬆ [W / ↑ / D-Pad Up]</span>
+          </span>
+          <span className="text-xs sm:text-sm font-black text-amber-300 flex items-center gap-1">
+            <VerdureIcon className="w-3.5 h-3.5" />
+            <span>Sell (+{sellPrice} Verdure)</span>
+          </span>
+        </button>
+
+        {/* DOWN QUADRANT: Store Bonsai */}
+        <button
+          onClick={() => {
+            onStore(bonsai.id);
+            onClose();
+          }}
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-36 sm:w-44 py-2 sm:py-2.5 px-2 rounded-2xl bg-gradient-to-t from-sky-950 via-slate-900 to-slate-950 border-2 border-sky-400 text-sky-200 shadow-xl hover:scale-105 active:scale-95 transition-all flex flex-col items-center gap-0.5 group cursor-pointer">
+          <span className="text-xs sm:text-sm font-black text-sky-300 flex items-center gap-1">
+            <span>🪴</span>
+            <span>Store to Bag</span>
+          </span>
+          <span className="text-[9px] sm:text-[10px] font-mono font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1">
+            <span>⬇ [S / ↓ / D-Pad Down]</span>
+          </span>
+        </button>
+
+        {/* LEFT QUADRANT: Give Compost */}
+        <button
+          onClick={() => {
+            if (compostCount > 0) {
+              onCompost(bonsai.id);
+              onClose();
+            } else {
+              gameAudio?.playErrorBuzz?.();
+            }
+          }}
+          className={`absolute left-0 top-1/2 -translate-y-1/2 w-32 sm:w-40 py-2 sm:py-2.5 px-1.5 rounded-2xl border-2 shadow-xl hover:scale-105 active:scale-95 transition-all flex flex-col items-center gap-0.5 ${
+            compostCount > 0
+              ? 'bg-gradient-to-r from-lime-950 via-slate-900 to-slate-950 border-lime-400 text-lime-200 cursor-pointer'
+              : 'bg-slate-950/90 border-slate-700 text-slate-500 opacity-60 cursor-not-allowed'
+          }`}>
+          <span className="text-[9px] sm:text-[10px] font-mono font-bold text-lime-400 uppercase tracking-wider">
+            ⬅ [A / ← / Left]
+          </span>
+          <span className="text-xs sm:text-sm font-black truncate">
+            🌾 Compost ({compostCount > 0 ? `${compostCount}` : 'None'})
+          </span>
+        </button>
+
+        {/* RIGHT QUADRANT: Give Fertilizer (Locked / Grey) */}
+        <button
+          disabled
+          onClick={() => {
+            gameAudio?.playErrorBuzz?.();
+          }}
+          className="absolute right-0 top-1/2 -translate-y-1/2 w-32 sm:w-40 py-2 sm:py-2.5 px-1.5 rounded-2xl border-2 border-slate-700 bg-slate-950/90 text-slate-500 opacity-50 shadow-xl flex flex-col items-center gap-0.5 cursor-not-allowed">
+          <span className="text-[9px] sm:text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">
+            ➡ [D / → / Right]
+          </span>
+          <span className="text-xs sm:text-sm font-bold truncate">
+            🧪 Fertilizer (Locked)
+          </span>
+        </button>
+
+        {/* CENTER HUB */}
+        <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-slate-900/95 border-2 border-emerald-400/80 shadow-2xl flex flex-col items-center justify-center p-1.5 text-center z-10">
+          <div
+            style={{ color: matDef.color }}
+            className="text-[11px] font-black flex items-center gap-0.5">
+            <span>{matDef.kanji}</span>
+            <span>Lv.{bonsai.level}</span>
+          </div>
+          <div className="text-[11px] font-bold text-slate-100 truncate max-w-[80px] my-0.5">
+            {bonsai.name}
+          </div>
+          <span className="text-[8.5px] text-slate-400 font-mono bg-slate-950 px-1 py-0.2 rounded border border-slate-800">
+            [Esc / B / Q / Y]
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
 // ROVER GARAGE DISCOVERY CODEX SPECIFICATIONS & PREVIEW BOXES
 // =========================================================================
 
@@ -3468,10 +3593,81 @@ export default function App() {
   const [excavationResult, setExcavationResult] = useState<ExcavationResultData | null>(null);
   const [inspectingBonsaiId, setInspectingBonsaiId] = useState<string | null>(null);
   const [inspectingStructureId, setInspectingStructureId] = useState<string | null>(null);
+  const [quickRadialBonsai, setQuickRadialBonsai] = useState<PlantedBonsai | null>(null);
+  const [focusedMenuIdx, setFocusedMenuIdx] = useState<number>(0);
+  const [titleMenuIdx, setTitleMenuIdx] = useState<number>(0);
+  const [focusedShopIdx, setFocusedShopIdx] = useState<number>(0);
+  const [focusedWbIdx, setFocusedWbIdx] = useState<number>(0);
+  const [focusedGarageIdx, setFocusedGarageIdx] = useState<number>(0);
   const [isMusicMuted, setIsMusicMuted] = useState(false);
   const [isSfxMuted, setIsSfxMuted] = useState(false);
   const [, setHudTick] = useState(0);
   const refreshHud = useCallback(() => setHudTick((t) => t + 1), []);
+
+  // Title Screen Keyboard and Menu Navigation
+  useEffect(() => {
+    if (gameState.status !== 'START') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        setTitleMenuIdx((i) => Math.max(0, i - 1));
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        setTitleMenuIdx((i) => Math.min(2, i + 1));
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 'e' || e.key === 'E' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (titleMenuIdx === 0) {
+          setGameState((prev) => ({...prev, status: 'PLAYING'}));
+          gameAudio.playPowerupChime();
+          if (sdk) sdk.startGame();
+        } else if (titleMenuIdx === 1) {
+          setIsHowToPlayOpen(true);
+          gameAudio.playCrispClick();
+        } else if (titleMenuIdx === 2) {
+          setIsGameMenuOpen(true);
+          gameAudio.playCrispClick();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [gameState.status, titleMenuIdx, sdk]);
+
+  // Global pure scrolling handler for Arrow keys across all scrollable containers
+  useEffect(() => {
+    const handleGlobalArrows = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        const dy = e.key === 'ArrowUp' ? -65 : e.key === 'ArrowDown' ? 65 : 0;
+        const dx = e.key === 'ArrowLeft' ? -65 : e.key === 'ArrowRight' ? 65 : 0;
+        const candidates = Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '.overflow-y-auto, .overflow-x-auto, [data-scrollable="true"]',
+          ),
+        );
+        for (let i = candidates.length - 1; i >= 0; i--) {
+          const el = candidates[i];
+          if (el && (el.offsetParent !== null || window.getComputedStyle(el).display !== 'none')) {
+            const canScrollY = el.scrollHeight > el.clientHeight + 4;
+            const canScrollX = el.scrollWidth > el.clientWidth + 4;
+            if (dy !== 0 && canScrollY) {
+              el.scrollTop += dy;
+              return;
+            }
+            if (dx !== 0 && canScrollX) {
+              el.scrollLeft += dx;
+              return;
+            }
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalArrows);
+    return () => window.removeEventListener('keydown', handleGlobalArrows);
+  }, []);
 
   // Live animated progress update for Workbench Modal while open
   const [, setWorkbenchTick] = useState(0);
@@ -3495,6 +3691,10 @@ export default function App() {
   // Active expedition seed for procedural world variation
   const worldSeedRef = useRef<number>(1337);
   const hasAutoplayed = useRef(false);
+
+  // --- Gamepad / Controller API Support ---
+  const [connectedGamepadName, setConnectedGamepadName] = useState<string | null>(null);
+  const lastGamepadButtonsRef = useRef<boolean[]>([]);
 
   // Input Hook
   const inputRef = useInput(canvasRef, true, {
@@ -4099,6 +4299,42 @@ export default function App() {
       }
     };
   }, []);
+
+  // HTML5 Gamepad Connection Detection and Lifecycle
+  useEffect(() => {
+    const handleGamepadConnected = (e: GamepadEvent) => {
+      const name = e.gamepad?.id ? e.gamepad.id.replace(/\s*\([^)]*\)/g, '').trim() || 'Controller' : 'Controller';
+      setConnectedGamepadName(name);
+      triggerNotification(`🎮 Controller Connected: ${name}`, '#38bdf8', 4000);
+      gameAudio.playConfirmSelect();
+    };
+
+    const handleGamepadDisconnected = () => {
+      setConnectedGamepadName(null);
+      triggerNotification('🎮 Controller Disconnected', '#f43f5e', 3500);
+      gameAudio.playErrorBuzz();
+    };
+
+    // Check if controller is already connected on mount
+    if (typeof navigator !== 'undefined' && navigator.getGamepads) {
+      const gps = navigator.getGamepads();
+      for (let i = 0; i < gps.length; i++) {
+        const gp = gps[i];
+        if (gp && gp.connected) {
+          const name = gp.id ? gp.id.replace(/\s*\([^)]*\)/g, '').trim() || 'Controller' : 'Controller';
+          setConnectedGamepadName(name);
+          break;
+        }
+      }
+    }
+
+    window.addEventListener('gamepadconnected', handleGamepadConnected);
+    window.addEventListener('gamepaddisconnected', handleGamepadDisconnected);
+    return () => {
+      window.removeEventListener('gamepadconnected', handleGamepadConnected);
+      window.removeEventListener('gamepaddisconnected', handleGamepadDisconnected);
+    };
+  }, [triggerNotification]);
 
   const addFloatingText = useCallback((x: number, y: number, text: string, color = '#10b981') => {
     floatingTextsRef.current.push({
@@ -5368,6 +5604,7 @@ export default function App() {
     activeBiomeIdRef.current = 'FOOTHILLS';
     setInspectingBonsaiId(null);
     setInspectingStructureId(null);
+    setQuickRadialBonsai(null);
     setStandingPlot(null);
     setActivePlot(null);
     activePlotRef.current = null;
@@ -7606,6 +7843,298 @@ export default function App() {
     refreshHud();
   }, [excavationResult, refreshHud, revealAreaSpecies, triggerNotification]);
 
+  // Keyboard navigation for Botanical Market
+  useEffect(() => {
+    if (!isShopModalOpen) return;
+    const tabs: ('MAPS' | 'EXPANSIONS' | 'DECOR' | 'GUIDES' | 'EQUIPMENT')[] = [
+      'MAPS',
+      'EXPANSIONS',
+      'DECOR',
+      'GUIDES',
+      'EQUIPMENT',
+    ];
+
+    const tabLengths = {
+      MAPS: 2,
+      EXPANSIONS: 4,
+      DECOR: 8,
+      GUIDES: 18,
+      EQUIPMENT: 2,
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        setShopTab((t) => tabs[(tabs.indexOf(t) - 1 + tabs.length) % tabs.length]);
+        setFocusedShopIdx(0);
+        gameAudio.playCrispClick();
+      } else if (e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        setShopTab((t) => tabs[(tabs.indexOf(t) + 1) % tabs.length]);
+        setFocusedShopIdx(0);
+        gameAudio.playCrispClick();
+      } else if (e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        setFocusedShopIdx((i) => Math.max(0, i - 1));
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        const maxLen = tabLengths[shopTab] || 2;
+        setFocusedShopIdx((i) => Math.min(maxLen - 1, i + 1));
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        // Activate purchase on focused item
+        if (shopTab === 'MAPS') {
+          if (focusedShopIdx === 0) buyExpeditionMap('has_map_highlands', 250, 'Misty Highlands');
+          else if (focusedShopIdx === 1) buyExpeditionMap('has_map_overgrowth', 800, 'Ancient Overgrowth');
+        } else if (shopTab === 'EXPANSIONS') {
+          const exp = SANCTUARY_EXPANSIONS[focusedShopIdx];
+          if (exp) buySanctuaryExpansion(exp.tier, exp.cost, exp.name);
+        } else if (shopTab === 'DECOR') {
+          const decorList = [
+            { type: 'decor_pebble_path' as const, cost: 5, name: 'Zen Pebble Stepping Path' },
+            { type: 'decor_rock_formation' as const, cost: 15, name: 'Zen Rock Formation' },
+            { type: 'decor_shrubbery_bush' as const, cost: 25, name: 'Topiary Shrubbery Bush' },
+            { type: 'decor_woven_wall' as const, cost: 40, name: 'Woven Wooden Lattice Wall' },
+            { type: 'crystal_pedestal_foliage' as const, cost: 100, name: 'Emerald Leaf Crystal Pedestal' },
+            { type: 'crystal_pedestal_branches' as const, cost: 100, name: 'Amber Branch Crystal Pedestal' },
+            { type: 'crystal_pedestal_trunk' as const, cost: 100, name: 'Coral Trunk Crystal Pedestal' },
+            { type: 'crystal_pedestal_roots' as const, cost: 100, name: 'Azure Root Crystal Pedestal' },
+          ];
+          const it = decorList[focusedShopIdx];
+          if (it) buyDecoration(it.type, it.cost, it.name);
+        } else if (shopTab === 'GUIDES') {
+          const guideList = [
+            { key: 'has_compost_guide' as const, cost: 35, title: 'Compost Guidebook' },
+            { key: 'has_tier1_guide' as const, cost: 75, title: 'Tier 1 Mist Irrigation Guidebook' },
+            { key: 'has_workbench_t2_guide' as const, cost: 160, title: 'T2 Precision Workbench Blueprint' },
+            { key: 'has_rover_t2_blueprint' as const, cost: 75, title: 'Rover T2 Blueprint' },
+            { key: 'has_rover_t3_blueprint' as const, cost: 150, title: 'Rover T3 Blueprint' },
+            { key: 'has_storage_module_1_guide' as const, cost: 25, title: 'Storage Module I Guidebook' },
+            { key: 'has_storage_module_2_guide' as const, cost: 50, title: 'Storage Module II Guidebook' },
+            { key: 'has_storage_module_3_guide' as const, cost: 100, title: 'Storage Module III Guidebook' },
+            { key: 'has_battery_module_1_guide' as const, cost: 25, title: 'Battery Module I Guidebook' },
+            { key: 'has_battery_module_2_guide' as const, cost: 50, title: 'Battery Module II Guidebook' },
+            { key: 'has_battery_module_3_guide' as const, cost: 100, title: 'Battery Module III Guidebook' },
+            { key: 'has_radar_module_1_guide' as const, cost: 30, title: 'Radar Module I Guidebook' },
+            { key: 'has_radar_module_2_guide' as const, cost: 65, title: 'Radar Module II Guidebook' },
+            { key: 'has_radar_module_3_guide' as const, cost: 120, title: 'Radar Module III Guidebook' },
+            { key: 'has_tier2_guide' as const, cost: 220, title: 'Tier 2 Pulsar Irrigation Guidebook' },
+            { key: 'has_auto_fabricator_guide' as const, cost: 300, title: 'Auto-Fabrication Blueprint Guidebook' },
+            { key: 'has_workbench_t3_guide' as const, cost: 350, title: 'T3 Master Foundry Blueprint' },
+            { key: 'has_tier3_guide' as const, cost: 450, title: 'Tier 3 Hydro Irrigation Guidebook' },
+          ];
+          const it = guideList[focusedShopIdx];
+          if (it) buyGuidebook(it.key, it.cost, it.title);
+        } else if (shopTab === 'EQUIPMENT') {
+          if (focusedShopIdx === 0) buyTool('tool_compost_heap', 50, 'Compost Heap');
+          else if (focusedShopIdx === 1) buyTool('tool_garden_well', 75, 'Stone Well');
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setIsShopModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isShopModalOpen, shopTab, focusedShopIdx, buyExpeditionMap, buySanctuaryExpansion, buyDecoration, buyGuidebook, buyTool]);
+
+  // Keyboard navigation for Workbench Modal
+  useEffect(() => {
+    if (!isWorkbenchModalOpen) return;
+    const tabs: WorkbenchCategory[] = [
+      'resources',
+      'bonsai_automatons',
+      'workbench',
+      'rover',
+      'electricity',
+    ];
+
+    const tabLengths = {
+      resources: 5,
+      bonsai_automatons: 3,
+      workbench: 4,
+      rover: 11,
+      electricity: 2,
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        setWorkbenchTab((t) => tabs[(tabs.indexOf(t) - 1 + tabs.length) % tabs.length]);
+        setFocusedWbIdx(0);
+        gameAudio.playCrispClick();
+      } else if (e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        setWorkbenchTab((t) => tabs[(tabs.indexOf(t) + 1) % tabs.length]);
+        setFocusedWbIdx(0);
+        gameAudio.playCrispClick();
+      } else if (e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        setFocusedWbIdx((i) => Math.max(0, i - 1));
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        const maxLen = tabLengths[workbenchTab as keyof typeof tabLengths] || 4;
+        setFocusedWbIdx((i) => Math.min(maxLen - 1, i + 1));
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        if (workbenchTab === 'workbench' || workbenchTab === 'upgrades') {
+          const wbList: CraftingRecipeId[] = ['workbench_t2_upgrade', 'workbench_t3_upgrade', 'crafting_automaton', 'auto_fabricator'];
+          const r = wbList[focusedWbIdx];
+          if (r) enqueueCraftingRecipe(r);
+        } else if (workbenchTab === 'rover') {
+          const roverList: CraftingRecipeId[] = [
+            'rover_chassis_t2',
+            'rover_chassis_t3',
+            'rover_storage_module_1',
+            'rover_storage_module_2',
+            'rover_storage_module_3',
+            'rover_battery_module_1',
+            'rover_battery_module_2',
+            'rover_battery_module_3',
+            'rover_radar_module_1',
+            'rover_radar_module_2',
+            'rover_radar_module_3',
+          ];
+          const r = roverList[focusedWbIdx];
+          if (r) enqueueCraftingRecipe(r);
+        } else if (workbenchTab === 'resources' || workbenchTab === 'compost') {
+          const resList: CraftingRecipeId[] = ['craft_copper_wire', 'craft_gears', 'craft_microcircuits', 'craft_quantum_chips', 'craft_enriched_compost'];
+          const r = resList[focusedWbIdx];
+          if (r) enqueueCraftingRecipe(r);
+        } else if (workbenchTab === 'bonsai_automatons' || workbenchTab === 'automatons') {
+          const autoList: CraftingRecipeId[] = ['tier1_automaton', 'tier2_automaton', 'tier3_automaton'];
+          const r = autoList[focusedWbIdx];
+          if (r) enqueueCraftingRecipe(r);
+        } else if (workbenchTab === 'electricity') {
+          const elecList: CraftingRecipeId[] = ['solar_panel', 'wind_turbine'];
+          const r = elecList[focusedWbIdx];
+          if (r) enqueueCraftingRecipe(r);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setIsWorkbenchModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isWorkbenchModalOpen, workbenchTab, focusedWbIdx, enqueueCraftingRecipe]);
+
+  // Keyboard navigation for Rover Garage Bay
+  useEffect(() => {
+    if (!isBiomeSelectOpen) return;
+    const biomes: ExpeditionBiomeId[] = ['FOOTHILLS', 'HIGHLANDS', 'OVERGROWTH'];
+    const ALL_ROVER_MODULE_KEYS: RoverModuleType[] = [
+      'storage_1',
+      'storage_2',
+      'storage_3',
+      'battery_1',
+      'battery_2',
+      'battery_3',
+      'radar_1',
+      'radar_2',
+      'radar_3',
+    ];
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'a' || e.key === 'A' || e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        setGarageTab((t) => (t === 'expeditions' ? 'loadout' : 'expeditions'));
+        setFocusedGarageIdx(0);
+        gameAudio.playCrispClick();
+      } else if (e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        setFocusedGarageIdx((i) => Math.max(0, i - 1));
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        const maxLimit = garageTab === 'expeditions' ? biomes.length - 1 : ALL_ROVER_MODULE_KEYS.length - 1;
+        setFocusedGarageIdx((i) => Math.min(maxLimit, i + 1));
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        if (garageTab === 'expeditions') {
+          const targetBiome = biomes[focusedGarageIdx];
+          if (targetBiome) startBiomeExcursion(targetBiome);
+        } else if (garageTab === 'loadout') {
+          const modKey = ALL_ROVER_MODULE_KEYS[focusedGarageIdx];
+          if (modKey) attachRoverModule(modKey);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setIsBiomeSelectOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isBiomeSelectOpen, garageTab, focusedGarageIdx, startBiomeExcursion, attachRoverModule]);
+
+  // Keyboard navigation for Game Menu / Settings Modal
+  useEffect(() => {
+    if (!isGameMenuOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const menuOptionsCount = 5;
+      if (e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        setFocusedMenuIdx((i) => Math.max(0, i - 1));
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        setFocusedMenuIdx((i) => Math.min(menuOptionsCount - 1, i + 1));
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        if (focusedMenuIdx === 0) {
+          setIsGameMenuOpen(false);
+          if (gameState.status === 'START') setGameState((p) => ({...p, status: 'PLAYING'}));
+          gameAudio.playCrispClick();
+        } else if (focusedMenuIdx === 1) {
+          setIsGoalModalOpen(true);
+          gameAudio.playCrispClick();
+        } else if (focusedMenuIdx === 2) {
+          setIsHowToPlayOpen(true);
+          gameAudio.playCrispClick();
+        } else if (focusedMenuIdx === 3) {
+          const muted = gameAudio.toggleMute();
+          setIsSfxMuted(muted);
+        } else if (focusedMenuIdx === 4) {
+          setIsMusicMuted((p) => !p);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setIsGameMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isGameMenuOpen, focusedMenuIdx, gameState.status]);
+
+  // Keyboard navigation for How to Play Guide
+  useEffect(() => {
+    if (!isHowToPlayOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        setGuidebookChapter((c) => Math.max(1, c - 1));
+        gameAudio.playCrispClick();
+      } else if (e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        setGuidebookChapter((c) => Math.min(5, c + 1));
+        gameAudio.playCrispClick();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setIsHowToPlayOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isHowToPlayOpen]);
+
   // Discrete Keyboard Event Listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -7614,6 +8143,11 @@ export default function App() {
       if (e.repeat) return;
 
       if (e.key === 'Escape') {
+        if (quickRadialBonsai) {
+          setQuickRadialBonsai(null);
+          gameAudio.playCrispClick();
+          return;
+        }
         if (excavationResult) {
           handleDeclineExcavatedSeedling();
           return;
@@ -7642,10 +8176,55 @@ export default function App() {
           setIsZenSkillsModalOpen(false);
         } else if (isGoalModalOpen) {
           setIsGoalModalOpen(false);
+        } else if (isHowToPlayOpen) {
+          setIsHowToPlayOpen(false);
         } else {
           setIsGameMenuOpen((prev) => !prev);
         }
-      } else if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') {
+      } else if (excursionReport) {
+        if (e.key === 'e' || e.key === 'E' || e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          depositHaulAndReturnToSanctuary();
+          return;
+        }
+      } else if (quickRadialBonsai) {
+        // Quick Radial Cross Menu Directional Triggering (WASD only, Arrows are reserved for scrolling)
+        if (e.key === 'w' || e.key === 'W') {
+          e.preventDefault();
+          donatePlantedBonsai(quickRadialBonsai.id);
+          setQuickRadialBonsai(null);
+          return;
+        }
+        if (e.key === 's' || e.key === 'S') {
+          e.preventDefault();
+          pickUpBonsaiToInventory(quickRadialBonsai.id);
+          setQuickRadialBonsai(null);
+          return;
+        }
+        if (e.key === 'a' || e.key === 'A') {
+          e.preventDefault();
+          if (sanctuaryInventoryRef.current.organic_compost > 0) {
+            applyOrganicCompost(quickRadialBonsai.id);
+            setQuickRadialBonsai(null);
+          } else {
+            gameAudio.playErrorBuzz();
+            triggerNotification('No Enriched Organic Compost in stock! Craft at Workbench.', '#ef4444');
+          }
+          return;
+        }
+        if (e.key === 'd' || e.key === 'D') {
+          e.preventDefault();
+          gameAudio.playErrorBuzz();
+          triggerNotification('🧪 Chemical Fertilizer research locked! Coming in future updates.', '#94a3b8');
+          return;
+        }
+        if (e.key === 'q' || e.key === 'Q') {
+          e.preventDefault();
+          setQuickRadialBonsai(null);
+          gameAudio.playCrispClick();
+          return;
+        }
+      } else if (e.key === 'w' || e.key === 'W') {
         if (locationRef.current === 'EXCURSION') {
           e.preventDefault();
           if (roverRef.current.moveCooldown <= 0) {
@@ -7653,7 +8232,7 @@ export default function App() {
             roverRef.current.moveCooldown = 0.18;
           }
         }
-      } else if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') {
+      } else if (e.key === 's' || e.key === 'S') {
         if (locationRef.current === 'EXCURSION') {
           e.preventDefault();
           if (roverRef.current.moveCooldown <= 0) {
@@ -7661,7 +8240,7 @@ export default function App() {
             roverRef.current.moveCooldown = 0.18;
           }
         }
-      } else if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') {
+      } else if (e.key === 'a' || e.key === 'A') {
         if (locationRef.current === 'EXCURSION') {
           e.preventDefault();
           if (roverRef.current.moveCooldown <= 0) {
@@ -7669,7 +8248,7 @@ export default function App() {
             roverRef.current.moveCooldown = 0.18;
           }
         }
-      } else if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') {
+      } else if (e.key === 'd' || e.key === 'D') {
         if (locationRef.current === 'EXCURSION') {
           e.preventDefault();
           if (roverRef.current.moveCooldown <= 0) {
@@ -7678,7 +8257,12 @@ export default function App() {
           }
         }
       } else if (e.key === 'e' || e.key === 'E') {
-        if (digStateRef.current.active || excursionReport) return;
+        if (digStateRef.current.active) return;
+        if (excursionReport) {
+          e.preventDefault();
+          depositHaulAndReturnToSanctuary();
+          return;
+        }
 
         if (locationRef.current === 'SANCTUARY') {
           if (isNearShop) {
@@ -7728,7 +8312,9 @@ export default function App() {
             }
           }
         } else if (locationRef.current === 'EXCURSION') {
-          if (roverRef.current.tileX === 0 && roverRef.current.tileY === 0) {
+          // If at or within 1 step of base camp: Finish Excursion and return with 100% loot!
+          if (Math.hypot(roverRef.current.tileX, roverRef.current.tileY) <= 1.0) {
+            e.preventDefault();
             finishExcursion(false);
           } else {
             const key = `${roverRef.current.tileX},${roverRef.current.tileY}`;
@@ -7744,12 +8330,17 @@ export default function App() {
         }
       } else if (e.key === 'q' || e.key === 'Q') {
         if (locationRef.current === 'SANCTUARY' && !digStateRef.current.active) {
-          if (inspectingStructureId) {
-            dismantleDeployedStructure(inspectingStructureId);
+          // DO NOT show or trigger the quick radial menu if inspection modal is open!
+          if (inspectingBonsaiId) {
             return;
           }
-          if (inspectingBonsaiId) {
-            pickUpBonsaiToInventory(inspectingBonsaiId);
+          if (quickRadialBonsai) {
+            setQuickRadialBonsai(null);
+            gameAudio.playCrispClick();
+            return;
+          }
+          if (inspectingStructureId) {
+            dismantleDeployedStructure(inspectingStructureId);
             return;
           }
           if (nearbyStructure) {
@@ -7757,7 +8348,13 @@ export default function App() {
             return;
           }
           if (nearbyBonsai) {
-            pickUpBonsaiToInventory(nearbyBonsai.id);
+            setQuickRadialBonsai(nearbyBonsai);
+            gameAudio.playCrispClick();
+            return;
+          }
+          if (nearbyBonsai) {
+            setQuickRadialBonsai(nearbyBonsai);
+            gameAudio.playCrispClick();
             return;
           }
 
@@ -7771,12 +8368,13 @@ export default function App() {
             }
             const bonsaiOnTile = plantedBonsaisRef.current.find((b) => Math.hypot(b.x - currentPlot.centerX, b.y - currentPlot.centerY) < 30);
             if (bonsaiOnTile) {
-              pickUpBonsaiToInventory(bonsaiOnTile.id);
+              setQuickRadialBonsai(bonsaiOnTile);
+              gameAudio.playCrispClick();
               return;
             }
           }
 
-          triggerNotification('Stand over any planted tree or placed item to dismantle [Q]!', '#f59e0b');
+          triggerNotification('Stand over a bonsai for [Q / Y] Menu, or item to store!', '#f59e0b');
         }
       } else if (e.key === 'v' || e.key === 'V') {
         if (locationRef.current === 'SANCTUARY' && !digStateRef.current.active) {
@@ -7838,13 +8436,16 @@ export default function App() {
           }
         }
       } else if (e.key === ' ' || e.key === 'Enter') {
-        if (excavationResult) {
+        if (excursionReport) {
+          e.preventDefault();
+          depositHaulAndReturnToSanctuary();
+        } else if (excavationResult) {
           e.preventDefault();
           handleCollectExcavatedSeedling();
         } else if (digStateRef.current.active) {
           e.preventDefault();
           executeDigAttempt();
-        } else if (locationRef.current === 'EXCURSION' && roverRef.current.tileX === 0 && roverRef.current.tileY === 0) {
+        } else if (locationRef.current === 'EXCURSION' && Math.hypot(roverRef.current.tileX, roverRef.current.tileY) <= 1.0) {
           e.preventDefault();
           finishExcursion(false);
         } else if (
@@ -7856,7 +8457,8 @@ export default function App() {
           !isWorkbenchModalOpen &&
           !isZenSkillsModalOpen &&
           !isShopModalOpen &&
-          !isBiomeSelectOpen
+          !isBiomeSelectOpen &&
+          !quickRadialBonsai
         ) {
           e.preventDefault();
           manualPruneBonsai(nearbyBonsai.id);
@@ -7879,11 +8481,13 @@ export default function App() {
     finishExcursion,
     inspectingBonsaiId,
     inspectingStructureId,
+    quickRadialBonsai,
     dismantleDeployedStructure,
     pickUpBonsaiToInventory,
     donatePlantedBonsai,
     isBiomeSelectOpen,
     isGoalModalOpen,
+    isHowToPlayOpen,
     isNearGarage,
     isNearShop,
     isNearWorkbench,
@@ -8068,12 +8672,349 @@ export default function App() {
   // --- MAIN SIMULATION TICK ---
   const update = useCallback(
     (deltaTime: number) => {
-      if (gameStateRef.current.status !== 'PLAYING') return;
-
       const dt = Math.min(deltaTime, 0.1);
       const input = inputRef.current;
       const av = avatarRef.current;
       const inv = sanctuaryInventoryRef.current;
+
+      // Active Gamepad Polling & Controls Processing
+      let gpMoveX = 0;
+      let gpMoveY = 0;
+      let activeGamepad: Gamepad | null = null;
+      if (typeof navigator !== 'undefined' && navigator.getGamepads) {
+        const gamepads = navigator.getGamepads();
+        for (let i = 0; i < gamepads.length; i++) {
+          const gp = gamepads[i];
+          if (gp && gp.connected) {
+            activeGamepad = gp;
+            break;
+          }
+        }
+      }
+
+      if (activeGamepad) {
+        const axes = activeGamepad.axes || [];
+        const buttons = activeGamepad.buttons || [];
+
+        // Left Stick (axes 0/1 with deadzone ~0.2)
+        const deadzone = 0.2;
+        const rawAxisX = axes[0] ?? 0;
+        const rawAxisY = axes[1] ?? 0;
+        if (Math.abs(rawAxisX) > deadzone) {
+          gpMoveX = (rawAxisX - Math.sign(rawAxisX) * deadzone) / (1 - deadzone);
+        }
+        if (Math.abs(rawAxisY) > deadzone) {
+          gpMoveY = (rawAxisY - Math.sign(rawAxisY) * deadzone) / (1 - deadzone);
+        }
+
+        // D-Pad (buttons 12: Up, 13: Down, 14: Left, 15: Right)
+        if (buttons[14]?.pressed) gpMoveX = -1;
+        if (buttons[15]?.pressed) gpMoveX = 1;
+        if (buttons[12]?.pressed) gpMoveY = -1;
+        if (buttons[13]?.pressed) gpMoveY = 1;
+
+        // Right Stick (axes 2 and 3) dedicated to scrolling scrollable menus/submenus/lists
+        const rightStickX = axes[2] ?? 0;
+        const rightStickY = axes[3] ?? 0;
+        if (Math.abs(rightStickX) > 0.18 || Math.abs(rightStickY) > 0.18) {
+          const sDx = Math.abs(rightStickX) > 0.18 ? rightStickX * 14 : 0;
+          const sDy = Math.abs(rightStickY) > 0.18 ? rightStickY * 14 : 0;
+          const candidates = Array.from(
+            document.querySelectorAll<HTMLElement>(
+              '.overflow-y-auto, .overflow-x-auto, [data-scrollable="true"]',
+            ),
+          );
+          for (let i = candidates.length - 1; i >= 0; i--) {
+            const el = candidates[i];
+            if (el && (el.offsetParent !== null || window.getComputedStyle(el).display !== 'none')) {
+              const canScrollY = el.scrollHeight > el.clientHeight + 4;
+              const canScrollX = el.scrollWidth > el.clientWidth + 4;
+              if (sDy !== 0 && canScrollY) {
+                el.scrollTop += sDy;
+                break;
+              }
+              if (sDx !== 0 && canScrollX) {
+                el.scrollLeft += sDx;
+                break;
+              }
+            }
+          }
+        }
+
+        // Button edge-detection (just pressed on this tick)
+        const lastBtns = lastGamepadButtonsRef.current;
+        const justPressed = (idx: number) => Boolean(buttons[idx]?.pressed && !lastBtns[idx]);
+
+        // Title Screen D-Pad / Left Stick Navigation
+        if (gameStateRef.current.status === 'START') {
+          if (justPressed(12) || (rawAxisY < -0.5 && !lastBtns[12])) {
+            setTitleMenuIdx((i) => Math.max(0, i - 1));
+            gameAudio.playHoverMicroTone();
+          } else if (justPressed(13) || (rawAxisY > 0.5 && !lastBtns[13])) {
+            setTitleMenuIdx((i) => Math.min(2, i + 1));
+            gameAudio.playHoverMicroTone();
+          }
+        }
+
+        // Button 0 (A / Cross): Start game on START screen, continue on VICTORY, primary interact
+        if (justPressed(0)) {
+          if (quickRadialBonsai) {
+            setQuickRadialBonsai(null);
+            gameAudio.playCrispClick();
+          } else if (gameStateRef.current.status === 'START') {
+            if (titleMenuIdx === 0) {
+              setGameState((prev) => ({...prev, status: 'PLAYING'}));
+              gameAudio.playPowerupChime();
+              if (sdk) sdk.startGame();
+            } else if (titleMenuIdx === 1) {
+              setIsHowToPlayOpen(true);
+              gameAudio.playCrispClick();
+            } else if (titleMenuIdx === 2) {
+              setIsGameMenuOpen(true);
+              gameAudio.playCrispClick();
+            }
+          } else if (gameStateRef.current.status === 'VICTORY') {
+            setGameState((prev) => ({...prev, status: 'PLAYING'}));
+          } else if (excavationResult) {
+            handleCollectExcavatedSeedling();
+          } else if (excursionReport) {
+            depositHaulAndReturnToSanctuary();
+          } else if (digStateRef.current.active) {
+            executeDigAttempt();
+          } else if (isGoalModalOpen) {
+            setIsGoalModalOpen(false);
+          } else if (isHowToPlayOpen) {
+            if (guidebookChapter < 5) setGuidebookChapter((c) => c + 1);
+            else setIsHowToPlayOpen(false);
+          } else if (isGameMenuOpen) {
+            setIsGameMenuOpen(false);
+          } else if (locationRef.current === 'SANCTUARY') {
+            if (isNearShopRef.current) {
+              setIsShopModalOpen(true);
+              gameAudio.playCrispClick();
+            } else if (isNearGarageRef.current) {
+              setIsBiomeSelectOpen(true);
+              gameAudio.playCrispClick();
+            } else if (isNearBonsaiSocietyRef.current) {
+              gameAudio.playCrispClick();
+              triggerNotification('🏛️ Bonsai Society (Grand Hall - Membership Opening Soon)', '#fbbf24');
+            } else if (isNearWorkbenchRef.current) {
+              setWorkbenchTab('resources');
+              setIsWorkbenchModalOpen(true);
+              gameAudio.playCrispClick();
+            } else if (isNearZenLibraryRef.current) {
+              setIsZenSkillsModalOpen(true);
+              gameAudio.playCrispClick();
+            } else if (nearbyStructureIdRef.current) {
+              const str = deployedStructuresRef.current.find((s) => s.id === nearbyStructureIdRef.current);
+              if (str) {
+                if (str.type === 'tool_compost_heap') {
+                  interactCompostHeapDirect(str.id);
+                } else if (str.type === 'tool_garden_well') {
+                  drawWaterFromWell(str.id);
+                } else if (str.type === 'solar_panel' || str.type === 'wind_turbine') {
+                  setInspectingStructureId(str.id);
+                  gameAudio.playCrispClick();
+                } else if (str.type.startsWith('crystal_pedestal')) {
+                  dismantleDeployedStructure(str.id);
+                }
+              }
+            } else if (nearbyBonsaiIdRef.current) {
+              setInspectingBonsaiId(nearbyBonsaiIdRef.current);
+              gameAudio.playCrispClick();
+            } else if (standingPlotKeyRef.current) {
+              setIsPlantingModalOpen(true);
+              gameAudio.playCrispClick();
+            }
+          } else if (locationRef.current === 'EXCURSION') {
+            if (Math.hypot(roverRef.current.tileX, roverRef.current.tileY) <= 1.0) {
+              finishExcursion(false);
+            } else {
+              const key = `${roverRef.current.tileX},${roverRef.current.tileY}`;
+              const node = excursionNodesRef.current.get(key);
+              if (node && !node.collected) {
+                if (node.type === 'SAPLING') triggerRadialDig(node);
+                else if (node.type === 'RESOURCE') collectCurrentRoverResource();
+              }
+            }
+          }
+        }
+
+        // Button 1 (B / Circle): Cancel / Close / Back / Leave
+        if (justPressed(1)) {
+          if (quickRadialBonsai) {
+            setQuickRadialBonsai(null);
+            gameAudio.playCrispClick();
+          } else if (excavationResult) {
+            handleDeclineExcavatedSeedling();
+          } else if (digStateRef.current.active) {
+            cancelDiggingMinigame();
+          } else if (inspectingBonsaiId) {
+            setInspectingBonsaiId(null);
+          } else if (inspectingStructureId) {
+            setInspectingStructureId(null);
+          } else if (stylingModalSapling) {
+            setStylingModalSapling(null);
+          } else if (isPlantingModalOpen) {
+            setIsPlantingModalOpen(false);
+            setStylingModalSapling(null);
+          } else if (isBiomeSelectOpen) {
+            setIsBiomeSelectOpen(false);
+          } else if (isShopModalOpen) {
+            setIsShopModalOpen(false);
+          } else if (isUnifiedStorageOpen) {
+            setIsUnifiedStorageOpen(false);
+          } else if (isWorkbenchModalOpen) {
+            setIsWorkbenchModalOpen(false);
+          } else if (isZenSkillsModalOpen) {
+            setIsZenSkillsModalOpen(false);
+          } else if (isGoalModalOpen) {
+            setIsGoalModalOpen(false);
+          } else if (isHowToPlayOpen) {
+            setIsHowToPlayOpen(false);
+          } else if (isGameMenuOpen) {
+            setIsGameMenuOpen(false);
+          } else {
+            // When no menu open, B toggles Game Menu & Settings
+            setIsGameMenuOpen(true);
+            gameAudio.playCrispClick();
+          }
+        }
+
+        // Button 2 (X / Square): Quick Prune / Timing needle strike in excavation
+        if (justPressed(2)) {
+          if (digStateRef.current.active) {
+            executeDigAttempt();
+          } else if (locationRef.current === 'SANCTUARY') {
+            if (nearbyBonsaiIdRef.current) {
+              manualPruneBonsai(nearbyBonsaiIdRef.current);
+            } else if (nearbyStructureIdRef.current) {
+              dismantleDeployedStructure(nearbyStructureIdRef.current);
+            }
+          } else if (locationRef.current === 'EXCURSION') {
+            collectCurrentRoverResource();
+          }
+        }
+
+        // Button 3 (Y / Triangle): Quick Selection Cross Menu on Bonsai / Store Decor
+        if (justPressed(3)) {
+          if (locationRef.current === 'SANCTUARY') {
+            if (quickRadialBonsai) {
+              setQuickRadialBonsai(null);
+              gameAudio.playCrispClick();
+            } else if (nearbyStructureIdRef.current) {
+              dismantleDeployedStructure(nearbyStructureIdRef.current);
+            } else if (nearbyBonsaiIdRef.current) {
+              const b = plantedBonsaisRef.current.find((tree) => tree.id === nearbyBonsaiIdRef.current);
+              if (b) {
+                setQuickRadialBonsai(b);
+                gameAudio.playCrispClick();
+              }
+            } else {
+              setIsUnifiedStorageOpen((prev) => !prev);
+              gameAudio.playCrispClick();
+            }
+          }
+        }
+
+        // Button 4 (LB / Left Bumper): Cycle / Tabs Left
+        if (justPressed(4)) {
+          window.dispatchEvent(new CustomEvent('gamepad-bumper', { detail: { direction: 'left' } }));
+          if (isShopModalOpen) {
+            const tabs: ('MAPS' | 'EXPANSIONS' | 'DECOR' | 'GUIDES' | 'EQUIPMENT')[] = ['MAPS', 'EXPANSIONS', 'DECOR', 'GUIDES', 'EQUIPMENT'];
+            setShopTab((t) => tabs[(tabs.indexOf(t) - 1 + tabs.length) % tabs.length]);
+            gameAudio.playCrispClick();
+          } else if (isWorkbenchModalOpen) {
+            const tabs: WorkbenchCategory[] = ['resources', 'bonsai_automatons', 'workbench', 'rover', 'electricity'];
+            setWorkbenchTab((t) => tabs[(tabs.indexOf(t) - 1 + tabs.length) % tabs.length]);
+            gameAudio.playCrispClick();
+          } else if (isBiomeSelectOpen) {
+            setGarageTab((t) => (t === 'expeditions' ? 'loadout' : 'expeditions'));
+            gameAudio.playCrispClick();
+          } else if (isUnifiedStorageOpen) {
+            const tabs: ('PLANTING' | 'MATERIALS' | 'EQUIPMENT' | 'DECOR')[] = ['PLANTING', 'MATERIALS', 'EQUIPMENT', 'DECOR'];
+            setStorageTab((t) => tabs[(tabs.indexOf(t) - 1 + tabs.length) % tabs.length]);
+            gameAudio.playCrispClick();
+          } else if (isHowToPlayOpen) {
+            setGuidebookChapter((c) => (c > 1 ? c - 1 : 5));
+            gameAudio.playCrispClick();
+          }
+        }
+
+        // Button 5 (RB / Right Bumper): Cycle / Tabs Right
+        if (justPressed(5)) {
+          window.dispatchEvent(new CustomEvent('gamepad-bumper', { detail: { direction: 'right' } }));
+          if (isShopModalOpen) {
+            const tabs: ('MAPS' | 'EXPANSIONS' | 'DECOR' | 'GUIDES' | 'EQUIPMENT')[] = ['MAPS', 'EXPANSIONS', 'DECOR', 'GUIDES', 'EQUIPMENT'];
+            setShopTab((t) => tabs[(tabs.indexOf(t) + 1) % tabs.length]);
+            gameAudio.playCrispClick();
+          } else if (isWorkbenchModalOpen) {
+            const tabs: WorkbenchCategory[] = ['resources', 'bonsai_automatons', 'workbench', 'rover', 'electricity'];
+            setWorkbenchTab((t) => tabs[(tabs.indexOf(t) + 1) % tabs.length]);
+            gameAudio.playCrispClick();
+          } else if (isBiomeSelectOpen) {
+            setGarageTab((t) => (t === 'expeditions' ? 'loadout' : 'expeditions'));
+            gameAudio.playCrispClick();
+          } else if (isUnifiedStorageOpen) {
+            const tabs: ('PLANTING' | 'MATERIALS' | 'EQUIPMENT' | 'DECOR')[] = ['PLANTING', 'MATERIALS', 'EQUIPMENT', 'DECOR'];
+            setStorageTab((t) => tabs[(tabs.indexOf(t) + 1) % tabs.length]);
+            gameAudio.playCrispClick();
+          } else if (isHowToPlayOpen) {
+            setGuidebookChapter((c) => (c < 5 ? c + 1 : 1));
+            gameAudio.playCrispClick();
+          }
+        }
+
+        // Button 8 (Select / View / -): Toggle Game Menu & Settings
+        if (justPressed(8)) {
+          if (isGameMenuOpen) {
+            setIsGameMenuOpen(false);
+          } else {
+            setIsGameMenuOpen(true);
+          }
+          gameAudio.playCrispClick();
+        }
+
+        // Button 9 (Start / Menu / Options / +): Toggle Nursery Inventory
+        if (justPressed(9)) {
+          if (locationRef.current === 'SANCTUARY') {
+            setIsUnifiedStorageOpen((prev) => !prev);
+            gameAudio.playCrispClick();
+          }
+        }
+
+        // D-Pad buttons when Quick Radial Menu is open
+        if (quickRadialBonsai) {
+          if (justPressed(12) || (rawAxisY < -0.5 && lastBtns[12] === false)) {
+            // Up: Quick Sell
+            donatePlantedBonsai(quickRadialBonsai.id);
+            setQuickRadialBonsai(null);
+          } else if (justPressed(13) || (rawAxisY > 0.5 && lastBtns[13] === false)) {
+            // Down: Store Bonsai
+            pickUpBonsaiToInventory(quickRadialBonsai.id);
+            setQuickRadialBonsai(null);
+          } else if (justPressed(14) || (rawAxisX < -0.5 && lastBtns[14] === false)) {
+            // Left: Give Compost
+            if (sanctuaryInventoryRef.current.organic_compost > 0) {
+              applyOrganicCompost(quickRadialBonsai.id);
+              setQuickRadialBonsai(null);
+            } else {
+              gameAudio.playErrorBuzz();
+              triggerNotification('No Enriched Organic Compost in stock! Craft at Workbench.', '#ef4444');
+            }
+          } else if (justPressed(15) || (rawAxisX > 0.5 && lastBtns[15] === false)) {
+            // Right: Give Fertilizer (locked)
+            gameAudio.playErrorBuzz();
+            triggerNotification('🧪 Chemical Fertilizer research locked! Coming in future updates.', '#94a3b8');
+          }
+        }
+
+        lastGamepadButtonsRef.current = buttons.map((b) => b.pressed);
+      } else {
+        lastGamepadButtonsRef.current = [];
+      }
+
+      if (gameStateRef.current.status !== 'PLAYING') return;
 
       // 1. Daylight & Turbine Rotation
       const daySpeed = (getConfig('dayCycleSpeed') as number) || 1.0;
@@ -8125,6 +9066,16 @@ export default function App() {
         if (moveX !== 0 && moveY !== 0) {
           moveX *= 0.7071;
           moveY *= 0.7071;
+        }
+
+        if (gpMoveX !== 0 || gpMoveY !== 0) {
+          moveX += gpMoveX;
+          moveY += gpMoveY;
+          const len = Math.hypot(moveX, moveY);
+          if (len > 1) {
+            moveX /= len;
+            moveY /= len;
+          }
         }
 
         av.vx = moveX * moveSpeed;
@@ -8617,7 +9568,7 @@ export default function App() {
       if (locationRef.current === 'EXCURSION') {
         const rover = roverRef.current;
 
-        // Continuous Smooth Driving while holding WASD / Arrow keys
+        // Continuous Smooth Driving while holding WASD / Arrow keys or Gamepad Stick / D-Pad
         if (!digStateRef.current.active && !excursionReport && !excavationResult && !isGameMenuOpen && !isHowToPlayOpen) {
           rover.moveCooldown = Math.max(0, rover.moveCooldown - dt);
 
@@ -8628,6 +9579,14 @@ export default function App() {
             else if (input.actions.right) rdx += 1;
             else if (input.actions.up) rdy -= 1;
             else if (input.actions.down) rdy += 1;
+
+            if (rdx === 0 && rdy === 0 && (Math.abs(gpMoveX) > 0.35 || Math.abs(gpMoveY) > 0.35)) {
+              if (Math.abs(gpMoveX) > Math.abs(gpMoveY)) {
+                rdx = gpMoveX > 0 ? 1 : -1;
+              } else {
+                rdy = gpMoveY > 0 ? 1 : -1;
+              }
+            }
 
             if (rdx !== 0 || rdy !== 0) {
               attemptRoverStep(rdx, rdy);
@@ -8704,29 +9663,47 @@ export default function App() {
     [
       addFloatingText,
       advanceBonsaiProgress,
+      cancelDiggingMinigame,
       canvasHeight,
       canvasWidth,
+      collectCurrentRoverResource,
+      depositHaulAndReturnToSanctuary,
+      dismantleDeployedStructure,
+      drawWaterFromWell,
+      executeDigAttempt,
       excursionReport,
       excavationResult,
+      finishExcursion,
       gainPlayerExp,
       getPowerMetrics,
+      guidebookChapter,
       handleBonsaiLevelUp,
+      handleCollectExcavatedSeedling,
+      handleDeclineExcavatedSeedling,
       inspectingBonsaiId,
+      inspectingStructureId,
+      interactCompostHeapDirect,
       isBiomeSelectOpen,
       isGameMenuOpen,
       isGoalModalOpen,
+      isHowToPlayOpen,
       isPlantingModalOpen,
       isShopModalOpen,
       isUnifiedStorageOpen,
       isWorkbenchModalOpen,
       isZenSkillsModalOpen,
+      manualPruneBonsai,
+      pickUpBonsaiToInventory,
       refreshHud,
       sanctuaryBonsaiSociety,
       sanctuaryRoverGarage,
       sanctuaryShopStand,
       sanctuaryWorkbench,
       sanctuaryZenLibrary,
+      sdk,
+      stylingModalSapling,
       triggerNotification,
+      triggerRadialDig,
     ],
   );
 
@@ -14443,7 +15420,9 @@ export default function App() {
         ctx.font = 'bold 15px system-ui';
         ctx.fillStyle = dig.isGated ? '#f87171' : '#facc15';
         ctx.fillText(
-          isMobile ? 'TAP DIG BUTTON • [LEAVE SITE] TO CANCEL' : 'PRESS SPACEBAR / ENTER TO SWING • [ESC] TO LEAVE SITE',
+          isMobile
+            ? 'TAP DIG BUTTON • [LEAVE SITE] TO CANCEL'
+            : '[Space / X] Strike Needle • [Esc / B] Cancel / Leave',
           cx,
           cy + dialRadius + 48,
         );
@@ -14453,13 +15432,13 @@ export default function App() {
         ctx.strokeStyle = '#ef4444';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.roundRect(cx - 90, cy + dialRadius + 64, 180, 24, 6);
+        ctx.roundRect(cx - 95, cy + dialRadius + 64, 190, 24, 6);
         ctx.fill();
         ctx.stroke();
 
         ctx.fillStyle = '#fca5a5';
         ctx.font = 'bold 11px system-ui';
-        ctx.fillText('Cancel / Leave Site (ESC)', cx, cy + dialRadius + 80);
+        ctx.fillText('Cancel / Leave Site [Esc / B]', cx, cy + dialRadius + 80);
 
         ctx.restore();
       }
@@ -14557,6 +15536,16 @@ export default function App() {
       <header className="w-full h-12 bg-slate-900/95 backdrop-blur-md border-b border-slate-800/80 px-3 flex items-center justify-between gap-2 z-50 shrink-0">
         {/* LEFT: Location, Unified [Lv + EXP + Zen] Badge, Coins (Sanctuary only) & Power Grid Pill */}
         <div className="flex items-center flex-wrap gap-2">
+          {/* 🎮 Gamepad Active Indicator */}
+          {connectedGamepadName && (
+            <div
+              className="bg-slate-950/90 border border-sky-500/60 px-2.5 py-1 rounded-lg text-sky-300 font-bold text-xs flex items-center gap-1.5 shadow"
+              title={`Controller Active: ${connectedGamepadName}`}>
+              <Gamepad className="w-3.5 h-3.5 text-sky-400 animate-pulse" />
+              <span className="hidden xl:inline">{connectedGamepadName}</span>
+              <span className="xl:hidden">Controller</span>
+            </div>
+          )}
           <div
             className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1.5 shadow ${
               location === 'SANCTUARY'
@@ -14657,7 +15646,7 @@ export default function App() {
                 }}
                 className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition-transform active:scale-95 border border-slate-700">
                 <Package className="w-3.5 h-3.5 text-sky-300" />
-                <span>Nursery Inventory [I]</span>
+                <span>Nursery Inventory [I / +]</span>
               </button>
             </>
           ) : (
@@ -14723,6 +15712,7 @@ export default function App() {
               setIsGameMenuOpen((prev) => !prev);
               gameAudio.playCrispClick();
             }}
+            title="Menu & Settings [Esc / -]"
             className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition-colors min-w-[34px] min-h-[34px] flex items-center justify-center border border-slate-700">
             <Menu className="w-4 h-4" />
           </button>
@@ -14772,7 +15762,7 @@ export default function App() {
                   }}
                   className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 shadow transition-transform active:scale-95 min-h-[38px]">
                   <ShoppingBag className="w-4 h-4" />
-                  Open Market [E]
+                  [E / A] Open Market
                 </button>
               </>
             ) : isNearWorkbench ? (
@@ -14797,7 +15787,7 @@ export default function App() {
                   }}
                   className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition-transform active:scale-95 min-h-[38px]">
                   <Wrench className="w-4 h-4" />
-                  [E] Open Workbench (Tier {inv.workbench_tier || 1})
+                  [E / A] Open Workbench (Tier {inv.workbench_tier || 1})
                 </button>
               </>
             ) : isNearZenLibrary ? (
@@ -14817,7 +15807,7 @@ export default function App() {
                   }}
                   className="bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition-transform active:scale-95 min-h-[38px]">
                   <BookOpen className="w-4 h-4" />
-                  Open Zen Library [E]
+                  [E / A] Open Zen Library
                 </button>
               </>
             ) : isNearBonsaiSociety ? (
@@ -14850,7 +15840,7 @@ export default function App() {
                   }}
                   className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 shadow transition-transform active:scale-95 min-h-[38px]">
                   <Truck className="w-4 h-4" />
-                  [E] Garage Departure
+                  [E / A] Garage Departure
                 </button>
               </>
             ) : nearbyStructure ? (() => {
@@ -14985,19 +15975,19 @@ export default function App() {
                       <div className="text-[11px] text-emerald-400">
                         {isCompost
                           ? compostReady > 0
-                            ? '[E] Collect Compost | [Q] Dismantle'
+                            ? '[E / A] Collect Compost | [Q / Y] Store to Bag'
                             : compostWaste > 0
-                            ? `[E] Add Waste (${inv.organic_waste || 0} avail) | [Q] Dismantle`
-                            : '[E] Deposit Waste | [Q] Dismantle'
+                            ? `[E / A] Add Waste (${inv.organic_waste || 0} avail) | [Q / Y] Store to Bag`
+                            : '[E / A] Deposit Waste | [Q / Y] Store to Bag'
                           : isWell
                           ? isWatering
-                            ? '[Q] Dismantle'
-                            : '[E] Draw Water (20s shared) | [Q] Dismantle'
+                            ? '[Q / Y] Store to Bag'
+                            : '[E / A] Draw Water (20s) | [Q / Y] Store to Bag'
                           : isEnergy
-                          ? `[E] Inspect | [Q] Dismantle • ${resonanceLabel}`
+                          ? `[E / A] Inspect | [Q / Y] Store to Bag • ${resonanceLabel}`
                           : nearbyStructure.type.startsWith('crystal_pedestal')
-                          ? '[E] Store into Inventory'
-                          : '[Q] Dismantle Decor'}
+                          ? '[E / A] Store into Inventory'
+                          : '[Q / Y] Store to Bag'}
                       </div>
                     </div>
                   </div>
@@ -15014,8 +16004,8 @@ export default function App() {
                         <span>{compostReady > 0 ? '🌾' : '🍂'}</span>
                         <span>
                           {compostReady > 0
-                            ? `[E] Collect (${compostReady})`
-                            : `[E] Deposit Waste (${inv.organic_waste || 0} avail)`}
+                            ? `[E / A] Collect (${compostReady})`
+                            : `[E / A] Deposit Waste (${inv.organic_waste || 0})`}
                         </span>
                       </button>
                     )}
@@ -15025,7 +16015,7 @@ export default function App() {
                         onClick={() => drawWaterFromWell(nearbyStructure.id)}
                         className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition-transform active:scale-95 min-h-[38px]">
                         <Droplets className="w-4 h-4" />
-                        <span>[E] Draw Water (20s)</span>
+                        <span>[E / A] Draw Water (20s)</span>
                       </button>
                     )}
 
@@ -15037,7 +16027,7 @@ export default function App() {
                         }}
                         className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition-transform active:scale-95 min-h-[38px]">
                         <Wrench className="w-4 h-4" />
-                        <span>[E] Inspect</span>
+                        <span>[E / A] Inspect</span>
                       </button>
                     )}
 
@@ -15045,7 +16035,7 @@ export default function App() {
                       onClick={() => dismantleDeployedStructure(nearbyStructure.id)}
                       className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1 shadow transition-transform active:scale-95 min-h-[38px]">
                       <Package className="w-4 h-4" />
-                      <span>{nearbyStructure.type.startsWith('crystal_pedestal') ? '[E] Store into Inventory' : '[Q] Dismantle'}</span>
+                      <span>{nearbyStructure.type.startsWith('crystal_pedestal') ? '[E / A] Store to Bag' : '[Q / Y] Store to Bag'}</span>
                     </button>
                   </div>
                 </>
@@ -15144,7 +16134,7 @@ export default function App() {
                           </span>
                         ) : (
                           <span>
-                            [E] Inspect / Care | [Q] Uproot/Store | [Space] Prune (-{(1 + zenSkillsRef.current.greenThumb + bSyn.quickPruneBonus).toFixed(1)}s) • Growth: x{bSyn.growthMultiplier.toFixed(2)}{nearbyBonsai.wateredTimer && nearbyBonsai.wateredTimer > 0 ? ` • 💧 Hydrated: ${nearbyBonsai.wateredTimer.toFixed(1)}s` : ''}
+                            [E / A] Inspect • [Space / X] Quick Prune • [Q / Y] Bonsai Menu • Growth: x{bSyn.growthMultiplier.toFixed(2)}{nearbyBonsai.wateredTimer && nearbyBonsai.wateredTimer > 0 ? ` • 💧 Hydrated: ${nearbyBonsai.wateredTimer.toFixed(1)}s` : ''}
                           </span>
                         )}
                       </div>
@@ -15173,15 +16163,18 @@ export default function App() {
                           : 'bg-pink-600 hover:bg-pink-500 text-white'
                       }`}>
                       <Scissors className="w-4 h-4" />
-                      <span>{bSyn.isStalled ? 'Prune (Stalled)' : 'Prune'}</span>
+                      <span>{bSyn.isStalled ? 'Prune (Stalled)' : '[Space / X] Prune'}</span>
                     </button>
 
                     <button
-                      onClick={() => pickUpBonsaiToInventory(nearbyBonsai.id)}
+                      onClick={() => {
+                        setQuickRadialBonsai(nearbyBonsai);
+                        gameAudio.playCrispClick();
+                      }}
                       className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-2.5 py-2 rounded-xl flex items-center gap-1 shadow transition-transform active:scale-95 min-h-[38px]"
-                      title="Uproot and store in inventory [Q]">
+                      title="Open Quick Radial Cross Menu [Q / Y]">
                       <span>🪴</span>
-                      <span>[Q] Store</span>
+                      <span>[Q / Y] Menu</span>
                     </button>
 
                     <button
@@ -15191,7 +16184,7 @@ export default function App() {
                       }}
                       className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1 shadow transition-transform active:scale-95 min-h-[38px]">
                       <Wrench className="w-4 h-4" />
-                      <span>[E] Inspect / Care</span>
+                      <span>[E / A] Inspect</span>
                     </button>
                   </div>
                 </>
@@ -15215,12 +16208,12 @@ export default function App() {
                   }}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition-transform active:scale-95 min-h-[38px] border border-emerald-400/50">
                   <Sprout className="w-4 h-4 text-emerald-200" />
-                  <span>[E] Deploy Bonsai or Item</span>
+                  <span>[E / A] Deploy Bonsai or Item</span>
                 </button>
               </>
             ) : (
               <div className="w-full text-center text-xs text-slate-400">
-                <span>Walk with WASD • Stand near stations or plots [E]</span>
+                <span>[WASD / Stick] Walk • [E / A] Interact • [I / +] Inventory • [Esc / -] Settings</span>
               </div>
             )}
           </div>
@@ -15323,7 +16316,7 @@ export default function App() {
 
               return (
                 <span className="text-slate-400 text-[11px] hidden sm:inline">
-                  WASD to Drive • [E] on exact node tile to interact ({rover.batteryKwh} kWh left)
+                  [WASD / Stick] Drive • [E / A] Interact • [Space / X] Strike Needle • [Esc / B] Leave
                 </span>
               );
             })()}
@@ -15349,6 +16342,18 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* QUICK BONSAI RADIAL CROSS MENU OVERLAY [Q / Y BUTTON] */}
+      {quickRadialBonsai && (
+        <QuickBonsaiRadialMenu
+          bonsai={quickRadialBonsai}
+          inventory={sanctuaryInventoryRef.current}
+          onSell={(id) => donatePlantedBonsai(id)}
+          onStore={(id) => pickUpBonsaiToInventory(id)}
+          onCompost={(id) => applyOrganicCompost(id)}
+          onClose={() => setQuickRadialBonsai(null)}
+        />
+      )}
 
       {/* ========================================================================= */}
       {/* MODAL: PLANT OR DEPLOY ON GRID PLOT ('P' KEY) - DEPLOYMENT MODAL */}
@@ -15594,17 +16599,20 @@ export default function App() {
             {/* TAB 1: EXPEDITIONS DEPARTURE & CODEX */}
             {garageTab === 'expeditions' && (
               <div className="flex-1 space-y-3 mb-3 overflow-y-auto pr-1">
-                {(['FOOTHILLS', 'HIGHLANDS', 'OVERGROWTH'] as ExpeditionBiomeId[]).map((biomeId) => {
+                {(['FOOTHILLS', 'HIGHLANDS', 'OVERGROWTH'] as ExpeditionBiomeId[]).map((biomeId, bIdx) => {
                   const b = getExpeditionBiomeDef(biomeId);
                   const reqKey = b.requiredMapKey;
                   const isUnlocked = b.unlockedByDefault || (reqKey ? inv[reqKey] : false);
+                  const isFocused = focusedGarageIdx === bIdx;
 
                   return (
                     <div
                       key={biomeId}
-                      style={{borderColor: isUnlocked ? b.accentColor : '#334155'}}
+                      style={{borderColor: isFocused ? '#38bdf8' : isUnlocked ? b.accentColor : '#334155'}}
                       className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all ${
-                        isUnlocked
+                        isFocused
+                          ? 'bg-slate-850 ring-4 ring-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.5)] scale-[1.01]'
+                          : isUnlocked
                           ? 'bg-slate-900/90 hover:bg-slate-850'
                           : 'bg-slate-900/50 opacity-80'
                       }`}>
@@ -15617,7 +16625,10 @@ export default function App() {
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <h4 className="font-bold text-sm sm:text-base text-slate-100">{b.name}</h4>
+                              <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
+                                {isFocused && <span className="text-sky-400 text-xs">► [E/A]</span>}
+                                <span>{b.name}</span>
+                              </h4>
                               <span
                                 style={{backgroundColor: `${b.themeColor}25`, color: b.accentColor}}
                                 className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-current">
@@ -15632,8 +16643,10 @@ export default function App() {
                           <button
                             onClick={() => startBiomeExcursion(biomeId)}
                             style={{backgroundColor: b.themeColor}}
-                            className="hover:opacity-90 text-white font-bold text-xs px-4 py-2 rounded-xl shadow transition-transform active:scale-95 flex items-center gap-1 shrink-0">
-                            <span>Depart Rover</span>
+                            className={`hover:opacity-90 text-white font-bold text-xs px-4 py-2 rounded-xl shadow transition-transform active:scale-95 flex items-center gap-1 shrink-0 ${
+                              isFocused ? 'ring-2 ring-white scale-105' : ''
+                            }`}>
+                            <span>Depart Rover [E/A]</span>
                             <ChevronRight className="w-4 h-4" />
                           </button>
                         ) : (
@@ -15893,17 +16906,20 @@ export default function App() {
                   )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {ALL_ROVER_MODULE_KEYS.map((mKey) => {
+                    {ALL_ROVER_MODULE_KEYS.map((mKey, mIdx) => {
                       const cfg = ROVER_MODULE_CONFIGS[mKey];
                       const inStock = inv.rover_modules[mKey] || 0;
                       const isFull = attached.length >= maxSlots;
                       const canAttach = inStock > 0 && !isFull;
+                      const isFocused = focusedGarageIdx === mIdx;
 
                       return (
                         <div
                           key={mKey}
                           className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-all ${
-                            inStock > 0
+                            isFocused
+                              ? 'bg-slate-850 border-sky-300 ring-4 ring-sky-400 scale-[1.01] shadow-[0_0_15px_rgba(56,189,248,0.5)]'
+                              : inStock > 0
                               ? 'bg-slate-950/90 border-slate-700 shadow-sm'
                               : 'bg-slate-950/40 border-slate-850 opacity-60'
                           }`}>
@@ -15911,7 +16927,10 @@ export default function App() {
                             <span className="text-2xl shrink-0">{cfg.icon}</span>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <h5 className="font-bold text-xs text-slate-100 truncate">{cfg.name}</h5>
+                                <h5 className="font-bold text-xs text-slate-100 truncate">
+                                  {isFocused && <span className="text-sky-400 mr-1">► [E/A]</span>}
+                                  {cfg.name}
+                                </h5>
                                 <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
                                   cfg.category === 'battery'
                                     ? 'bg-amber-950/80 text-amber-300 border-amber-500/50'
@@ -15947,6 +16966,18 @@ export default function App() {
                 </div>
               </div>
             )}
+
+            {/* FOOTER CONTROLLER & KEYBOARD PROMPTS STRIP */}
+            <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 shrink-0 mt-1">
+              <span className="font-mono text-cyan-400 text-[11px] hidden sm:inline">
+                🎮 [A/D / LB/RB] Switch Tabs • [W/S] Select • [E / A] Depart/Equip • [Arrows / R-Stick] Scroll • [Esc / B] Close
+              </span>
+              <button
+                onClick={() => setIsBiomeSelectOpen(false)}
+                className="px-5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-all border border-slate-700">
+                Close [Esc / B]
+              </button>
+            </div>
           </div>
         );
       })()}
@@ -16038,7 +17069,11 @@ export default function App() {
               </div>
 
               {/* Map 1: Misty Highlands Chart */}
-              <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-2xl flex flex-col gap-2">
+              <div className={`border p-4 rounded-2xl flex flex-col gap-2 transition-all ${
+                focusedShopIdx === 0
+                  ? 'bg-slate-850 ring-4 ring-sky-400 border-sky-300 scale-[1.01] shadow-[0_0_20px_rgba(56,189,248,0.5)]'
+                  : 'bg-slate-900/80 border-slate-800'
+              }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-sky-950/80 border border-sky-500/50 flex items-center justify-center overflow-hidden">
@@ -16050,6 +17085,7 @@ export default function App() {
                     </div>
                     <div>
                       <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-2">
+                        {focusedShopIdx === 0 && <span className="text-sky-400 text-xs">► [E/A]</span>}
                         Misty Highlands Chart
                         {inv.has_map_highlands && (
                           <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
@@ -16083,7 +17119,11 @@ export default function App() {
               </div>
 
               {/* Map 2: Ancient Overgrowth Map */}
-              <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-2xl flex flex-col gap-2">
+              <div className={`border p-4 rounded-2xl flex flex-col gap-2 transition-all ${
+                focusedShopIdx === 1
+                  ? 'bg-slate-850 ring-4 ring-purple-400 border-purple-300 scale-[1.01] shadow-[0_0_20px_rgba(168,85,247,0.5)]'
+                  : 'bg-slate-900/80 border-slate-800'
+              }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-purple-950/80 border border-purple-500/50 flex items-center justify-center overflow-hidden">
@@ -16095,6 +17135,7 @@ export default function App() {
                     </div>
                     <div>
                       <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-2">
+                        {focusedShopIdx === 1 && <span className="text-purple-400 text-xs">► [E/A]</span>}
                         Ancient Overgrowth Map
                         {inv.has_map_overgrowth && (
                           <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
@@ -16139,15 +17180,20 @@ export default function App() {
                 </span>
               </div>
 
-              {SANCTUARY_EXPANSIONS.map((exp) => {
+              {SANCTUARY_EXPANSIONS.map((exp, expIdx) => {
                 const isOwned = inv.sanctuary_expansion_tier >= exp.tier;
                 const isPrevOwned = inv.sanctuary_expansion_tier >= exp.tier - 1;
                 const canAfford = inv.coins >= exp.cost;
+                const isFocused = focusedShopIdx === expIdx;
 
                 return (
                   <div
                     key={exp.tier}
-                    className="bg-slate-900/80 border border-slate-800 p-3.5 sm:p-4 rounded-2xl flex flex-col gap-2">
+                    className={`border p-3.5 sm:p-4 rounded-2xl flex flex-col gap-2 transition-all ${
+                      isFocused
+                        ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+                        : 'bg-slate-900/80 border-slate-800'
+                    }`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-emerald-950/80 border border-emerald-500/50 flex items-center justify-center">
@@ -16155,6 +17201,7 @@ export default function App() {
                         </div>
                         <div>
                           <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-2">
+                            {isFocused && <span className="text-emerald-400 text-xs">► [E/A]</span>}
                             {exp.name}
                             {isOwned && (
                               <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
@@ -16200,7 +17247,11 @@ export default function App() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {/* 1. Zen Pebble Stepping Path (5 Verdure) */}
-                <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl flex flex-col justify-between gap-2">
+                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
+                  focusedShopIdx === 0
+                    ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+                    : 'bg-slate-900/80 border-slate-800'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2.5">
@@ -16212,7 +17263,10 @@ export default function App() {
                           )}
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Zen Pebble Stepping Path</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 0 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
+                            <span>Zen Pebble Stepping Path</span>
+                          </h4>
                           <span className="text-[10px] text-emerald-400 font-bold">+35% player movement speed when traversed</span>
                         </div>
                       </div>
@@ -16239,7 +17293,11 @@ export default function App() {
                 </div>
 
                 {/* 2. Zen Rock Formation (15 Verdure) */}
-                <div className="bg-slate-900/80 border border-amber-500/30 p-3.5 rounded-2xl flex flex-col justify-between gap-2">
+                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
+                  focusedShopIdx === 1
+                    ? 'bg-slate-850 ring-4 ring-amber-400 border-amber-300 scale-[1.01] shadow-[0_0_20px_rgba(245,158,11,0.5)]'
+                    : 'bg-slate-900/80 border-amber-500/30'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2.5">
@@ -16251,7 +17309,10 @@ export default function App() {
                           )}
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Zen Rock Formation</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 1 && <span className="text-amber-400 text-xs">► [E/A]</span>}
+                            <span>Zen Rock Formation</span>
+                          </h4>
                           <span className="text-[10px] text-amber-300 font-bold">+0.25s Pruning Effect (Quick Prune)</span>
                         </div>
                       </div>
@@ -16278,7 +17339,11 @@ export default function App() {
                 </div>
 
                 {/* 3. Topiary Shrubbery Bush (25 Verdure) */}
-                <div className="bg-slate-900/80 border border-emerald-500/30 p-3.5 rounded-2xl flex flex-col justify-between gap-2">
+                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
+                  focusedShopIdx === 2
+                    ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+                    : 'bg-slate-900/80 border-emerald-500/30'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2.5">
@@ -16290,7 +17355,10 @@ export default function App() {
                           )}
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Topiary Shrubbery Bush</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 2 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
+                            <span>Topiary Shrubbery Bush</span>
+                          </h4>
                           <span className="text-[10px] text-emerald-300 font-bold">+15% Level Up Experience (XP Boosted)</span>
                         </div>
                       </div>
@@ -16317,7 +17385,11 @@ export default function App() {
                 </div>
 
                 {/* 4. Woven Wooden Lattice Wall (40 Verdure) */}
-                <div className="bg-slate-900/80 border border-yellow-600/30 p-3.5 rounded-2xl flex flex-col justify-between gap-2">
+                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
+                  focusedShopIdx === 3
+                    ? 'bg-slate-850 ring-4 ring-yellow-400 border-yellow-300 scale-[1.01] shadow-[0_0_20px_rgba(250,204,21,0.5)]'
+                    : 'bg-slate-900/80 border-yellow-600/30'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2.5">
@@ -16329,7 +17401,10 @@ export default function App() {
                           )}
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Woven Wooden Lattice Wall</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 3 && <span className="text-yellow-400 text-xs">► [E/A]</span>}
+                            <span>Woven Wooden Lattice Wall</span>
+                          </h4>
                           <span className="text-[10px] text-yellow-300 font-bold">+10% Hydration Growth Speed (Private Growing)</span>
                         </div>
                       </div>
@@ -16356,7 +17431,11 @@ export default function App() {
                 </div>
 
                 {/* 5. Emerald Leaf Crystal Pedestal (100 Verdure) */}
-                <div className="bg-slate-900/80 border border-emerald-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                  focusedShopIdx === 4
+                    ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+                    : 'bg-slate-900/80 border-emerald-500/40'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2.5">
@@ -16364,7 +17443,10 @@ export default function App() {
                           <span>💎</span>
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Emerald Leaf Crystal Pedestal</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 4 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
+                            <span>Emerald Leaf Crystal Pedestal</span>
+                          </h4>
                           <span className="text-[10px] text-emerald-400 font-semibold">+1 Foliage Cultivation Potential / lvl</span>
                         </div>
                       </div>
@@ -16391,7 +17473,11 @@ export default function App() {
                 </div>
 
                 {/* 6. Amber Branch Crystal Pedestal (100 Verdure) */}
-                <div className="bg-slate-900/80 border border-amber-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                  focusedShopIdx === 5
+                    ? 'bg-slate-850 ring-4 ring-amber-400 border-amber-300 scale-[1.01] shadow-[0_0_20px_rgba(245,158,11,0.5)]'
+                    : 'bg-slate-900/80 border-amber-500/40'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2.5">
@@ -16399,7 +17485,10 @@ export default function App() {
                           <span>💎</span>
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Amber Branch Crystal Pedestal</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 5 && <span className="text-amber-400 text-xs">► [E/A]</span>}
+                            <span>Amber Branch Crystal Pedestal</span>
+                          </h4>
                           <span className="text-[10px] text-amber-400 font-semibold">+1 Branches Cultivation Potential / lvl</span>
                         </div>
                       </div>
@@ -16426,7 +17515,11 @@ export default function App() {
                 </div>
 
                 {/* 7. Coral Trunk Crystal Pedestal (100 Verdure) */}
-                <div className="bg-slate-900/80 border border-rose-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                  focusedShopIdx === 6
+                    ? 'bg-slate-850 ring-4 ring-rose-400 border-rose-300 scale-[1.01] shadow-[0_0_20px_rgba(244,63,94,0.5)]'
+                    : 'bg-slate-900/80 border-rose-500/40'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2.5">
@@ -16434,7 +17527,10 @@ export default function App() {
                           <span>💎</span>
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Coral Trunk Crystal Pedestal</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 6 && <span className="text-rose-400 text-xs">► [E/A]</span>}
+                            <span>Coral Trunk Crystal Pedestal</span>
+                          </h4>
                           <span className="text-[10px] text-rose-400 font-semibold">+1 Trunk Cultivation Potential / lvl</span>
                         </div>
                       </div>
@@ -16461,7 +17557,11 @@ export default function App() {
                 </div>
 
                 {/* 8. Azure Root Crystal Pedestal (100 Verdure) */}
-                <div className="bg-slate-900/80 border border-blue-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                  focusedShopIdx === 7
+                    ? 'bg-slate-850 ring-4 ring-blue-400 border-blue-300 scale-[1.01] shadow-[0_0_20px_rgba(59,130,246,0.5)]'
+                    : 'bg-slate-900/80 border-blue-500/40'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2.5">
@@ -16469,7 +17569,10 @@ export default function App() {
                           <span>💎</span>
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Azure Root Crystal Pedestal</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 7 && <span className="text-blue-400 text-xs">► [E/A]</span>}
+                            <span>Azure Root Crystal Pedestal</span>
+                          </h4>
                           <span className="text-[10px] text-blue-400 font-semibold">+1 Roots Cultivation Potential / lvl</span>
                         </div>
                       </div>
@@ -16509,8 +17612,12 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {/* 1. Compost Guidebook */}
-                <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col justify-between gap-2">
+                {/* 1. Compost Guidebook (Index 0) */}
+                <div className={`border p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
+                  focusedShopIdx === 0
+                    ? 'ring-4 ring-lime-400 border-lime-300 scale-[1.01] bg-slate-850 shadow-[0_0_20px_rgba(163,230,53,0.5)]'
+                    : 'bg-slate-900/80 border-slate-800'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
@@ -16522,7 +17629,10 @@ export default function App() {
                           )}
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Compost Guidebook</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 0 && <span className="text-lime-400 text-xs">► [E/A]</span>}
+                            <span>Compost Guidebook</span>
+                          </h4>
                           <span className="text-[10px] text-lime-300 font-semibold">Organic Waste Recycling Guide</span>
                         </div>
                       </div>
@@ -16552,8 +17662,12 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 2. Tier 1 Mist Irrigation Guidebook */}
-                <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col justify-between gap-2">
+                {/* 2. Tier 1 Mist Irrigation Guidebook (Index 1) */}
+                <div className={`border p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
+                  focusedShopIdx === 1
+                    ? 'ring-4 ring-sky-400 border-sky-300 scale-[1.01] bg-slate-850 shadow-[0_0_20px_rgba(56,189,248,0.5)]'
+                    : 'bg-slate-900/80 border-slate-800'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
@@ -16565,7 +17679,10 @@ export default function App() {
                           )}
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Tier 1 Mist Irrigation Guidebook</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 1 && <span className="text-sky-400 text-xs">► [E/A]</span>}
+                            <span>Tier 1 Mist Irrigation Guidebook</span>
+                          </h4>
                           <span className="text-[10px] text-sky-300 font-semibold">1.0x Baseline Speed (2 kW)</span>
                         </div>
                       </div>
@@ -16596,7 +17713,11 @@ export default function App() {
                 </div>
 
                 {/* 3. T2 Precision Workbench Blueprint */}
-                <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col justify-between gap-2">
+                <div className={`border p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
+                  focusedShopIdx === 2
+                    ? 'ring-4 ring-sky-400 border-sky-300 scale-[1.01] bg-slate-850 shadow-[0_0_20px_rgba(56,189,248,0.5)]'
+                    : 'bg-slate-900/80 border-slate-800'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
@@ -16608,7 +17729,10 @@ export default function App() {
                           )}
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T2 Precision Workbench Blueprint</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 2 && <span className="text-sky-400 text-xs">► [E/A]</span>}
+                            <span>T2 Precision Workbench Blueprint</span>
+                          </h4>
                           <span className="text-[10px] text-sky-300 font-semibold">Capacity: 5 Units</span>
                         </div>
                       </div>
@@ -16639,7 +17763,11 @@ export default function App() {
                 </div>
 
                 {/* Rover T2 Blueprint */}
-                <div className="bg-slate-900/80 border border-sky-500/30 p-3 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                <div className={`border p-3 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                  focusedShopIdx === 3
+                    ? 'ring-4 ring-sky-400 border-sky-300 scale-[1.01] bg-slate-850 shadow-[0_0_20px_rgba(56,189,248,0.5)]'
+                    : 'bg-slate-900/80 border-sky-500/30'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
@@ -16647,7 +17775,10 @@ export default function App() {
                           <Truck className="w-4 h-4 text-sky-400" />
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Rover T2 Blueprint</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 3 && <span className="text-sky-400 text-xs">► [E/A]</span>}
+                            <span>Rover T2 Blueprint</span>
+                          </h4>
                           <span className="text-[10px] text-sky-300 font-semibold">Surveyor Chassis (5 Slots)</span>
                         </div>
                       </div>
@@ -16678,7 +17809,11 @@ export default function App() {
                 </div>
 
                 {/* Rover T3 Blueprint */}
-                <div className="bg-slate-900/80 border border-amber-500/30 p-3 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                <div className={`border p-3 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                  focusedShopIdx === 4
+                    ? 'ring-4 ring-amber-400 border-amber-300 scale-[1.01] bg-slate-850 shadow-[0_0_20px_rgba(245,158,11,0.5)]'
+                    : 'bg-slate-900/80 border-amber-500/30'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
@@ -16686,7 +17821,10 @@ export default function App() {
                           <Trophy className="w-4 h-4 text-amber-400" />
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Rover T3 Blueprint</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 4 && <span className="text-amber-400 text-xs">► [E/A]</span>}
+                            <span>Rover T3 Blueprint</span>
+                          </h4>
                           <span className="text-[10px] text-amber-300 font-semibold">Vanguard Chassis (10 Slots)</span>
                         </div>
                       </div>
@@ -17254,7 +18392,11 @@ export default function App() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* 1. Compost Heap (50 Verdure) */}
-                <div className="bg-slate-900/80 border border-lime-500/40 p-4 rounded-2xl flex flex-col justify-between gap-3 shadow">
+                <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
+                  focusedShopIdx === 0
+                    ? 'bg-slate-850 ring-4 ring-lime-400 border-lime-300 scale-[1.01] shadow-[0_0_20px_rgba(163,230,53,0.5)]'
+                    : 'bg-slate-900/80 border-lime-500/40'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3">
@@ -17266,7 +18408,10 @@ export default function App() {
                           )}
                         </div>
                         <div>
-                          <h4 className="font-bold text-sm sm:text-base text-slate-100">Compost Heap</h4>
+                          <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 0 && <span className="text-lime-400 text-xs">► [E/A]</span>}
+                            <span>Compost Heap</span>
+                          </h4>
                           <span className="text-xs text-lime-400 font-bold">Passive Organic Decomposition (10s Cycle)</span>
                         </div>
                       </div>
@@ -17294,7 +18439,11 @@ export default function App() {
                 </div>
 
                 {/* 2. Stone Well (75 Verdure) */}
-                <div className="bg-slate-900/80 border border-sky-500/40 p-4 rounded-2xl flex flex-col justify-between gap-3 shadow">
+                <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
+                  focusedShopIdx === 1
+                    ? 'bg-slate-850 ring-4 ring-sky-400 border-sky-300 scale-[1.01] shadow-[0_0_20px_rgba(56,189,248,0.5)]'
+                    : 'bg-slate-900/80 border-sky-500/40'
+                }`}>
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3">
@@ -17306,7 +18455,10 @@ export default function App() {
                           )}
                         </div>
                         <div>
-                          <h4 className="font-bold text-sm sm:text-base text-slate-100">Stone Well</h4>
+                          <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 1 && <span className="text-sky-400 text-xs">► [E/A]</span>}
+                            <span>Stone Well</span>
+                          </h4>
                           <span className="text-xs text-sky-400 font-bold">3×3 Grid Irrigation (20 Seconds)</span>
                         </div>
                       </div>
@@ -17335,6 +18487,18 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {/* FOOTER CONTROLLER & KEYBOARD PROMPTS STRIP */}
+          <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 shrink-0 mt-1">
+            <span className="font-mono text-amber-400 text-[11px] hidden sm:inline">
+              🎮 [A/D / LB/RB] Switch Tabs • [W/S] Select Item • [E / A] Purchase • [Arrows / R-Stick] Scroll • [Esc / B] Close
+            </span>
+            <button
+              onClick={() => setIsShopModalOpen(false)}
+              className="px-5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-all border border-slate-700">
+              Close [Esc / B]
+            </button>
+          </div>
         </div>
       )}
 
@@ -17939,11 +19103,12 @@ export default function App() {
 
             {/* RECIPES LIST FILTERED BY ACTIVE SUBMENU TAB (WHEN NOT ON MODULES TAB) */}
             {workbenchTab !== 'modules' && (() => {
-              const renderRecipeCard = (recipeId: CraftingRecipeId) => {
+              const renderRecipeCard = (recipeId: CraftingRecipeId, cardIdx?: number) => {
                 const recipe = WORKBENCH_RECIPES[recipeId];
                 if (!recipe) return null;
                 const costs = recipe.costs;
                 const isGuideLocked = recipe.requiresGuide ? !inv[recipe.requiresGuide] : false;
+                const isFocused = cardIdx !== undefined && focusedWbIdx === cardIdx;
 
                 const hasScrap = !costs.scrap_metal || (inv.scrap_metal ?? 0) >= costs.scrap_metal;
                 const hasWire = !costs.copper_wire || (inv.copper_wire ?? 0) >= costs.copper_wire;
@@ -18041,7 +19206,9 @@ export default function App() {
                   <div
                     key={recipeId}
                     className={`p-3.5 rounded-2xl border flex flex-col justify-between gap-2.5 transition-all shadow-sm ${
-                      isAlreadyInstalled
+                      isFocused
+                        ? 'bg-slate-850 ring-4 ring-sky-400 border-sky-300 scale-[1.01] shadow-[0_0_20px_rgba(56,189,248,0.5)]'
+                        : isAlreadyInstalled
                         ? 'bg-emerald-950/40 border-emerald-500/40'
                         : isQueuedOrCrafting
                         ? 'bg-sky-950/40 border-sky-500/50'
@@ -18197,8 +19364,8 @@ export default function App() {
                             </div>
                           ) : (inv.workbench_tier || 1) === 1 ? (
                             <>
-                              {renderRecipeCard('workbench_t2_upgrade')}
-                              {renderRecipeCard('workbench_t3_upgrade')}
+                              {renderRecipeCard('workbench_t2_upgrade', 0)}
+                              {renderRecipeCard('workbench_t3_upgrade', 1)}
                             </>
                           ) : (
                             <>
@@ -18214,7 +19381,7 @@ export default function App() {
                                 </div>
                                 <div className="text-[11px] text-slate-400">Reinforced chassis frame with precision brass rails.</div>
                               </div>
-                              {renderRecipeCard('workbench_t3_upgrade')}
+                              {renderRecipeCard('workbench_t3_upgrade', 1)}
                             </>
                           )}
                         </div>
@@ -18233,8 +19400,8 @@ export default function App() {
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                          {renderRecipeCard('crafting_automaton')}
-                          {renderRecipeCard('auto_fabricator')}
+                          {renderRecipeCard('crafting_automaton', 2)}
+                          {renderRecipeCard('auto_fabricator', 3)}
                         </div>
                       </div>
                     </div>
@@ -18273,8 +19440,8 @@ export default function App() {
                             </div>
                           ) : (inv.rover_chassis_tier || 1) === 1 ? (
                             <>
-                              {renderRecipeCard('rover_chassis_t2')}
-                              {renderRecipeCard('rover_chassis_t3')}
+                              {renderRecipeCard('rover_chassis_t2', 0)}
+                              {renderRecipeCard('rover_chassis_t3', 1)}
                             </>
                           ) : (
                             <>
@@ -18290,7 +19457,7 @@ export default function App() {
                                 </div>
                                 <div className="text-[11px] text-slate-400">Current active chassis frame with 5 module bays.</div>
                               </div>
-                              {renderRecipeCard('rover_chassis_t3')}
+                              {renderRecipeCard('rover_chassis_t3', 1)}
                             </>
                           )}
                         </div>
@@ -18307,15 +19474,15 @@ export default function App() {
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                          {renderRecipeCard('rover_storage_module_1')}
-                          {renderRecipeCard('rover_storage_module_2')}
-                          {renderRecipeCard('rover_storage_module_3')}
-                          {renderRecipeCard('rover_battery_module_1')}
-                          {renderRecipeCard('rover_battery_module_2')}
-                          {renderRecipeCard('rover_battery_module_3')}
-                          {renderRecipeCard('rover_radar_module_1')}
-                          {renderRecipeCard('rover_radar_module_2')}
-                          {renderRecipeCard('rover_radar_module_3')}
+                          {renderRecipeCard('rover_storage_module_1', 2)}
+                          {renderRecipeCard('rover_storage_module_2', 3)}
+                          {renderRecipeCard('rover_storage_module_3', 4)}
+                          {renderRecipeCard('rover_battery_module_1', 5)}
+                          {renderRecipeCard('rover_battery_module_2', 6)}
+                          {renderRecipeCard('rover_battery_module_3', 7)}
+                          {renderRecipeCard('rover_radar_module_1', 8)}
+                          {renderRecipeCard('rover_radar_module_2', 9)}
+                          {renderRecipeCard('rover_radar_module_3', 10)}
                         </div>
                       </div>
                     </div>
@@ -18346,12 +19513,24 @@ export default function App() {
                           }
                           return r.category === workbenchTab;
                         })
-                        .map((recipeId) => renderRecipeCard(recipeId))}
+                        .map((recipeId, rIdx) => renderRecipeCard(recipeId, rIdx))}
                     </div>
                   )}
                 </div>
               );
             })()}
+
+            {/* FOOTER CONTROLLER & KEYBOARD PROMPTS STRIP */}
+            <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 shrink-0 mt-1">
+              <span className="font-mono text-sky-400 text-[11px] hidden sm:inline">
+                🎮 [A/D / LB/RB] Switch Tabs • [W/S] Select • [E / A] Queue Craft • [Arrows / R-Stick] Scroll • [Esc / B] Close
+              </span>
+              <button
+                onClick={() => setIsWorkbenchModalOpen(false)}
+                className="px-5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-all border border-slate-700">
+                Close [Esc / B]
+              </button>
+            </div>
           </div>
         );
       })()}
@@ -18449,9 +19628,13 @@ export default function App() {
                   }
                 }}
                 autoFocus
-                className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm sm:text-base py-3 rounded-2xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2">
+                className={`w-full font-black text-sm sm:text-base py-3 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  titleMenuIdx === 0
+                    ? 'bg-emerald-400 hover:bg-emerald-300 text-slate-950 ring-4 ring-emerald-300/80 scale-105 shadow-[0_0_25px_rgba(52,211,153,0.7)]'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                }`}>
                 <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
-                <span>START NEW GAME / CONTINUE</span>
+                <span>{titleMenuIdx === 0 ? '► START GAME [E / A]' : 'START GAME [E / A]'}</span>
               </button>
 
               <button
@@ -18459,9 +19642,13 @@ export default function App() {
                   setIsHowToPlayOpen(true);
                   gameAudio.playCrispClick();
                 }}
-                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm py-2.5 rounded-2xl transition-colors flex items-center justify-center gap-2 border border-slate-700">
+                className={`w-full font-bold text-xs sm:text-sm py-2.5 rounded-2xl transition-all flex items-center justify-center gap-2 border cursor-pointer ${
+                  titleMenuIdx === 1
+                    ? 'bg-slate-700 text-white ring-4 ring-emerald-400/80 scale-105 border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.5)]'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                }`}>
                 <HelpCircle className="w-4 h-4 text-emerald-400" />
-                <span>📖 How to Play (5 Chapters)</span>
+                <span>{titleMenuIdx === 1 ? '► How to Play [E/A]' : '📖 How to Play (5 Chapters)'}</span>
               </button>
 
               <button
@@ -18469,10 +19656,17 @@ export default function App() {
                   setIsGameMenuOpen(true);
                   gameAudio.playCrispClick();
                 }}
-                className="w-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-xs sm:text-sm py-2 rounded-2xl transition-colors flex items-center justify-center gap-2 border border-slate-700/80">
+                className={`w-full font-bold text-xs sm:text-sm py-2 rounded-2xl transition-all flex items-center justify-center gap-2 border cursor-pointer ${
+                  titleMenuIdx === 2
+                    ? 'bg-slate-700 text-white ring-4 ring-sky-400/80 scale-105 border-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.5)]'
+                    : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700/80'
+                }`}>
                 <Wrench className="w-4 h-4 text-sky-400" />
-                <span>⚙️ Settings & Controls</span>
+                <span>{titleMenuIdx === 2 ? '► Settings [E/A]' : '⚙️ Settings & Controls'}</span>
               </button>
+            </div>
+            <div className="mt-4 text-[11px] text-slate-400 font-mono">
+              🎮 [W/S / D-Pad] Select Option • [E / Enter / A / Space] Start Game
             </div>
           </div>
         </div>
@@ -18493,36 +19687,25 @@ export default function App() {
                   }
                   gameAudio.playCrispClick();
                 }}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 min-h-[48px]">
+                className={`w-full font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[48px] ${
+                  focusedMenuIdx === 0
+                    ? 'bg-emerald-500 text-slate-950 ring-2 ring-emerald-300 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.5)]'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                }`}>
                 <Play className="w-5 h-5" />
-                {gameState.status === 'START' ? 'Enter Sanctuary' : 'Resume Cultivation'}
+                {gameState.status === 'START' ? 'Enter Sanctuary [E / A]' : 'Resume Cultivation [E / A]'}
               </button>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => {
-                    const muted = gameAudio.toggleMute();
-                    setIsSfxMuted(muted);
-                  }}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5 min-h-[44px]">
-                  {isSfxMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
-                  SFX: {isSfxMuted ? 'Off' : 'On'}
-                </button>
-
-                <button
-                  onClick={() => setIsMusicMuted((prev) => !prev)}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5 min-h-[44px]">
-                  {isMusicMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
-                  Music: {isMusicMuted ? 'Off' : 'On'}
-                </button>
-              </div>
 
               <button
                 onClick={() => {
                   setIsGoalModalOpen(true);
                   gameAudio.playCrispClick();
                 }}
-                className="w-full bg-yellow-950/80 hover:bg-yellow-900 text-yellow-200 font-semibold text-xs py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 min-h-[44px] border border-yellow-500/40">
+                className={`w-full font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[44px] border ${
+                  focusedMenuIdx === 1
+                    ? 'bg-yellow-900 text-yellow-100 border-yellow-400 ring-2 ring-yellow-400/50 scale-[1.02]'
+                    : 'bg-yellow-950/80 hover:bg-yellow-900 text-yellow-200 border-yellow-500/40'
+                }`}>
                 <Trophy className="w-4 h-4 text-yellow-400" />
                 🏆 View Mastery Goal (Level 100 Premium)
               </button>
@@ -18532,27 +19715,63 @@ export default function App() {
                   setIsHowToPlayOpen(true);
                   gameAudio.playCrispClick();
                 }}
-                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 min-h-[44px]">
+                className={`w-full font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[44px] border ${
+                  focusedMenuIdx === 2
+                    ? 'bg-slate-700 text-white border-emerald-400 ring-2 ring-emerald-400/50 scale-[1.02]'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                }`}>
                 <HelpCircle className="w-4 h-4" />
                 📖 How to Play Guide (5 Chapters)
               </button>
 
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    const muted = gameAudio.toggleMute();
+                    setIsSfxMuted(muted);
+                  }}
+                  className={`font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[44px] border ${
+                    focusedMenuIdx === 3
+                      ? 'bg-slate-700 text-white border-sky-400 ring-2 ring-sky-400/50 scale-[1.02]'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                  }`}>
+                  {isSfxMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
+                  SFX: {isSfxMuted ? 'Off' : 'On'}
+                </button>
+
+                <button
+                  onClick={() => setIsMusicMuted((prev) => !prev)}
+                  className={`font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[44px] border ${
+                    focusedMenuIdx === 4
+                      ? 'bg-slate-700 text-white border-sky-400 ring-2 ring-sky-400/50 scale-[1.02]'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                  }`}>
+                  {isMusicMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
+                  Music: {isMusicMuted ? 'Off' : 'On'}
+                </button>
+              </div>
+
               <button
                 onClick={initGame}
-                className="w-full bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-xs py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 min-h-[44px]">
+                className="w-full bg-slate-800/80 hover:bg-slate-700 text-amber-400 font-semibold text-xs py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 min-h-[44px] border border-slate-700">
                 <RotateCw className="w-4 h-4" />
                 Restart Sanctuary
               </button>
             </div>
 
-            <button
-              onClick={() => {
-                setIsGameMenuOpen(false);
-                setGameState((prev) => ({...prev, status: 'START'}));
-              }}
-              className="text-xs text-slate-400 hover:text-slate-200 transition-colors">
-              Quit to Title Screen
-            </button>
+            <div className="w-full pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+              <span className="font-mono text-emerald-400 text-[11px]">
+                🎮 [W/S / ↑↓] Navigate • [E / A] Select • [Esc / B / -] Close
+              </span>
+              <button
+                onClick={() => {
+                  setIsGameMenuOpen(false);
+                  setGameState((prev) => ({...prev, status: 'START'}));
+                }}
+                className="text-xs text-slate-400 hover:text-slate-200 transition-colors">
+                Quit to Title
+              </button>
+            </div>
           </div>
         </MenuOverlay>
       )}
@@ -18872,7 +20091,7 @@ export default function App() {
                       Claim large bonus Zen Point rewards through the Achievements tab:
                     </p>
                     <ul className="list-disc list-inside space-y-1 text-slate-400 pl-1 text-xs">
-                      <li><strong>Taxonomy &amp; Styles:</strong> Catalog up to 20 leaf species and 60 stylistic silhouettes in your Bondex.</li>
+                    <li><strong>Taxonomy &amp; Styles:</strong> Catalog up to 20 leaf species and 140 stylistic variants in your Bondex.</li>
                       <li><strong>Maturity &amp; Forms:</strong> Cultivate Sprout through Premium specimens and complete Tree Group triads.</li>
                       <li><strong>Wilderness Pioneer:</strong> Complete 5 and 10 expeditions in each biome.</li>
                     </ul>
@@ -18895,11 +20114,11 @@ export default function App() {
                     : 'bg-slate-900 text-slate-600 cursor-not-allowed'
                 }`}>
                 <ChevronLeft className="w-4 h-4" />
-                <span>Prev Chapter</span>
+                <span>Prev [A / LB]</span>
               </button>
 
               <span className="text-xs font-mono text-slate-400">
-                Chapter {guidebookChapter} of 5
+                Chapter {guidebookChapter} of 5 • 🎮 [A/D / LB/RB]
               </span>
 
               {guidebookChapter < 5 ? (
@@ -18909,14 +20128,14 @@ export default function App() {
                     gameAudio.playCrispClick();
                   }}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow flex items-center gap-1">
-                  <span>Next Chapter</span>
+                  <span>Next [D / RB]</span>
                   <ChevronRight className="w-4 h-4" />
                 </button>
               ) : (
                 <button
                   onClick={() => setIsHowToPlayOpen(false)}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow">
-                  Close Guide
+                  Close Guide [Esc / B]
                 </button>
               )}
             </div>

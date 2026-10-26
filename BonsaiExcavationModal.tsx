@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Trophy,
   Package,
@@ -69,6 +69,7 @@ export interface BonsaiExcavationModalProps {
   result: ExcavationResultData | null;
   onCollect: () => void;
   onDecline?: () => void;
+  onStrike?: () => void;
 }
 
 export default function BonsaiExcavationModal({
@@ -76,7 +77,50 @@ export default function BonsaiExcavationModal({
   result,
   onCollect,
   onDecline,
+  onStrike,
 }: BonsaiExcavationModalProps) {
+  const [selectedAction, setSelectedAction] = useState<'collect' | 'decline'>('collect');
+
+  const handleStrike = useCallback(() => {
+    if (onStrike) {
+      onStrike();
+    } else {
+      gameAudio.playCoinPickup();
+      onCollect();
+    }
+  }, [onCollect, onStrike]);
+
+  useEffect(() => {
+    if (!isOpen || !result) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === ' ' || e.key === 'Enter' || e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        if (selectedAction === 'decline' && onDecline) {
+          gameAudio.playCrispClick();
+          onDecline();
+        } else {
+          handleStrike();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        gameAudio.playCrispClick();
+        onDecline?.();
+      } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        setSelectedAction('decline');
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        setSelectedAction('collect');
+        gameAudio.playHoverMicroTone();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, result, selectedAction, handleStrike, onDecline]);
+
   if (!isOpen || !result) return null;
 
   const matDef = getMaturityDef(result.maturity);
@@ -283,26 +327,36 @@ export default function BonsaiExcavationModal({
         </div>
 
         {/* Bottom Action Bar: Collect Seedling or Decline/Leave Behind */}
-        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-          <button
-            onClick={() => {
-              gameAudio.playCrispClick();
-              onDecline?.();
-            }}
-            className="px-4 py-2.5 sm:py-3 rounded-2xl border border-rose-500/40 hover:bg-rose-950/50 text-rose-300 font-medium text-xs sm:text-sm transition-all active:scale-95 flex items-center justify-center gap-1.5 shrink-0">
-            <span>Decline Seedling (Leave Behind)</span>
-          </button>
-          <button
-            onClick={() => {
-              gameAudio.playCoinPickup();
-              onCollect();
-            }}
-            autoFocus
-            className="flex-1 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black py-2.5 sm:py-3 rounded-2xl shadow-lg transition-transform flex items-center justify-center gap-2 text-xs sm:text-sm">
-            <Package className="w-4 h-4" />
-            <span>Collect Seedling into Cargo (1 Slot • 3.0 kg)</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3 shrink-0 pt-2 border-t border-slate-800">
+          <div className="text-[11px] font-mono text-emerald-400/90 flex items-center gap-1.5 order-2 sm:order-1">
+            <span>🎮 [Space / X] or [E / A] Strike/Collect • [Esc / B] Decline</span>
+          </div>
+          <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto order-1 sm:order-2">
+            <button
+              onClick={() => {
+                gameAudio.playCrispClick();
+                onDecline?.();
+              }}
+              className={`px-4 py-2.5 rounded-2xl border font-bold text-xs sm:text-sm transition-all active:scale-95 flex items-center justify-center gap-1.5 shrink-0 ${
+                selectedAction === 'decline'
+                  ? 'bg-rose-950/80 text-rose-200 border-rose-400 ring-2 ring-rose-500/50 shadow-lg'
+                  : 'border-rose-500/40 hover:bg-rose-950/50 text-rose-300'
+              }`}>
+              <span>Decline [Esc / B]</span>
+            </button>
+            <button
+              onClick={handleStrike}
+              autoFocus
+              className={`flex-1 sm:flex-none px-6 py-2.5 rounded-2xl font-black text-xs sm:text-sm shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 ${
+                selectedAction === 'collect'
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.5)] scale-[1.02]'
+                  : 'bg-emerald-700 text-emerald-100 hover:bg-emerald-600'
+              }`}>
+              <Package className="w-4 h-4" />
+              <span>Collect Seedling [Space / X] or [E / A] (3.0 kg)</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

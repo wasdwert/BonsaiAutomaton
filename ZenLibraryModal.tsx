@@ -408,42 +408,8 @@ export default function ZenLibraryModal({
     'ALL' | 'BONDEX' | 'MATURITY' | 'AUTOMATION' | 'EXPEDITIONS'
   >('ALL');
 
-  // Calculate Bondex Discovery Statistics
-  let discoveredSpeciesCount = 0;
-  let totalStylesLoggedCount = 0;
-
-  BONDEX_SPECIES_LIST.forEach((sp) => {
-    const entry = discoveredSpeciesMap[sp.id];
-    if (entry && entry.discovered) {
-      discoveredSpeciesCount += 1;
-      totalStylesLoggedCount += entry.stylesRaised ? entry.stylesRaised.length : 0;
-    }
-  });
-
-  const selectedEntry = BONDEX_SPECIES_LIST[selectedSpeciesIndex] || BONDEX_SPECIES_LIST[0];
-  const selectedDef = getLeafTypeDef(selectedEntry.id);
-  const selectedDiscovery = discoveredSpeciesMap[selectedEntry.id];
-  const isSelectedDiscovered = selectedDiscovery ? selectedDiscovery.discovered : false;
-  const selectedHighestMaturity = selectedDiscovery?.highestMaturity || 'sprout';
-  const selectedMatDef = getMaturityDef(selectedHighestMaturity);
-  const selectedRaisedStyles = selectedDiscovery?.stylesRaised || [];
-  const selectedBiomes = getSpeciesBiomeEncounters(selectedEntry.id);
-
-  // Fog-of-War: Filter biomes to only those where player has actually encountered the species in that area
-  const revealedBiomes = selectedBiomes.filter(
-    (bio) =>
-      discoveredAreaSpecies &&
-      (discoveredAreaSpecies[bio.biomeId] || []).includes(selectedEntry.id),
-  );
-
-  // Filter list by Tree Type Group
-  const filteredList =
-    selectedGroupFilter === 'ALL'
-      ? BONDEX_SPECIES_LIST
-      : BONDEX_SPECIES_LIST.filter((sp) => {
-          const def = getLeafTypeDef(sp.id);
-          return def.group === selectedGroupFilter;
-        });
+  const [focusedSkillIdx, setFocusedSkillIdx] = useState<number>(0);
+  const [focusedMilestoneIdx, setFocusedMilestoneIdx] = useState<number>(0);
 
   // Calculate category completion statistics for Milestones
   const milestoneCategoryCounts = useMemo(() => {
@@ -536,6 +502,170 @@ export default function ZenLibraryModal({
     deployedStructures,
     installedCraftingArms,
   ]);
+
+  // Handle Gamepad Bumper tab cycling & Keyboard Navigation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const ALL_STYLES: BonsaiStyle[] = [
+      'CHOKAN',
+      'MOYOGI',
+      'SHAKAN',
+      'HAN_KENGAI',
+      'SOKAN',
+      'KENGAI',
+      'KABUDACHI',
+    ];
+
+    const skillKeys = Object.keys(SKILL_CONFIGS);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tabs: ShrineTab[] = ['bondex', 'skills', 'milestones'];
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      } else if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        const idx = tabs.indexOf(activeTab);
+        const nextIdx = (idx - 1 + tabs.length) % tabs.length;
+        setActiveTab(tabs[nextIdx]);
+        gameAudio.playCrispClick();
+      } else if (e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        const idx = tabs.indexOf(activeTab);
+        const nextIdx = (idx + 1) % tabs.length;
+        setActiveTab(tabs[nextIdx]);
+        gameAudio.playCrispClick();
+      } else if (e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        if (activeTab === 'bondex') {
+          setSelectedSpeciesIndex((idx) => Math.max(0, idx - 1));
+          gameAudio.playHoverMicroTone();
+        } else if (activeTab === 'skills') {
+          setFocusedSkillIdx((idx) => Math.max(0, idx - 1));
+          gameAudio.playHoverMicroTone();
+        } else if (activeTab === 'milestones') {
+          setFocusedMilestoneIdx((idx) => Math.max(0, idx - 1));
+          gameAudio.playHoverMicroTone();
+        }
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        if (activeTab === 'bondex') {
+          setSelectedSpeciesIndex((idx) => Math.min(BONDEX_SPECIES_LIST.length - 1, idx + 1));
+          gameAudio.playHoverMicroTone();
+        } else if (activeTab === 'skills') {
+          setFocusedSkillIdx((idx) => Math.min(skillKeys.length - 1, idx + 1));
+          gameAudio.playHoverMicroTone();
+        } else if (activeTab === 'milestones') {
+          setFocusedMilestoneIdx((idx) => Math.min(filteredAchievements.length - 1, idx + 1));
+          gameAudio.playHoverMicroTone();
+        }
+      } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        if (activeTab === 'bondex') {
+          // Cycle through the 7 styles for the selected specimen
+          setViewerStyle((cur) => {
+            const idx = ALL_STYLES.indexOf(cur);
+            return ALL_STYLES[(idx + 1) % ALL_STYLES.length];
+          });
+          gameAudio.playCrispClick();
+        } else if (activeTab === 'skills') {
+          const key = skillKeys[focusedSkillIdx];
+          if (key) upgradeZenSkill(key as keyof ZenSkills);
+        } else if (activeTab === 'milestones') {
+          const ach = filteredAchievements[focusedMilestoneIdx];
+          if (ach) {
+            const isCompleted = ach.isUnlocked(
+              stats,
+              plantedBonsais,
+              storedPottedBonsais,
+              discoveredSpeciesMap,
+              inventory,
+              deployedStructures,
+              installedCraftingArms,
+            );
+            const isClaimed = stats.claimedAchievements.includes(ach.id);
+            if (isCompleted && !isClaimed) {
+              claimAchievement(ach.id, ach.rewardZen, ach.title);
+            }
+          }
+        }
+      }
+    };
+
+    const handleBumper = (e: Event) => {
+      const ce = e as CustomEvent<{direction: 'left' | 'right'}>;
+      const dir = ce.detail?.direction;
+      const tabs: ShrineTab[] = ['bondex', 'skills', 'milestones'];
+      setActiveTab((cur) => {
+        const idx = tabs.indexOf(cur);
+        const nextIdx = dir === 'right' ? (idx + 1) % tabs.length : (idx - 1 + tabs.length) % tabs.length;
+        return tabs[nextIdx];
+      });
+      gameAudio.playCrispClick();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('gamepad-bumper', handleBumper);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('gamepad-bumper', handleBumper);
+    };
+  }, [
+    isOpen,
+    activeTab,
+    focusedSkillIdx,
+    focusedMilestoneIdx,
+    filteredAchievements,
+    stats,
+    plantedBonsais,
+    storedPottedBonsais,
+    discoveredSpeciesMap,
+    inventory,
+    deployedStructures,
+    installedCraftingArms,
+    upgradeZenSkill,
+    claimAchievement,
+    onClose,
+  ]);
+
+  // Calculate Bondex Discovery Statistics
+  let discoveredSpeciesCount = 0;
+  let totalStylesLoggedCount = 0;
+
+  BONDEX_SPECIES_LIST.forEach((sp) => {
+    const entry = discoveredSpeciesMap[sp.id];
+    if (entry && entry.discovered) {
+      discoveredSpeciesCount += 1;
+      totalStylesLoggedCount += entry.stylesRaised ? entry.stylesRaised.length : 0;
+    }
+  });
+
+  const selectedEntry = BONDEX_SPECIES_LIST[selectedSpeciesIndex] || BONDEX_SPECIES_LIST[0];
+  const selectedDef = getLeafTypeDef(selectedEntry.id);
+  const selectedDiscovery = discoveredSpeciesMap[selectedEntry.id];
+  const isSelectedDiscovered = selectedDiscovery ? selectedDiscovery.discovered : false;
+  const selectedHighestMaturity = selectedDiscovery?.highestMaturity || 'sprout';
+  const selectedMatDef = getMaturityDef(selectedHighestMaturity);
+  const selectedRaisedStyles = selectedDiscovery?.stylesRaised || [];
+  const selectedBiomes = getSpeciesBiomeEncounters(selectedEntry.id);
+
+  // Fog-of-War: Filter biomes to only those where player has actually encountered the species in that area
+  const revealedBiomes = selectedBiomes.filter(
+    (bio) =>
+      discoveredAreaSpecies &&
+      (discoveredAreaSpecies[bio.biomeId] || []).includes(selectedEntry.id),
+  );
+
+  // Filter list by Tree Type Group
+  const filteredList =
+    selectedGroupFilter === 'ALL'
+      ? BONDEX_SPECIES_LIST
+      : BONDEX_SPECIES_LIST.filter((sp) => {
+          const def = getLeafTypeDef(sp.id);
+          return def.group === selectedGroupFilter;
+        });
 
   if (!isOpen) return null;
 
@@ -641,7 +771,7 @@ export default function ZenLibraryModal({
                 🌿 {discoveredSpeciesCount} / 20 Species Discovered ({Math.round((discoveredSpeciesCount / 20) * 100)}%)
               </div>
               <div className="bg-slate-950/90 border border-amber-500/60 px-2.5 py-0.5 rounded-lg text-amber-300 font-bold font-mono text-[11px] shadow-sm">
-                🎋 {totalStylesLoggedCount} / 60 Styles
+                🎋 {totalStylesLoggedCount} / 140 Styles
               </div>
             </div>
           </div>
@@ -1004,18 +1134,21 @@ export default function ZenLibraryModal({
           {/* SKILLS MULTI-COLUMN GRID */}
           <div className="flex-1 space-y-2.5 overflow-y-auto pr-1">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {(Object.keys(SKILL_CONFIGS) as string[]).map((key) => {
+              {(Object.keys(SKILL_CONFIGS) as string[]).map((key, sIdx) => {
                 const conf = SKILL_CONFIGS[key];
                 if (!conf) return null;
                 const currentRank = (zenSkills[key as keyof ZenSkills] as number) || 0;
                 const isMax = currentRank >= conf.maxRank;
                 const cost = isMax ? 0 : conf.costs[currentRank] || 5;
                 const canAfford = zenEssence >= cost;
+                const isFocused = focusedSkillIdx === sIdx;
 
                 return (
                   <div
                     key={key}
-                    className="bg-slate-900/90 border border-slate-800 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                    className={`bg-slate-900/90 border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                      isFocused ? 'border-pink-400 ring-2 ring-pink-500/50 bg-slate-850 scale-[1.01]' : 'border-slate-800'
+                    }`}>
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
@@ -1106,7 +1239,7 @@ export default function ZenLibraryModal({
           {/* MILESTONES CARDS LIST (CLAIMABLE AT TOP WITH GLOWING CLAIM PULSE) */}
           <div className="flex-1 space-y-2.5 overflow-y-auto pr-1">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {filteredAchievements.map((ach) => {
+              {filteredAchievements.map((ach, mIdx) => {
                 const isClaimed = stats.claimedAchievements.includes(ach.id);
                 const isCompleted = ach.isUnlocked(
                   stats,
@@ -1118,6 +1251,7 @@ export default function ZenLibraryModal({
                   installedCraftingArms,
                 );
                 const isClaimable = isCompleted && !isClaimed;
+                const isFocused = focusedMilestoneIdx === mIdx;
                 const curVal = ach.currentValue(
                   stats,
                   plantedBonsais,
@@ -1147,8 +1281,10 @@ export default function ZenLibraryModal({
                   <div
                     key={ach.id}
                     className={`p-3.5 rounded-2xl border flex flex-col justify-between gap-2.5 transition-all ${
-                      isClaimable
-                        ? 'bg-gradient-to-br from-amber-950/60 via-slate-900 to-emerald-950/40 border-amber-400 shadow-[0_0_18px_rgba(251,191,36,0.35)] ring-2 ring-amber-400/60'
+                      isFocused
+                        ? 'ring-2 ring-amber-300 border-amber-400 bg-slate-850 scale-[1.01]'
+                        : isClaimable
+                        ? 'bg-gradient-to-br from-amber-950/60 via-slate-900 to-emerald-950/40 border-amber-400 shadow-[0_0_18px_rgba(251,191,36,0.35)] ring-1 ring-amber-400/60'
                         : isClaimed
                         ? 'bg-slate-950/50 border-slate-800/80 opacity-70'
                         : 'bg-slate-900/80 border-slate-800'
@@ -1222,6 +1358,17 @@ export default function ZenLibraryModal({
         </div>
       )}
 
+      {/* FOOTER CONTROLLER & KEYBOARD PROMPTS STRIP */}
+      <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 shrink-0 mt-1">
+        <span className="font-mono text-pink-400 text-[11px] hidden sm:inline">
+          🎮 [A/D / LB/RB] Switch Tabs • [W/S] Navigate • [E / A] Inspect/Select • [Arrows / R-Stick] Scroll • [Esc / B] Close
+        </span>
+        <button
+          onClick={onClose}
+          className="px-5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-all border border-slate-700">
+          Close [Esc / B]
+        </button>
+      </div>
     </div>
   );
 }

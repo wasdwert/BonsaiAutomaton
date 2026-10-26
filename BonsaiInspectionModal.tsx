@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Droplets,
@@ -42,6 +42,7 @@ import {
   calculateBaseAesthetic,
 } from './types';
 import { getNatureFactor } from './DeploymentModal';
+import { gameAudio } from './utils/helper';
 
 function getFactorDisplay(val: number): { arrow: string; text: string; colorClass: string } {
   if (val > 1.0) {
@@ -189,6 +190,127 @@ export default function BonsaiInspectionModal({
   onAttachAutomaton,
   onDetachAutomaton,
 }: BonsaiInspectionModalProps) {
+  // Navigation focus index for interactive buttons:
+  // 0: Prune, 1: Compost, 2: Donate / Sell, 3: Store in Bag, 4: Automaton, 5: Close Inspection
+  const [focusedBtnIdx, setFocusedBtnIdx] = useState<number>(0);
+
+  const cycleAutomaton = () => {
+    if (!bonsai) return;
+    const cur = bonsai.automatonTier;
+    if (cur === 0) {
+      if (inv.automatons_tier1 > 0) onAttachAutomaton(bonsai.id, 1);
+      else if (inv.automatons_tier2 > 0) onAttachAutomaton(bonsai.id, 2);
+      else if (inv.automatons_tier3 > 0) onAttachAutomaton(bonsai.id, 3);
+      else gameAudio?.playErrorBuzz?.();
+    } else if (cur === 1) {
+      if (inv.automatons_tier2 > 0) onAttachAutomaton(bonsai.id, 2);
+      else if (inv.automatons_tier3 > 0) onAttachAutomaton(bonsai.id, 3);
+      else onDetachAutomaton(bonsai.id);
+    } else if (cur === 2) {
+      if (inv.automatons_tier3 > 0) onAttachAutomaton(bonsai.id, 3);
+      else onDetachAutomaton(bonsai.id);
+    } else {
+      onDetachAutomaton(bonsai.id);
+    }
+  };
+
+  const activateFocusedButton = () => {
+    if (!bonsai) return;
+    if (focusedBtnIdx === 0) {
+      onPrune(bonsai.id);
+    } else if (focusedBtnIdx === 1) {
+      if (inv.organic_compost > 0 && bonsai.level < 100) {
+        onCompost(bonsai.id);
+      } else {
+        gameAudio?.playErrorBuzz?.();
+      }
+    } else if (focusedBtnIdx === 2) {
+      onDonate(bonsai.id);
+    } else if (focusedBtnIdx === 3) {
+      onStore(bonsai.id);
+    } else if (focusedBtnIdx === 4) {
+      cycleAutomaton();
+    } else if (focusedBtnIdx === 5) {
+      onClose();
+    }
+  };
+
+  // Keyboard and controller shortcut listener
+  useEffect(() => {
+    if (!isOpen || !bonsai) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        setFocusedBtnIdx((idx) => {
+          if (idx === 2 || idx === 3) return idx - 2; // move to row 1 (0 or 1)
+          if (idx === 5) return 2; // move from close to donate
+          if (idx === 4) return 0; // move from automaton to prune
+          return Math.max(0, idx - 1);
+        });
+        gameAudio?.playHoverMicroTone?.();
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        setFocusedBtnIdx((idx) => {
+          if (idx === 0 || idx === 1) return idx + 2; // move to row 2 (2 or 3)
+          if (idx === 2 || idx === 3) return 5; // move to close button
+          return Math.min(5, idx + 1);
+        });
+        gameAudio?.playHoverMicroTone?.();
+      } else if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        setFocusedBtnIdx((idx) => {
+          if (idx === 1) return 0;
+          if (idx === 3) return 2;
+          return Math.max(0, idx - 1);
+        });
+        gameAudio?.playHoverMicroTone?.();
+      } else if (e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        setFocusedBtnIdx((idx) => {
+          if (idx === 0) return 1;
+          if (idx === 2) return 3;
+          return Math.min(5, idx + 1);
+        });
+        gameAudio?.playHoverMicroTone?.();
+      } else if (e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
+        e.preventDefault();
+        activateFocusedButton();
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        onPrune(bonsai.id);
+      } else if (e.key === 'x' || e.key === 'X') {
+        e.preventDefault();
+        onPrune(bonsai.id);
+      } else if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        if (inv.organic_compost > 0 && bonsai.level < 100) {
+          onCompost(bonsai.id);
+        } else {
+          gameAudio?.playErrorBuzz?.();
+        }
+      } else if (e.key === 'v' || e.key === 'V') {
+        e.preventDefault();
+        onDonate(bonsai.id);
+      } else if (e.key === '1') {
+        e.preventDefault();
+        if (inv.automatons_tier1 > 0 && bonsai.automatonTier !== 1) onAttachAutomaton(bonsai.id, 1);
+      } else if (e.key === '2') {
+        e.preventDefault();
+        if (inv.automatons_tier2 > 0 && bonsai.automatonTier !== 2) onAttachAutomaton(bonsai.id, 2);
+      } else if (e.key === '3') {
+        e.preventDefault();
+        if (inv.automatons_tier3 > 0 && bonsai.automatonTier !== 3) onAttachAutomaton(bonsai.id, 3);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, bonsai, focusedBtnIdx, inv.organic_compost, inv.automatons_tier1, inv.automatons_tier2, inv.automatons_tier3, onPrune, onCompost, onDonate, onStore, onAttachAutomaton, onDetachAutomaton, onClose]);
+
   if (!isOpen || !bonsai) return null;
 
   const matDef = getMaturityDef(bonsai.maturity || 'sprout');
@@ -562,11 +684,16 @@ export default function BonsaiInspectionModal({
               </div>
 
               {/* Automation Unit Outfitting */}
-              <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 space-y-2">
+              <div className={`bg-slate-950/90 border rounded-xl p-3 space-y-2 transition-all ${
+                focusedBtnIdx === 4 ? 'border-cyan-400 ring-2 ring-cyan-400/70 bg-cyan-950/30' : 'border-slate-800'
+              }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Zap className="w-4 h-4 text-cyan-400" />
-                    <span className="font-bold text-xs text-cyan-200">Installed Automaton</span>
+                    <span className="font-bold text-xs text-cyan-200">
+                      {focusedBtnIdx === 4 && <span className="text-cyan-400 font-bold mr-1">► [E/A]</span>}
+                      Installed Automaton
+                    </span>
                   </div>
                   <span className="text-[10px] font-semibold bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-lg">
                     {bonsai.automatonTier > 0
@@ -632,15 +759,20 @@ export default function BonsaiInspectionModal({
                 <button
                   onClick={() => onPrune(bonsai.id)}
                   className={`font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow active:scale-95 ${
+                    focusedBtnIdx === 0
+                      ? 'ring-4 ring-pink-400 border-pink-300 scale-[1.02] shadow-[0_0_15px_rgba(236,72,153,0.7)]'
+                      : ''
+                  } ${
                     bSyn.isStalled
                       ? 'bg-rose-950 text-rose-300 border border-rose-500/70 hover:bg-rose-900'
-                      : 'bg-pink-600 hover:bg-pink-500 text-white'
+                      : 'bg-pink-600 hover:bg-pink-500 text-white ring-1 ring-pink-400/40 hover:ring-pink-300'
                   }`}>
                   <Scissors className="w-4 h-4" />
                   <span>
+                    {focusedBtnIdx === 0 && '► '}
                     {bSyn.isStalled
                       ? 'Prune (Stalled)'
-                      : `[Space] Prune (-${((1 + greenThumbRank + bSyn.quickPruneBonus) % 1 === 0 ? (1 + greenThumbRank + bSyn.quickPruneBonus).toFixed(0) : (1 + greenThumbRank + bSyn.quickPruneBonus).toFixed(2))}s)`}
+                      : `[E / Space] Prune (-${((1 + greenThumbRank + bSyn.quickPruneBonus) % 1 === 0 ? (1 + greenThumbRank + bSyn.quickPruneBonus).toFixed(0) : (1 + greenThumbRank + bSyn.quickPruneBonus).toFixed(2))}s)`}
                   </span>
                 </button>
 
@@ -648,28 +780,49 @@ export default function BonsaiInspectionModal({
                   disabled={inv.organic_compost <= 0 || bonsai.level >= 100}
                   onClick={() => onCompost(bonsai.id)}
                   className={`py-2.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow ${
+                    focusedBtnIdx === 1
+                      ? 'ring-4 ring-lime-400 border-lime-300 scale-[1.02] shadow-[0_0_15px_rgba(163,230,53,0.7)]'
+                      : ''
+                  } ${
                     inv.organic_compost > 0 && bonsai.level < 100
-                      ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
+                      ? 'bg-lime-600 hover:bg-lime-500 text-white ring-1 ring-lime-400/40 active:scale-95'
                       : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                   }`}>
                   <span>🌾</span>
-                  <span>[C] Apply Compost ({inv.organic_compost})</span>
+                  <span>
+                    {focusedBtnIdx === 1 && '► '}
+                    [E / C] Compost ({inv.organic_compost})
+                  </span>
                 </button>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => onDonate(bonsai.id)}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow active:scale-95">
+                  className={`bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow ring-1 ring-emerald-400/40 active:scale-95 ${
+                    focusedBtnIdx === 2
+                      ? 'ring-4 ring-emerald-400 border-emerald-300 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.7)]'
+                      : ''
+                  }`}>
                   <VerdureIcon className="w-4 h-4" />
-                  <span>[V] Donate (+{calculateDonationValue(bonsai)} Verdure)</span>
+                  <span>
+                    {focusedBtnIdx === 2 && '► '}
+                    [E / V] Donate (+{calculateDonationValue(bonsai)})
+                  </span>
                 </button>
 
                 <button
                   onClick={() => onStore(bonsai.id)}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow border border-slate-700">
+                  className={`bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow border border-slate-700 active:scale-95 ${
+                    focusedBtnIdx === 3
+                      ? 'ring-4 ring-sky-400 border-sky-300 scale-[1.02] shadow-[0_0_15px_rgba(56,189,248,0.7)]'
+                      : ''
+                  }`}>
                   <span>🪴</span>
-                  <span>[Q] Store in Bag</span>
+                  <span>
+                    {focusedBtnIdx === 3 && '► '}
+                    [E] Store in Bag
+                  </span>
                 </button>
               </div>
             </div>
@@ -747,8 +900,8 @@ export default function BonsaiInspectionModal({
                           <div className="flex-1 bg-slate-900 h-1.5 rounded-full overflow-hidden border border-slate-800">
                             <div
                               style={{ width: `${geneticVal}%` }}
-                              className={`h-full rounded-full transition-all duration-300 ${config.bar}`}
-                            />
+                              className={`h-full rounded-full transition-all duration-300 ${config.bar}`}>
+                            </div>
                           </div>
                           <span
                             className={`text-[10px] font-bold shrink-0 font-mono ${config.lightText}`}>
@@ -764,8 +917,8 @@ export default function BonsaiInspectionModal({
                           <div className="flex-1 bg-slate-900 h-1.5 rounded-full overflow-hidden border border-slate-800">
                             <div
                               style={{ width: cpPoints === 0 ? '0%' : `${cpPercent}%` }}
-                              className={`h-full rounded-full transition-all duration-300 ${config.bar}`}
-                            />
+                              className={`h-full rounded-full transition-all duration-300 ${config.bar}`}>
+                            </div>
                           </div>
                           <span
                             className={`text-[10px] font-bold shrink-0 font-mono ${config.lightText}`}>
@@ -810,12 +963,24 @@ export default function BonsaiInspectionModal({
           </div>
         </div>
 
-        {/* Bottom Close Button */}
-        <div className="pt-3 border-t border-slate-800 shrink-0 mt-3">
+        {/* Bottom Close Button & Controller Hotkeys Bar */}
+        <div className="pt-3 border-t border-slate-800 shrink-0 mt-3 flex items-center justify-between gap-3">
+          <div className="text-[11px] font-mono text-slate-400 hidden sm:flex items-center gap-2">
+            <span>🎮 [WASD / D-Pad] Select Button</span>
+            <span>•</span>
+            <span>[E / A] Activate Focused</span>
+            <span>•</span>
+            <span>[Arrows / R-Stick] Scroll</span>
+          </div>
           <button
             onClick={onClose}
-            className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs py-2.5 rounded-xl transition-colors min-h-[38px]">
-            Close Inspection Menu (ESC)
+            className={`flex-1 sm:flex-initial font-bold text-xs py-2.5 px-6 rounded-xl transition-all min-h-[38px] border ${
+              focusedBtnIdx === 5
+                ? 'bg-slate-700 text-white ring-4 ring-slate-300 border-white scale-[1.02] shadow-[0_0_15px_rgba(255,255,255,0.4)]'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
+            }`}>
+            {focusedBtnIdx === 5 && '► '}
+            Close Inspection Menu [Esc / B]
           </button>
         </div>
       </div>

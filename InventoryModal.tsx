@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Package,
   Sprout,
@@ -131,7 +131,7 @@ export default function InventoryModal({
   onPlantStoredBonsai,
   onPlantSaplingClick,
 }: InventoryModalProps) {
-  if (!isOpen) return null;
+  const [focusedIdx, setFocusedIdx] = useState<number>(0);
 
   // Use individual seedlingList if available, otherwise fallback to storedSaplings
   const effectiveSeedlings: SeedlingItem[] =
@@ -157,6 +157,93 @@ export default function InventoryModal({
 
   const totalAvailableSeedlings = effectiveSeedlings.length;
   const totalStoredPots = storedPottedBonsais.length;
+
+  // Reset focused item index when switching tabs
+  useEffect(() => {
+    setFocusedIdx(0);
+  }, [storageTab]);
+
+  // Handle Gamepad Bumper tab cycling & Keyboard Navigation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tabs: ('PLANTING' | 'MATERIALS' | 'EQUIPMENT' | 'DECOR')[] = [
+        'PLANTING',
+        'MATERIALS',
+        'EQUIPMENT',
+        'DECOR',
+      ];
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        const idx = tabs.indexOf(storageTab);
+        const nextIdx = (idx - 1 + tabs.length) % tabs.length;
+        setStorageTab(tabs[nextIdx]);
+        gameAudio.playCrispClick();
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        const idx = tabs.indexOf(storageTab);
+        const nextIdx = (idx + 1) % tabs.length;
+        setStorageTab(tabs[nextIdx]);
+        gameAudio.playCrispClick();
+      } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        setFocusedIdx((i) => Math.max(0, i - 1));
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        const maxItems =
+          storageTab === 'PLANTING'
+            ? storedPottedBonsais.length + effectiveSeedlings.length
+            : 10;
+        setFocusedIdx((i) => Math.min(Math.max(0, maxItems - 1), i + 1));
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'e' || e.key === 'E') {
+        if (storageTab === 'PLANTING') {
+          e.preventDefault();
+          if (focusedIdx < storedPottedBonsais.length) {
+            const potted = storedPottedBonsais[focusedIdx];
+            if (potted) onPlantStoredBonsai(potted.id);
+          } else {
+            const seedIdx = focusedIdx - storedPottedBonsais.length;
+            const seed = effectiveSeedlings[seedIdx];
+            if (seed) onPlantSaplingClick(seed);
+          }
+        }
+      }
+    };
+
+    const handleBumper = (e: Event) => {
+      const ce = e as CustomEvent<{direction: 'left' | 'right'}>;
+      const dir = ce.detail?.direction;
+      const tabs: ('PLANTING' | 'MATERIALS' | 'EQUIPMENT' | 'DECOR')[] = [
+        'PLANTING',
+        'MATERIALS',
+        'EQUIPMENT',
+        'DECOR',
+      ];
+      const idx = tabs.indexOf(storageTab);
+      const nextIdx =
+        dir === 'right'
+          ? (idx + 1) % tabs.length
+          : (idx - 1 + tabs.length) % tabs.length;
+      setStorageTab(tabs[nextIdx]);
+      gameAudio.playCrispClick();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('gamepad-bumper', handleBumper);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('gamepad-bumper', handleBumper);
+    };
+  }, [isOpen, storageTab, setStorageTab, focusedIdx, storedPottedBonsais, effectiveSeedlings, onPlantStoredBonsai, onPlantSaplingClick, onClose]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed top-12 left-0 right-0 bottom-0 z-40 bg-slate-950/95 backdrop-blur-md p-3 sm:p-5 flex flex-col overflow-hidden border-t border-slate-800 text-left select-none">
@@ -881,11 +968,16 @@ export default function InventoryModal({
         </div>
       )}
 
-      <button
-        onClick={onClose}
-        className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 rounded-xl transition-colors min-h-[40px] shrink-0 text-xs">
-        Close Inventory
-      </button>
+      <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-3 shrink-0">
+        <div className="text-[11px] font-mono text-emerald-400/90 hidden sm:flex items-center gap-1.5">
+          <span>🎮 [A/D / LB/RB] Switch Tabs • [W/S / ↑↓] Navigate • [E / A] Plant/Action</span>
+        </div>
+        <button
+          onClick={onClose}
+          className="flex-1 sm:flex-initial bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-6 rounded-xl transition-colors min-h-[40px] text-xs border border-slate-700">
+          Close Inventory [Esc / B]
+        </button>
+      </div>
     </div>
   );
 }

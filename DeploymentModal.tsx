@@ -273,6 +273,7 @@ export default function DeploymentModal({
   const [activeCategory, setActiveCategory] = useState<DeploymentCategory>('seedlings');
   const [selectedSeedlingForStyle, setSelectedSeedlingForStyle] = useState<SeedlingItem | null>(null);
   const [activeStyleIdx, setActiveStyleIdx] = useState<number>(0);
+  const [focusedItemIdx, setFocusedItemIdx] = useState<number>(0);
 
   useEffect(() => {
     if (initialSelectedSeedling) {
@@ -283,12 +284,169 @@ export default function DeploymentModal({
     }
   }, [initialSelectedSeedling, isOpen]);
 
-  if (!isOpen) return null;
+  // Reset focused item index when switching categories
+  useEffect(() => {
+    setFocusedItemIdx(0);
+  }, [activeCategory]);
 
   const compostCount = getStructureInventoryCount(inv, 'tool_compost_heap');
   const wellCount = getStructureInventoryCount(inv, 'tool_garden_well');
   const solarCount = getStructureInventoryCount(inv, 'solar_panel');
   const windCount = getStructureInventoryCount(inv, 'wind_turbine');
+
+  const infraItems: DeployedStructureType[] = [
+    'solar_panel',
+    'wind_turbine',
+    'tool_garden_well',
+    'tool_compost_heap',
+  ];
+
+  const decorItems: DeployedStructureType[] = [
+    'decor_pebble_path',
+    'decor_rock_formation',
+    'decor_shrubbery_bush',
+    'decor_woven_wall',
+    'crystal_pedestal_foliage',
+    'crystal_pedestal_branches',
+    'crystal_pedestal_trunk',
+    'crystal_pedestal_roots',
+  ];
+
+  // Handle keyboard navigation and gamepad events
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (selectedSeedlingForStyle) {
+        // "Choose Style to Plant" view
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+          e.preventDefault();
+          setActiveStyleIdx((idx) => (idx - 1 + STYLES.length) % STYLES.length);
+          gameAudio.playCrispClick();
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+          e.preventDefault();
+          setActiveStyleIdx((idx) => (idx + 1) % STYLES.length);
+          gameAudio.playCrispClick();
+        } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'e' || e.key === 'E') {
+          e.preventDefault();
+          const curStyleKey = STYLES[activeStyleIdx] || 'CHOKAN';
+          const natureObj = selectedSeedlingForStyle.nature
+            ? getBonsaiNature(selectedSeedlingForStyle.nature)
+            : undefined;
+          gameAudio.playConfirmSelect();
+          onPlantSeedling(selectedSeedlingForStyle, curStyleKey, natureObj);
+          setSelectedSeedlingForStyle(null);
+          onClose();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          setSelectedSeedlingForStyle(null);
+          gameAudio.playCrispClick();
+        }
+      } else {
+        // Main Deployment modal view
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          onClose();
+        } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+          e.preventDefault();
+          const cats: DeploymentCategory[] = ['seedlings', 'bonsais', 'infrastructure', 'decorations'];
+          setActiveCategory((cur) => {
+            const idx = cats.indexOf(cur);
+            return cats[(idx - 1 + cats.length) % cats.length];
+          });
+          gameAudio.playCrispClick();
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+          e.preventDefault();
+          const cats: DeploymentCategory[] = ['seedlings', 'bonsais', 'infrastructure', 'decorations'];
+          setActiveCategory((cur) => {
+            const idx = cats.indexOf(cur);
+            return cats[(idx + 1) % cats.length];
+          });
+          gameAudio.playCrispClick();
+        } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+          e.preventDefault();
+          setFocusedItemIdx((idx) => Math.max(0, idx - 1));
+          gameAudio.playHoverMicroTone();
+        } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+          e.preventDefault();
+          let maxCount = 1;
+          if (activeCategory === 'seedlings') maxCount = seedlingList.length;
+          else if (activeCategory === 'bonsais') maxCount = storedBonsais.length;
+          else if (activeCategory === 'infrastructure') maxCount = infraItems.length;
+          else if (activeCategory === 'decorations') maxCount = decorItems.length;
+          setFocusedItemIdx((idx) => Math.min(Math.max(0, maxCount - 1), idx + 1));
+          gameAudio.playHoverMicroTone();
+        } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'e' || e.key === 'E') {
+          e.preventDefault();
+          if (activeCategory === 'seedlings' && seedlingList[focusedItemIdx]) {
+            setSelectedSeedlingForStyle(seedlingList[focusedItemIdx]);
+            setActiveStyleIdx(0);
+            gameAudio.playCrispClick();
+          } else if (activeCategory === 'bonsais' && storedBonsais[focusedItemIdx]) {
+            gameAudio.playPowerupChime();
+            onPlantStoredBonsai(storedBonsais[focusedItemIdx].id);
+            onClose();
+          } else if (activeCategory === 'infrastructure') {
+            const item = infraItems[focusedItemIdx];
+            if (item) {
+              const count = getStructureInventoryCount(inv, item);
+              if (count > 0) onDeployStructure(item);
+              else gameAudio.playErrorBuzz();
+            }
+          } else if (activeCategory === 'decorations') {
+            const item = decorItems[focusedItemIdx];
+            if (item) {
+              const count = getStructureInventoryCount(inv, item);
+              if (count > 0) onDeployStructure(item);
+              else gameAudio.playErrorBuzz();
+            }
+          }
+        }
+      }
+    };
+
+    const handleBumper = (e: Event) => {
+      const ce = e as CustomEvent<{direction: 'left' | 'right'}>;
+      const dir = ce.detail?.direction;
+      if (selectedSeedlingForStyle) {
+        setActiveStyleIdx((idx) =>
+          dir === 'right' ? (idx + 1) % STYLES.length : (idx - 1 + STYLES.length) % STYLES.length,
+        );
+        gameAudio.playCrispClick();
+      } else {
+        const cats: DeploymentCategory[] = ['seedlings', 'bonsais', 'infrastructure', 'decorations'];
+        setActiveCategory((cur) => {
+          const idx = cats.indexOf(cur);
+          const nextIdx = dir === 'right' ? (idx + 1) % cats.length : (idx - 1 + cats.length) % cats.length;
+          return cats[nextIdx];
+        });
+        gameAudio.playCrispClick();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('gamepad-bumper', handleBumper);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('gamepad-bumper', handleBumper);
+    };
+  }, [
+    isOpen,
+    selectedSeedlingForStyle,
+    activeStyleIdx,
+    activeCategory,
+    focusedItemIdx,
+    seedlingList,
+    storedBonsais,
+    inv,
+    onPlantSeedling,
+    onPlantStoredBonsai,
+    onDeployStructure,
+    onClose,
+  ]);
+
+  if (!isOpen) return null;
+
   const decorCount =
     (inv.decor_pebble_path_inv || 0) +
     (inv.decor_rock_formation_inv || 0) +
@@ -620,8 +778,11 @@ export default function DeploymentModal({
                 onClick={() => setSelectedSeedlingForStyle(null)}
                 className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-4 py-2.5 rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow">
                 <ChevronLeft className="w-4 h-4" />
-                <span>Back to Seedlings</span>
+                <span>Back [Esc / B]</span>
               </button>
+              <div className="text-[11px] font-mono text-emerald-400/90 hidden sm:inline">
+                🎮 [A/D / LB/RB] Cycle Style • [E / A] Plant • [Esc / B] Back
+              </div>
               <button
                 onClick={() => {
                   gameAudio.playConfirmSelect();
@@ -629,9 +790,9 @@ export default function DeploymentModal({
                   setSelectedSeedlingForStyle(null);
                   onClose();
                 }}
-                className="flex-1 max-w-md bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold py-2.5 rounded-xl text-xs sm:text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer">
+                className="flex-1 max-w-md bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold py-2.5 rounded-xl text-xs sm:text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer ring-2 ring-emerald-400/60">
                 <Sprout className="w-4 h-4" />
-                <span>Plant in {curStyleDef.japanese} ({curStyleDef.name}) Style</span>
+                <span>Plant [E / A] ({curStyleDef.japanese})</span>
               </button>
             </div>
           </div>
@@ -862,9 +1023,13 @@ export default function DeploymentModal({
                               setSelectedSeedlingForStyle(seedling);
                               setActiveStyleIdx(0);
                             }}
-                            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-xl shadow transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer text-xs sm:text-sm">
+                            className={`w-full font-bold py-2 rounded-xl shadow transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer text-xs sm:text-sm ${
+                              focusedItemIdx === sIdx && activeCategory === 'seedlings'
+                                ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 ring-2 ring-emerald-300'
+                                : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                            }`}>
                             <Sprout className="w-4 h-4" />
-                            <span>Choose Style to Plant</span>
+                            <span>Choose Style to Plant [E / A]</span>
                           </button>
                         </div>
                       );
@@ -1381,6 +1546,18 @@ export default function DeploymentModal({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Bottom Navigational Prompts Strip */}
+          <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 shrink-0">
+            <span className="font-mono text-emerald-400">
+              🎮 [A/D / LB/RB] Switch Tabs • [W/S / ↑↓] Select • [E / A] Deploy • [Esc / B] Close
+            </span>
+            <button
+              onClick={onClose}
+              className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-all">
+              Close [Esc / B]
+            </button>
           </div>
         </>
       )}
