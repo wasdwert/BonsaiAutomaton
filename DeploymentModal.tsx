@@ -32,6 +32,7 @@ import {
   BonsaiNature,
   getBonsaiNature,
   calculateBaseAesthetic,
+  GridPlacementPreview,
 } from './types';
 import {
   SanctuaryInventory,
@@ -93,6 +94,7 @@ export interface DeploymentModalProps {
   onPlantSeedling: (seedling: SeedlingItem, style: BonsaiStyle, nature?: BonsaiNature) => void;
   onPlantStoredBonsai: (storedId: string) => void;
   onDeployStructure: (type: DeployedStructureType) => void;
+  onStartPlacementPreview?: (preview: GridPlacementPreview) => void;
   onOpenFullInventory?: () => void;
   initialSelectedSeedling?: SeedlingItem | null;
 }
@@ -267,6 +269,7 @@ export default function DeploymentModal({
   onPlantSeedling,
   onPlantStoredBonsai,
   onDeployStructure,
+  onStartPlacementPreview,
   onOpenFullInventory,
   initialSelectedSeedling,
 }: DeploymentModalProps) {
@@ -306,6 +309,7 @@ export default function DeploymentModal({
     'decor_rock_formation',
     'decor_shrubbery_bush',
     'decor_woven_wall',
+    'torii_gate',
     'crystal_pedestal_foliage',
     'crystal_pedestal_branches',
     'crystal_pedestal_trunk',
@@ -334,7 +338,19 @@ export default function DeploymentModal({
             ? getBonsaiNature(selectedSeedlingForStyle.nature)
             : undefined;
           gameAudio.playConfirmSelect();
-          onPlantSeedling(selectedSeedlingForStyle, curStyleKey, natureObj);
+          if (onStartPlacementPreview) {
+            onStartPlacementPreview({
+              category: 'seedling',
+              payload: selectedSeedlingForStyle,
+              width: 1,
+              height: 1,
+              orientation: 'horizontal',
+              style: curStyleKey,
+              nature: natureObj,
+            });
+          } else {
+            onPlantSeedling(selectedSeedlingForStyle, curStyleKey, natureObj);
+          }
           setSelectedSeedlingForStyle(null);
           onClose();
         } else if (e.key === 'Escape') {
@@ -383,22 +399,62 @@ export default function DeploymentModal({
             setActiveStyleIdx(0);
             gameAudio.playCrispClick();
           } else if (activeCategory === 'bonsais' && storedBonsais[focusedItemIdx]) {
-            gameAudio.playPowerupChime();
-            onPlantStoredBonsai(storedBonsais[focusedItemIdx].id);
+            gameAudio.playCrispClick();
+            if (onStartPlacementPreview) {
+              onStartPlacementPreview({
+                category: 'bonsai',
+                payload: storedBonsais[focusedItemIdx],
+                width: 1,
+                height: 1,
+                orientation: 'horizontal',
+              });
+            } else {
+              onPlantStoredBonsai(storedBonsais[focusedItemIdx].id);
+            }
             onClose();
           } else if (activeCategory === 'infrastructure') {
             const item = infraItems[focusedItemIdx];
             if (item) {
               const count = getStructureInventoryCount(inv, item);
-              if (count > 0) onDeployStructure(item);
-              else gameAudio.playErrorBuzz();
+              if (count > 0) {
+                gameAudio.playCrispClick();
+                if (onStartPlacementPreview) {
+                  onStartPlacementPreview({
+                    category: 'infrastructure',
+                    payload: item,
+                    width: 1,
+                    height: 1,
+                    orientation: 'horizontal',
+                  });
+                } else {
+                  onDeployStructure(item);
+                }
+                onClose();
+              } else {
+                gameAudio.playErrorBuzz();
+              }
             }
           } else if (activeCategory === 'decorations') {
             const item = decorItems[focusedItemIdx];
             if (item) {
               const count = getStructureInventoryCount(inv, item);
-              if (count > 0) onDeployStructure(item);
-              else gameAudio.playErrorBuzz();
+              if (count > 0) {
+                gameAudio.playCrispClick();
+                if (onStartPlacementPreview) {
+                  onStartPlacementPreview({
+                    category: 'decoration',
+                    payload: item,
+                    width: item === 'torii_gate' ? 3 : 1,
+                    height: 1,
+                    orientation: 'horizontal',
+                  });
+                } else {
+                  onDeployStructure(item);
+                }
+                onClose();
+              } else {
+                gameAudio.playErrorBuzz();
+              }
             }
           }
         }
@@ -442,6 +498,7 @@ export default function DeploymentModal({
     onPlantSeedling,
     onPlantStoredBonsai,
     onDeployStructure,
+    onStartPlacementPreview,
     onClose,
   ]);
 
@@ -786,7 +843,19 @@ export default function DeploymentModal({
               <button
                 onClick={() => {
                   gameAudio.playConfirmSelect();
-                  onPlantSeedling(seedling, curStyleKey, natureObj);
+                  if (onStartPlacementPreview) {
+                    onStartPlacementPreview({
+                      category: 'seedling',
+                      payload: seedling,
+                      width: 1,
+                      height: 1,
+                      orientation: 'horizontal',
+                      style: curStyleKey,
+                      nature: natureObj,
+                    });
+                  } else {
+                    onPlantSeedling(seedling, curStyleKey, natureObj);
+                  }
                   setSelectedSeedlingForStyle(null);
                   onClose();
                 }}
@@ -1153,11 +1222,22 @@ export default function DeploymentModal({
                           <button
                             onClick={() => {
                               gameAudio.playPowerupChime();
-                              onPlantStoredBonsai(stored.id);
+                              if (onStartPlacementPreview) {
+                                onStartPlacementPreview({
+                                  category: 'bonsai',
+                                  payload: stored,
+                                  width: 1,
+                                  height: 1,
+                                  orientation: 'horizontal',
+                                });
+                              } else {
+                                onPlantStoredBonsai(stored.id);
+                              }
+                              onClose();
                             }}
                             className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs py-2 rounded-xl shadow transition-transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
                             <Sprout className="w-4 h-4" />
-                            <span>Plant on Plot</span>
+                            <span>Deploy on Plot</span>
                           </button>
                         </div>
                       );
@@ -1197,7 +1277,20 @@ export default function DeploymentModal({
                     </p>
                     <button
                       disabled={solarCount <= 0}
-                      onClick={() => onDeployStructure('solar_panel')}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'solar_panel',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('solar_panel');
+                        }
+                      }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
                         solarCount > 0
                           ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
@@ -1227,7 +1320,20 @@ export default function DeploymentModal({
                     </p>
                     <button
                       disabled={windCount <= 0}
-                      onClick={() => onDeployStructure('wind_turbine')}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'wind_turbine',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('wind_turbine');
+                        }
+                      }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
                         windCount > 0
                           ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
@@ -1257,7 +1363,20 @@ export default function DeploymentModal({
                     </p>
                     <button
                       disabled={wellCount <= 0}
-                      onClick={() => onDeployStructure('tool_garden_well')}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'tool_garden_well',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('tool_garden_well');
+                        }
+                      }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
                         wellCount > 0
                           ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
@@ -1287,7 +1406,20 @@ export default function DeploymentModal({
                     </p>
                     <button
                       disabled={compostCount <= 0}
-                      onClick={() => onDeployStructure('tool_compost_heap')}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'tool_compost_heap',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('tool_compost_heap');
+                        }
+                      }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
                         compostCount > 0
                           ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
@@ -1331,7 +1463,20 @@ export default function DeploymentModal({
                     </p>
                     <button
                       disabled={(inv.decor_pebble_path_inv || 0) <= 0}
-                      onClick={() => onDeployStructure('decor_pebble_path')}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'decoration',
+                            payload: 'decor_pebble_path',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('decor_pebble_path');
+                        }
+                      }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
                         (inv.decor_pebble_path_inv || 0) > 0
                           ? 'bg-slate-700 hover:bg-slate-600 text-white active:scale-95'
@@ -1360,7 +1505,20 @@ export default function DeploymentModal({
                     </p>
                     <button
                       disabled={(inv.decor_rock_formation_inv || 0) <= 0}
-                      onClick={() => onDeployStructure('decor_rock_formation')}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'decoration',
+                            payload: 'decor_rock_formation',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('decor_rock_formation');
+                        }
+                      }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
                         (inv.decor_rock_formation_inv || 0) > 0
                           ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
@@ -1389,7 +1547,20 @@ export default function DeploymentModal({
                     </p>
                     <button
                       disabled={(inv.decor_shrubbery_bush_inv || 0) <= 0}
-                      onClick={() => onDeployStructure('decor_shrubbery_bush')}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'decoration',
+                            payload: 'decor_shrubbery_bush',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('decor_shrubbery_bush');
+                        }
+                      }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
                         (inv.decor_shrubbery_bush_inv || 0) > 0
                           ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
@@ -1418,13 +1589,68 @@ export default function DeploymentModal({
                     </p>
                     <button
                       disabled={(inv.decor_woven_wall_inv || 0) <= 0}
-                      onClick={() => onDeployStructure('decor_woven_wall')}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'decoration',
+                            payload: 'decor_woven_wall',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('decor_woven_wall');
+                        }
+                      }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
                         (inv.decor_woven_wall_inv || 0) > 0
                           ? 'bg-amber-700 hover:bg-amber-600 text-white active:scale-95'
                           : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                       }`}>
                       Place Woven Lattice Wall
+                    </button>
+                  </div>
+
+                  {/* Torii Gate (3x1 / 1x3 Rotatable) */}
+                  <div className="bg-slate-900/80 border border-red-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-2xl">⛩️</span>
+                        <div>
+                          <h5 className="font-bold text-xs sm:text-sm text-red-300 truncate">Torii Gate (3x1 / 1x3)</h5>
+                          <span className="text-[10px] text-amber-400 font-bold">3x1 / 1x3 Multi-Plot • Rotatable Archway</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-slate-950 text-red-300 border border-red-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Stock: {inv.torii_gate_inv || 0}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Majestic vermilion shinto archway. Outer pillars anchor the sides, while the central archway plot remains open, walkable, and placeable!
+                    </p>
+                    <button
+                      disabled={(inv.torii_gate_inv || 0) <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'decoration',
+                            payload: 'torii_gate',
+                            width: 3,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('torii_gate');
+                        }
+                      }}
+                      className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        (inv.torii_gate_inv || 0) > 0
+                          ? 'bg-red-600 hover:bg-red-500 text-white active:scale-95 ring-1 ring-red-400/50'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      {(inv.torii_gate_inv || 0) > 0 ? 'Place Torii Gate [E / A]' : 'Claim Free in Botanical Market'}
                     </button>
                   </div>
 
@@ -1447,7 +1673,20 @@ export default function DeploymentModal({
                     </p>
                     <button
                       disabled={(inv.crystal_pedestal_foliage_inv || 0) <= 0}
-                      onClick={() => onDeployStructure('crystal_pedestal_foliage')}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'decoration',
+                            payload: 'crystal_pedestal_foliage',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('crystal_pedestal_foliage');
+                        }
+                      }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
                         (inv.crystal_pedestal_foliage_inv || 0) > 0
                           ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
@@ -1476,7 +1715,20 @@ export default function DeploymentModal({
                     </p>
                     <button
                       disabled={(inv.crystal_pedestal_branches_inv || 0) <= 0}
-                      onClick={() => onDeployStructure('crystal_pedestal_branches')}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'decoration',
+                            payload: 'crystal_pedestal_branches',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('crystal_pedestal_branches');
+                        }
+                      }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
                         (inv.crystal_pedestal_branches_inv || 0) > 0
                           ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
@@ -1505,7 +1757,20 @@ export default function DeploymentModal({
                     </p>
                     <button
                       disabled={(inv.crystal_pedestal_trunk_inv || 0) <= 0}
-                      onClick={() => onDeployStructure('crystal_pedestal_trunk')}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'decoration',
+                            payload: 'crystal_pedestal_trunk',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('crystal_pedestal_trunk');
+                        }
+                      }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
                         (inv.crystal_pedestal_trunk_inv || 0) > 0
                           ? 'bg-rose-600 hover:bg-rose-500 text-white active:scale-95'
@@ -1534,7 +1799,20 @@ export default function DeploymentModal({
                     </p>
                     <button
                       disabled={(inv.crystal_pedestal_roots_inv || 0) <= 0}
-                      onClick={() => onDeployStructure('crystal_pedestal_roots')}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'decoration',
+                            payload: 'crystal_pedestal_roots',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('crystal_pedestal_roots');
+                        }
+                      }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
                         (inv.crystal_pedestal_roots_inv || 0) > 0
                           ? 'bg-blue-600 hover:bg-blue-500 text-white active:scale-95'

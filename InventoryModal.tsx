@@ -901,6 +901,22 @@ export default function InventoryModal({
               </div>
             </div>
 
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-red-500/40 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">⛩️</span>
+                <div>
+                  <h4 className="font-bold text-xs sm:text-sm text-red-300">Torii Gate (3x1 / 1x3)</h4>
+                  <p className="text-[10px] text-amber-400 font-semibold">3x1 / 1x3 Multi-Plot • Open Center Walkway</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-black text-red-300">{inv.torii_gate_inv || 0} in Stock</div>
+                <span className="text-[10px] text-slate-400">
+                  {deployedStructures.filter((s) => s.type === 'torii_gate').length} Placed
+                </span>
+              </div>
+            </div>
+
             <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-emerald-500/40 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">💎</span>

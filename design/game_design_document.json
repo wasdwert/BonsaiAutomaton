@@ -52,9 +52,9 @@
   ],
   "sections": [
     {
-      "title": "Controls and Accessibility",
-      "content": "1. Dedicated Scrolling Protocol: Arrow keys (Up, Down, Left, Right) and the Gamepad Right Analog Stick are exclusively assigned to viewport and list scrolling across all interfaces (Market catalog, Artisan recipes, Zen Library Bondex, and modal dialogs), fully detached from focus and movement mechanics. 2. Menu Item Focus & Navigation: W/S and Gamepad D-Pad (Up/Down) navigate item focus across menus (Title Screen, Market, Workbench, Rover Garage, and Bonsai Inspection actions), while A/D and Left/Right Bumpers (LB/RB) cleanly toggle modal categories and sub-tabs. E / Button A activates the focused selection. 3. Title Screen Keyboard Launch: Boot sequences automatically highlight the 'Enter Sanctuary' action, allowing immediate game start via E, Enter, Space, or Gamepad Button A without mouse input. 4. Excursion Return Protocol: Approaching the Basecamp extraction beacon and pressing E or Gamepad Button A completes the expedition, displays the debrief summary, and safely returns the rover and cargo to the Sanctuary.",
-      "summary": "Dedicated Arrow/Right-Stick Scrolling, Multi-Modal Menu Item Navigation, and Excursion Completion Protocol."
+      "title": "Core Mechanics",
+      "content": "1. Immediate Ghost Footprint Initialization: The ghost placement silhouette instantly resolves and renders on the player's active grid plot upon closing the deployment menu on frame one, eliminating the need to leave and re-enter the grid. 2. Dedicated Arrow-Key Preview Rotation: Arrow keys (Left/Right/Up/Down), Q/R keys, and Shoulder Bumpers (LB/RB) directly toggle footprint orientation between horizontal (3x1) and vertical (1x3) during placement preview before reaching window scroll interceptors. 3. Architectural Depth Z-Layering: Torii Gates utilize two-tier depth rendering: the ground layer (pebble pathway and foundation post stones) renders below the player, while the elevated vermilion pillars and overhead Kasagi roof crossbeam render above the player avatar, allowing the player to naturally walk through and underneath the archway with genuine depth perspective.",
+      "summary": "Immediate Ghost Placement Telemetry, Dedicated Arrow Rotation Capture, and Architectural Z-Layering for Torii Gates."
     }
   ]
 }

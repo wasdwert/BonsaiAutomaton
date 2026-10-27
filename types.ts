@@ -225,6 +225,19 @@ export type GrowthStyle =
   | 'KENGAI'
   | 'KABUDACHI';
 
+/**
+ * Real-time Sanctuary Grid Deployment placement preview state
+ */
+export interface GridPlacementPreview {
+  category: 'seedling' | 'bonsai' | 'infrastructure' | 'decoration';
+  payload: any;
+  width: number;
+  height: number;
+  orientation: 'horizontal' | 'vertical'; // default 'horizontal'
+  style?: GrowthStyle;
+  nature?: BonsaiNature;
+}
+
 export const STYLE_ATTRIBUTE_WEIGHTS: Record<
   string,
   { foliage: number; branches: number; trunk: number; roots: number }

@@ -129,6 +129,7 @@ import {
   calculateBaseAesthetic,
   formatStyleWeightsString,
   STYLE_ATTRIBUTE_WEIGHTS,
+  GridPlacementPreview,
 } from './types';
 export { calculateBaseAesthetic };
 import BonsaiExcavationModal, { ExcavationResultData } from './BonsaiExcavationModal';
@@ -220,6 +221,48 @@ export function getPlotAtCoords(
   };
 }
 
+/**
+ * Returns the sanctuary plot info for placement preview.
+ * Clamps coordinates to the nearest valid grid plot bounds so preview is immediately active.
+ */
+export function getPreviewPlot(
+  playerX: number,
+  playerY: number,
+  expansionTier = 0,
+): SanctuaryPlotInfo {
+  const halfTileW = (SANCTUARY_GRID.cellW - 8) / 2;
+  const halfTileH = (SANCTUARY_GRID.cellH - 8) / 2;
+  const gridLeft = SANCTUARY_GRID.startX - SANCTUARY_GRID.cellW / 2;
+  const gridTop = SANCTUARY_GRID.startY - SANCTUARY_GRID.cellH / 2;
+
+  const c = Math.max(0, Math.min(SANCTUARY_GRID.cols - 1, Math.floor((playerX - gridLeft) / SANCTUARY_GRID.cellW)));
+  const r = Math.max(0, Math.min(SANCTUARY_GRID.rows - 1, Math.floor((playerY - gridTop) / SANCTUARY_GRID.cellH)));
+
+  const centerX = SANCTUARY_GRID.startX + c * SANCTUARY_GRID.cellW;
+  const centerY = SANCTUARY_GRID.startY + r * SANCTUARY_GRID.cellH;
+  const plotX = centerX - halfTileW;
+  const plotY = centerY - halfTileH;
+
+  let isUnlocked = false;
+  if (expansionTier >= 4) isUnlocked = true;
+  else if (expansionTier === 3) isUnlocked = r >= 0 && r <= 5;
+  else if (expansionTier === 2) isUnlocked = r >= 0 && r <= 3;
+  else if (expansionTier === 1) isUnlocked = c >= 4 && c <= 11 && r >= 0 && r <= 3;
+  else isUnlocked = c >= 6 && c <= 9 && r >= 0 && r <= 3;
+
+  return {
+    col: c,
+    row: r,
+    x: plotX,
+    y: plotY,
+    width: halfTileW * 2,
+    height: halfTileH * 2,
+    centerX,
+    centerY,
+    isUnlocked,
+  };
+}
+
 // Excursion Grid Tile Size (64px per step)
 export const EXCURSION_TILE_SIZE = 64;
 
@@ -238,7 +281,8 @@ export type DeployedStructureType =
   | 'crystal_pedestal_foliage'
   | 'crystal_pedestal_branches'
   | 'crystal_pedestal_trunk'
-  | 'crystal_pedestal_roots';
+  | 'crystal_pedestal_roots'
+  | 'torii_gate';
 
 export interface DeployedStructure {
   id: string;
@@ -249,6 +293,9 @@ export interface DeployedStructure {
   gridY: number;
   rotation?: number;
   variant?: number;
+  orientation?: 'horizontal' | 'vertical';
+  width?: number;
+  height?: number;
   // Compost Heap state
   depositedWaste?: number; // up to 20
   maxCapacity?: number;    // default 20
@@ -1598,6 +1645,7 @@ export interface SanctuaryInventory {
   decor_rock_formation_inv: number;
   decor_shrubbery_bush_inv: number;
   decor_woven_wall_inv: number;
+  torii_gate_inv?: number;
   crystal_pedestal_foliage_inv: number;
   crystal_pedestal_branches_inv: number;
   crystal_pedestal_trunk_inv: number;
@@ -1607,6 +1655,7 @@ export interface SanctuaryInventory {
     rockFormation: number;
     shrubbery: number;
     wovenWall: number;
+    toriiGate?: number;
   };
   tool_compost_heap_inv?: number;
   tool_garden_well_inv?: number;
@@ -1646,6 +1695,7 @@ export interface SanctuaryInventory {
 export function getInventoryStructureKey(type: DeployedStructureType): string {
   if (type === 'solar_panel') return 'solar_panels_inv';
   if (type === 'wind_turbine') return 'wind_turbines_inv';
+  if (type === 'torii_gate') return 'torii_gate_inv';
   return `${type}_inv`;
 }
 
@@ -1661,6 +1711,9 @@ export function getStructureInventoryCount(inv: SanctuaryInventory, type: Deploy
   }
   if (type === 'tool_garden_well') {
     return inv.tool_garden_well_inv ?? inv.tools?.gardenWell ?? 0;
+  }
+  if (type === 'torii_gate') {
+    return inv.torii_gate_inv ?? inv.decorations?.toriiGate ?? 0;
   }
   const key = `${type}_inv`;
   return inv[key] ?? 0;
@@ -3543,6 +3596,390 @@ export function drawWildBarrierTree(
   ctx.restore();
 }
 
+/**
+ * Procedural ground layer rendering for Torii Gate:
+ * - Pebble path in the center plot (walkable flooring)
+ * - Stone pedestals and ground shadows for outer pillars
+ * Drawn in Ground Layer BEFORE player avatar and entities.
+ */
+export function drawToriiGateGround(
+  ctx: CanvasRenderingContext2D,
+  
+  sx: number,
+  sy: number,
+  orientation: 'horizontal' | 'vertical' = 'horizontal',
+) {
+  ctx.save();
+  // 0. Integrated Pebble Path Graphic on Middle Plot (walkable)
+  renderPebbleCluster(ctx, sx, sy, 0);
+
+  if (orientation === 'vertical') {
+    const topY = sy - 74;
+    const bottomY = sy + 74;
+
+    // 1. Perspective portal ground shadows
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(sx - 24, bottomY + 12, 12, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(sx + 24, bottomY + 12, 12, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(sx - 20, topY + 12, 10, 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(sx + 20, topY + 12, 10, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Stepped slate stone pedestals at bottom and top portals
+    const drawVerticalPedestal = (px: number, py: number, scale = 1) => {
+      ctx.fillStyle = '#334155';
+      ctx.beginPath();
+      ctx.roundRect(px - 10 * scale, py + 2, 20 * scale, 8 * scale, 2);
+      ctx.fill();
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.roundRect(px - 7 * scale, py - 3, 14 * scale, 6 * scale, 1.5);
+      ctx.fill();
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(px - 5 * scale, py - 6, 10 * scale, 4);
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillRect(px - 5.5 * scale, py - 7, 11 * scale, 1.2);
+    };
+
+    drawVerticalPedestal(sx - 24, bottomY + 6, 1.1);
+    drawVerticalPedestal(sx + 24, bottomY + 6, 1.1);
+    drawVerticalPedestal(sx - 20, topY + 6, 0.9);
+    drawVerticalPedestal(sx + 20, topY + 6, 0.9);
+  } else {
+    // Spans 3 horizontal plots (width = 3 * cellW = 216px).
+    // Outer pillars are positioned at sx - 72 and sx + 72.
+    const leftX = sx - 72;
+    const rightX = sx + 72;
+    const groundY = sy + 20;
+
+    // 1. Ground Shadows for outer stone pedestals
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(leftX, groundY + 4, 18, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(rightX, groundY + 4, 18, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Stepped Slate Stone Pedestals (Kamebara)
+    const drawPedestal = (px: number) => {
+      ctx.fillStyle = '#334155';
+      ctx.beginPath();
+      ctx.roundRect(px - 14, groundY - 6, 28, 10, 2);
+      ctx.fill();
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.roundRect(px - 10, groundY - 10, 20, 6, 1.5);
+      ctx.fill();
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Black lacquered nemaki collar with gold trim
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(px - 6.5, groundY - 14, 13, 5);
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillRect(px - 7, groundY - 15, 14, 1.5);
+    };
+
+    drawPedestal(leftX);
+    drawPedestal(rightX);
+  }
+  ctx.restore();
+}
+
+/**
+ * Procedural overhead / foreground layer rendering for Torii Gate:
+ * - Tall vermilion vertical pillar columns extending upwards (raised height)
+ * - Arched Kasagi & Shimaki lintels, Nuki crossbeam, and roof caps
+ * Drawn in Overhead Layer AFTER player avatar and entities so the player walks UNDER the archway!
+ */
+export function drawToriiGateOverhead(
+  ctx: CanvasRenderingContext2D,
+  
+  sx: number,
+  sy: number,
+  orientation: 'horizontal' | 'vertical' = 'horizontal',
+  isGhost = false,
+) {
+  ctx.save();
+  if (isGhost) {
+    ctx.globalAlpha = 0.65;
+  }
+
+  if (orientation === 'vertical') {
+    const topY = sy - 74;
+    const bottomY = sy + 74;
+
+    // Vertical Vermilion Timber Columns flanking the corridor
+    const runnerGradL = ctx.createLinearGradient(sx - 28, 0, sx - 16, 0);
+    runnerGradL.addColorStop(0, '#991b1b');
+    runnerGradL.addColorStop(0.5, '#dc2626');
+    runnerGradL.addColorStop(1, '#7f1d1d');
+    ctx.fillStyle = runnerGradL;
+
+    ctx.fillRect(sx - 28, bottomY - 32, 8, 32);
+    ctx.fillRect(sx - 24, topY - 32, 7, 32);
+
+    const runnerGradR = ctx.createLinearGradient(sx + 16, 0, sx + 28, 0);
+    runnerGradR.addColorStop(0, '#dc2626');
+    runnerGradR.addColorStop(0.5, '#ef4444');
+    runnerGradR.addColorStop(1, '#991b1b');
+    ctx.fillStyle = runnerGradR;
+    ctx.fillRect(sx + 20, bottomY - 32, 8, 32);
+    ctx.fillRect(sx + 17, topY - 32, 7, 32);
+
+    // Longitude side rails connecting top and bottom posts along outer edges
+    ctx.strokeStyle = '#991b1b';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(sx - 24, bottomY - 14);
+    ctx.lineTo(sx - 20, topY - 14);
+    ctx.moveTo(sx + 24, bottomY - 14);
+    ctx.lineTo(sx + 20, topY - 14);
+    ctx.stroke();
+
+    // Northern Top Arch Lintel (Kasagi & Shimaki) - raised comfortably above player head
+    const topSpan = 64;
+    ctx.fillStyle = '#dc2626';
+    ctx.beginPath();
+    ctx.roundRect(sx - topSpan / 2, topY - 44, topSpan, 6, 1);
+    ctx.fill();
+    ctx.strokeStyle = '#7f1d1d';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(sx - topSpan / 2 - 4, topY - 43);
+    ctx.quadraticCurveTo(sx, topY - 41, sx + topSpan / 2 + 4, topY - 43);
+    ctx.lineTo(sx + topSpan / 2 + 8, topY - 51);
+    ctx.quadraticCurveTo(sx, topY - 49, sx - topSpan / 2 - 8, topY - 51);
+    ctx.closePath();
+    ctx.fillStyle = '#0f172a';
+    ctx.fill();
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(sx - topSpan / 2 - 8, topY - 51, 5, 8);
+    ctx.fillRect(sx + topSpan / 2 + 3, topY - 51, 5, 8);
+
+    // Southern Arch Crossbeam - raised comfortably above player head
+    const botSpan = 72;
+    ctx.fillStyle = '#dc2626';
+    ctx.beginPath();
+    ctx.roundRect(sx - botSpan / 2, bottomY - 44, botSpan, 6, 1);
+    ctx.fill();
+    ctx.strokeStyle = '#7f1d1d';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(sx - botSpan / 2 - 4, bottomY - 43);
+    ctx.quadraticCurveTo(sx, bottomY - 41, sx + botSpan / 2 + 4, bottomY - 43);
+    ctx.lineTo(sx + botSpan / 2 + 8, bottomY - 51);
+    ctx.quadraticCurveTo(sx, bottomY - 49, sx - botSpan / 2 - 8, bottomY - 51);
+    ctx.closePath();
+    ctx.fillStyle = '#0f172a';
+    ctx.fill();
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(sx - botSpan / 2 - 8, bottomY - 51, 5, 8);
+    ctx.fillRect(sx + botSpan / 2 + 3, bottomY - 51, 5, 8);
+  } else {
+    // Spans 3 horizontal plots (width = 3 * cellW = 216px).
+    // Outer pillars are positioned at sx - 72 and sx + 72.
+    // Elevated archway: groundY = sy + 20, beamY = sy - 46, kasagiY = sy - 64
+    const leftX = sx - 72;
+    const rightX = sx + 72;
+    const groundY = sy + 20;
+    const beamY = sy - 46;
+    const kasagiY = sy - 64;
+
+    // Main Vermilion Wooden Pillars (Hashira)
+    const drawPillar = (px: number, incline: number) => {
+      const postGrad = ctx.createLinearGradient(px - 6, groundY - 14, px + 6, groundY - 14);
+      postGrad.addColorStop(0, '#991b1b');
+      postGrad.addColorStop(0.3, '#dc2626');
+      postGrad.addColorStop(0.7, '#ef4444');
+      postGrad.addColorStop(1, '#7f1d1d');
+
+      ctx.fillStyle = postGrad;
+      ctx.beginPath();
+      ctx.moveTo(px - 5.5, groundY - 14);
+      ctx.lineTo(px + incline - 4.5, kasagiY + 6);
+      ctx.lineTo(px + incline + 4.5, kasagiY + 6);
+      ctx.lineTo(px + 5.5, groundY - 14);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = '#7f1d1d';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    };
+
+    drawPillar(leftX, 1.5);
+    drawPillar(rightX, -1.5);
+
+    // Lower Tie-Beam (Nuki) penetrating both pillars
+    const nukiGrad = ctx.createLinearGradient(0, beamY, 0, beamY + 8);
+    nukiGrad.addColorStop(0, '#dc2626');
+    nukiGrad.addColorStop(0.5, '#ef4444');
+    nukiGrad.addColorStop(1, '#991b1b');
+    ctx.fillStyle = nukiGrad;
+    ctx.beginPath();
+    ctx.roundRect(leftX - 16, beamY, (rightX - leftX) + 32, 7, 1);
+    ctx.fill();
+    ctx.strokeStyle = '#7f1d1d';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Wedge pins (Kusabi) on outer pillar joints
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.moveTo(leftX - 7, beamY - 2); ctx.lineTo(leftX - 10, beamY + 9); ctx.lineTo(leftX - 7, beamY + 9); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(rightX + 7, beamY - 2); ctx.lineTo(rightX + 10, beamY + 9); ctx.lineTo(rightX + 7, beamY + 9); ctx.closePath(); ctx.fill();
+
+    // Central Tablet Strut (Gakuzuka) & Framed Dedication Tablet
+    ctx.fillStyle = '#b91c1c';
+    ctx.fillRect(sx - 3, kasagiY + 5, 6, beamY - (kasagiY + 5));
+
+    // Framed Tablet (Gaku)
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.roundRect(sx - 10, beamY - 12, 20, 11, 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.fillStyle = '#fde047';
+    ctx.font = 'bold 7px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('鳥居', sx, beamY - 4);
+
+    // Upper Lintel Beams (Shimaki & Kasagi)
+    const shimakiGrad = ctx.createLinearGradient(0, kasagiY + 4, 0, kasagiY + 11);
+    shimakiGrad.addColorStop(0, '#ef4444');
+    shimakiGrad.addColorStop(1, '#991b1b');
+    ctx.fillStyle = shimakiGrad;
+    ctx.beginPath();
+    ctx.roundRect(leftX - 22, kasagiY + 4, (rightX - leftX) + 44, 7, 1);
+    ctx.fill();
+    ctx.strokeStyle = '#7f1d1d';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Kasagi (Upper main roof beam with graceful curved upturn ends)
+    const spanHalf = ((rightX - leftX) + 56) / 2;
+    const kLeft = sx - spanHalf;
+    const kRight = sx + spanHalf;
+
+    ctx.beginPath();
+    ctx.moveTo(kLeft, kasagiY + 4);
+    ctx.quadraticCurveTo(sx, kasagiY + 6, kRight, kasagiY + 4);
+    ctx.lineTo(kRight + 4, kasagiY - 6);
+    ctx.quadraticCurveTo(sx, kasagiY - 3, kLeft - 4, kasagiY - 6);
+    ctx.closePath();
+
+    const kasagiGrad = ctx.createLinearGradient(0, kasagiY - 6, 0, kasagiY + 6);
+    kasagiGrad.addColorStop(0, '#1e293b');
+    kasagiGrad.addColorStop(0.4, '#0f172a');
+    kasagiGrad.addColorStop(0.7, '#991b1b');
+    kasagiGrad.addColorStop(1, '#7f1d1d');
+    ctx.fillStyle = kasagiGrad;
+    ctx.fill();
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Top Dark Slate Ridge Capping
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(kLeft - 4, kasagiY - 6);
+    ctx.quadraticCurveTo(sx, kasagiY - 3, kRight + 4, kasagiY - 6);
+    ctx.stroke();
+
+    // Gold-tipped corner finials (Kin-kanagu) on both Kasagi ends
+    const drawGoldFinial = (fx: number, fy: number, isRight: boolean) => {
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.moveTo(fx, fy - 6);
+      ctx.lineTo(isRight ? fx + 7 : fx - 4, fy - 4);
+      ctx.lineTo(isRight ? fx + 4 : fx - 4, fy + 4);
+      ctx.lineTo(fx, fy + 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#fef08a';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    };
+
+    drawGoldFinial(kLeft, kasagiY, false);
+    drawGoldFinial(kRight, kasagiY, true);
+
+    // Decorative amulets on outer posts
+    const drawTassel = (tx: number, ty: number) => {
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(tx, ty + 6);
+      ctx.stroke();
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(tx, ty + 7, 2, 0, Math.PI * 2);
+      ctx.fill();
+    };
+    drawTassel(leftX - 8, beamY + 7);
+    drawTassel(rightX + 8, beamY + 7);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Procedural vector rendering for Horizontal Torii Gate (3x1 plots)
+ */
+export function drawToriiGateHorizontal(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  isGhost = false,
+) {
+  drawToriiGateGround(ctx, sx, sy, 'horizontal');
+  drawToriiGateOverhead(ctx, sx, sy, 'horizontal', isGhost);
+}
+
+/**
+ * Procedural vector rendering for Vertical Torii Gate (1x3 plots)
+ */
+export function drawToriiGateVertical(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  isGhost = false,
+) {
+  drawToriiGateGround(ctx, sx, sy, 'vertical');
+  drawToriiGateOverhead(ctx, sx, sy, 'vertical', isGhost);
+}
+
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stepperRef = useRef<ReturnType<typeof createFixedStepper>>();
@@ -3604,6 +4041,75 @@ export default function App() {
   const [, setHudTick] = useState(0);
   const refreshHud = useCallback(() => setHudTick((t) => t + 1), []);
 
+  // Fullscreen state and lock (with graceful pseudo-fullscreen fallback for sandboxed iframes)
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement || document.body.classList.contains('pseudo-fullscreen')));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement && !document.body.classList.contains('pseudo-fullscreen')) {
+        let nativeSucceeded = false;
+        if (document.documentElement.requestFullscreen) {
+          try {
+            await document.documentElement.requestFullscreen().catch(() => {});
+            nativeSucceeded = Boolean(document.fullscreenElement);
+          } catch {
+            // Native fullscreen blocked by iframe sandbox policy
+          }
+        }
+        if (!nativeSucceeded) {
+          document.body.classList.add('pseudo-fullscreen');
+        }
+        if ((navigator as any).keyboard?.lock) {
+          try {
+            await (navigator as any).keyboard.lock(['Escape']);
+          } catch (_) {}
+        }
+      } else {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          await document.exitFullscreen().catch(() => {});
+        }
+        document.body.classList.remove('pseudo-fullscreen');
+      }
+    } catch (err) {
+      document.body.classList.toggle('pseudo-fullscreen');
+    }
+    setIsFullscreen(Boolean(document.fullscreenElement || document.body.classList.contains('pseudo-fullscreen')));
+  }, []);
+
+  // Real-time grid placement preview state
+  const [placementPreview, setPlacementPreview] = useState<GridPlacementPreview | null>(null);
+  const placementPreviewRef = useRef<GridPlacementPreview | null>(null);
+  placementPreviewRef.current = placementPreview;
+  const lastPreviewPlotKeyRef = useRef<string>('');
+
+  const togglePreviewOrientation = useCallback(() => {
+    setPlacementPreview((prev) => {
+      if (!prev) return null;
+      const nextOrientation = prev.orientation === 'horizontal' ? 'vertical' : 'horizontal';
+      return {
+        ...prev,
+        orientation: nextOrientation,
+        width: prev.orientation === 'horizontal' ? 1 : 3,
+        height: prev.orientation === 'horizontal' ? 3 : 1,
+      };
+    });
+    gameAudio.playCrispClick();
+  }, []);
+
+  const handleStartPlacementPreview = useCallback((preview: GridPlacementPreview) => {
+    setPlacementPreview(preview);
+    setIsPlantingModalOpen(false);
+    setIsUnifiedStorageOpen(false);
+    gameAudio.playCrispClick();
+  }, []);
+
   // Title Screen Keyboard and Menu Navigation
   useEffect(() => {
     if (gameState.status !== 'START') return;
@@ -3639,6 +4145,18 @@ export default function App() {
   // Global pure scrolling handler for Arrow keys across all scrollable containers
   useEffect(() => {
     const handleGlobalArrows = (e: KeyboardEvent) => {
+      if (
+        placementPreviewRef.current &&
+        (e.key === 'ArrowLeft' ||
+          e.key === 'ArrowRight' ||
+          e.key === 'ArrowUp' ||
+          e.key === 'ArrowDown')
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        togglePreviewOrientation();
+        return;
+      }
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
         const dy = e.key === 'ArrowUp' ? -65 : e.key === 'ArrowDown' ? 65 : 0;
@@ -3792,6 +4310,7 @@ export default function App() {
     decor_rock_formation_inv: 0,
     decor_shrubbery_bush_inv: 0,
     decor_woven_wall_inv: 0,
+    torii_gate_inv: 0,
     crystal_pedestal_foliage_inv: 0,
     crystal_pedestal_branches_inv: 0,
     crystal_pedestal_trunk_inv: 0,
@@ -3801,6 +4320,7 @@ export default function App() {
       rockFormation: 0,
       shrubbery: 0,
       wovenWall: 0,
+      toriiGate: 0,
     },
     tool_compost_heap_inv: 0,
     tool_garden_well_inv: 0,
@@ -5440,6 +5960,7 @@ export default function App() {
       decor_rock_formation_inv: 0,
       decor_shrubbery_bush_inv: 0,
       decor_woven_wall_inv: 0,
+      torii_gate_inv: 0,
       crystal_pedestal_foliage_inv: 0,
       crystal_pedestal_branches_inv: 0,
       crystal_pedestal_trunk_inv: 0,
@@ -5449,6 +5970,7 @@ export default function App() {
         rockFormation: 0,
         shrubbery: 0,
         wovenWall: 0,
+        toriiGate: 0,
       },
       tool_compost_heap_inv: 0,
       tool_garden_well_inv: 0,
@@ -6349,6 +6871,7 @@ export default function App() {
         | 'decor_rock_formation'
         | 'decor_shrubbery_bush'
         | 'decor_woven_wall'
+        | 'torii_gate'
         | 'crystal_pedestal_foliage'
         | 'crystal_pedestal_branches'
         | 'crystal_pedestal_trunk'
@@ -6365,9 +6888,10 @@ export default function App() {
         else if (decorType === 'decor_rock_formation') inv.decorations.rockFormation = (inv.decorations.rockFormation || 0) + 1;
         else if (decorType === 'decor_shrubbery_bush') inv.decorations.shrubbery = (inv.decorations.shrubbery || 0) + 1;
         else if (decorType === 'decor_woven_wall') inv.decorations.wovenWall = (inv.decorations.wovenWall || 0) + 1;
+        else if (decorType === 'torii_gate') inv.decorations.toriiGate = (inv.decorations.toriiGate || 0) + 1;
 
         gameAudio.playCoinPickup();
-        triggerNotification(`🎋 Purchased ${name}! (+1 added to Inventory)`, '#10b981');
+        triggerNotification(`🎋 Claimed ${name}! (+1 added to Inventory)`, '#10b981');
         refreshHud();
       } else {
         gameAudio.playErrorBuzz();
@@ -6410,49 +6934,63 @@ export default function App() {
       const stock = getStructureInventoryCount(inv, type);
 
       if (stock <= 0) {
-        const itemLabels: Record<string, string> = {
-          solar_panel: 'Solar Panels',
-          wind_turbine: 'Wind Turbines',
-          decor_pebble_path: 'Zen Pebble Stepping Paths',
-          decor_rock_formation: 'Zen Rock Formations',
-          decor_shrubbery_bush: 'Topiary Shrubbery Bushes',
-          decor_woven_wall: 'Woven Wooden Lattice Walls',
-          tool_compost_heap: 'Compost Heaps',
-          tool_garden_well: 'Stone Wells',
-          crystal_pedestal_foliage: 'Emerald Leaf Crystal Pedestals',
-          crystal_pedestal_branches: 'Amber Branch Crystal Pedestals',
-          crystal_pedestal_trunk: 'Coral Trunk Crystal Pedestals',
-          crystal_pedestal_roots: 'Azure Root Crystal Pedestals',
-        };
-        gameAudio.playErrorBuzz();
-        triggerNotification(`No ${itemLabels[type] || 'items'} in stock! Purchase or craft first.`, '#ef4444');
-        return;
+      const itemLabels: Record<string, string> = {
+        solar_panel: 'Solar Panels',
+        wind_turbine: 'Wind Turbines',
+        decor_pebble_path: 'Zen Pebble Stepping Paths',
+        decor_rock_formation: 'Zen Rock Formations',
+        decor_shrubbery_bush: 'Topiary Shrubbery Bushes',
+        decor_woven_wall: 'Woven Wooden Lattice Walls',
+        torii_gate: 'Torii Gates',
+        tool_compost_heap: 'Compost Heaps',
+        tool_garden_well: 'Stone Wells',
+        crystal_pedestal_foliage: 'Emerald Leaf Crystal Pedestals',
+        crystal_pedestal_branches: 'Amber Branch Crystal Pedestals',
+        crystal_pedestal_trunk: 'Coral Trunk Crystal Pedestals',
+        crystal_pedestal_roots: 'Azure Root Crystal Pedestals',
+      };
+      gameAudio.playErrorBuzz();
+      triggerNotification(`No ${itemLabels[type] || 'items'} in stock! Purchase or craft first.`, '#ef4444');
+      return;
+    }
+
+    const av = avatarRef.current;
+    const currentPlot = getPlotAtCoords(av.x, av.y, inv.sanctuary_expansion_tier || 0);
+
+    if (!currentPlot) {
+      gameAudio.playErrorBuzz();
+      triggerNotification('Walk onto the nursery grid plots to deploy!', '#ef4444');
+      return;
+    }
+
+    if (!currentPlot.isUnlocked) {
+      gameAudio.playErrorBuzz();
+      triggerNotification('🔒 Locked Plot - Purchase Greenhouse Expansions at the Botanical Market!', '#f59e0b');
+      return;
+    }
+
+    const snapX = currentPlot.centerX;
+    const snapY = currentPlot.centerY;
+
+    const isTreeOccupied = plantedBonsaisRef.current.some(
+      (b) => Math.hypot(b.x - snapX, b.y - snapY) < 30,
+    );
+    const isStructureOccupied = deployedStructuresRef.current.some((s) => {
+      if (s.type === 'torii_gate') {
+        if (s.orientation === 'vertical') {
+          return (
+            Math.hypot(s.x - snapX, (s.y - SANCTUARY_GRID.cellH) - snapY) < 30 ||
+            Math.hypot(s.x - snapX, (s.y + SANCTUARY_GRID.cellH) - snapY) < 30
+          );
+        } else {
+          return (
+            Math.hypot((s.x - SANCTUARY_GRID.cellW) - snapX, s.y - snapY) < 30 ||
+            Math.hypot((s.x + SANCTUARY_GRID.cellW) - snapX, s.y - snapY) < 30
+          );
+        }
       }
-
-      const av = avatarRef.current;
-      const currentPlot = getPlotAtCoords(av.x, av.y, inv.sanctuary_expansion_tier || 0);
-
-      if (!currentPlot) {
-        gameAudio.playErrorBuzz();
-        triggerNotification('Walk onto the nursery grid plots to deploy!', '#ef4444');
-        return;
-      }
-
-      if (!currentPlot.isUnlocked) {
-        gameAudio.playErrorBuzz();
-        triggerNotification('🔒 Locked Plot - Purchase Greenhouse Expansions at the Botanical Market!', '#f59e0b');
-        return;
-      }
-
-      const snapX = currentPlot.centerX;
-      const snapY = currentPlot.centerY;
-
-      const isTreeOccupied = plantedBonsaisRef.current.some(
-        (b) => Math.hypot(b.x - snapX, b.y - snapY) < 30,
-      );
-      const isStructureOccupied = deployedStructuresRef.current.some(
-        (s) => Math.hypot(s.x - snapX, s.y - snapY) < 30,
-      );
+      return Math.hypot(s.x - snapX, s.y - snapY) < 30;
+    });
 
       const nearWb =
         snapX >= sanctuaryWorkbench.x - 30 &&
@@ -6505,10 +7043,13 @@ export default function App() {
       } else if (type === 'tool_garden_well') {
         inv.tool_garden_well_inv = inv[key];
         if (inv.tools) inv.tools.gardenWell = inv[key];
-      } else if (type === 'decor_pebble_path') inv.decorations.pebblePath = Math.max(0, (inv.decorations.pebblePath || 0) - 1);
+      }      else if (type === 'decor_pebble_path') inv.decorations.pebblePath = Math.max(0, (inv.decorations.pebblePath || 0) - 1);
       else if (type === 'decor_rock_formation') inv.decorations.rockFormation = Math.max(0, (inv.decorations.rockFormation || 0) - 1);
       else if (type === 'decor_shrubbery_bush') inv.decorations.shrubbery = Math.max(0, (inv.decorations.shrubbery || 0) - 1);
       else if (type === 'decor_woven_wall') inv.decorations.wovenWall = Math.max(0, (inv.decorations.wovenWall || 0) - 1);
+      else if (type === 'torii_gate') {
+        if (inv.decorations) inv.decorations.toriiGate = Math.max(0, (inv.decorations.toriiGate || 1) - 1);
+      }
 
       const newStruct: DeployedStructure = {
         id: `struct_${type}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -6581,6 +7122,7 @@ export default function App() {
         decor_rock_formation: '🪨 Zen Rock Formation',
         decor_shrubbery_bush: '🌿 Topiary Shrubbery Bush',
         decor_woven_wall: '🎋 Woven Wooden Lattice Wall',
+        torii_gate: '⛩️ Torii Gate (3x1)',
         crystal_pedestal_foliage: '💎 Emerald Leaf Crystal Pedestal',
         crystal_pedestal_branches: '💎 Amber Branch Crystal Pedestal',
         crystal_pedestal_trunk: '💎 Coral Trunk Crystal Pedestal',
@@ -6631,6 +7173,10 @@ export default function App() {
       else if (struct.type === 'decor_rock_formation') inv.decorations.rockFormation = (inv.decorations.rockFormation || 0) + 1;
       else if (struct.type === 'decor_shrubbery_bush') inv.decorations.shrubbery = (inv.decorations.shrubbery || 0) + 1;
       else if (struct.type === 'decor_woven_wall') inv.decorations.wovenWall = (inv.decorations.wovenWall || 0) + 1;
+      else if (struct.type === 'torii_gate') {
+        inv.torii_gate_inv = (inv.torii_gate_inv || 0) + 1;
+        if (inv.decorations) inv.decorations.toriiGate = (inv.decorations.toriiGate || 0) + 1;
+      }
 
       deployedStructuresRef.current.splice(idx, 1);
       invalidateSynergiesCache();
@@ -6646,6 +7192,7 @@ export default function App() {
         decor_rock_formation: 'Zen Rock Formation',
         decor_shrubbery_bush: 'Topiary Shrubbery Bush',
         decor_woven_wall: 'Woven Wooden Lattice Wall',
+        torii_gate: '⛩️ Torii Gate',
         crystal_pedestal_foliage: 'Emerald Leaf Crystal Pedestal',
         crystal_pedestal_branches: 'Amber Branch Crystal Pedestal',
         crystal_pedestal_trunk: 'Coral Trunk Crystal Pedestal',
@@ -7489,6 +8036,170 @@ export default function App() {
     [addFloatingText, isGridPlotUnlocked, plantIndividualSeedling, refreshHud, sanctuaryBonsaiSociety, sanctuaryRoverGarage, sanctuaryShopStand, sanctuaryWorkbench, sanctuaryZenLibrary, snapToSanctuaryGrid, triggerNotification],
   );
 
+  // --- PLACEMENT PREVIEW VALIDATION & CONFIRMATION ---
+  const checkPlotPlacementValid = useCallback(
+    (plot: SanctuaryPlotInfo | null, preview: GridPlacementPreview | null): boolean => {
+      if (!plot || !preview || !plot.isUnlocked) return false;
+
+      const snapX = plot.centerX;
+      const snapY = plot.centerY;
+
+      const nearStation =
+        (snapX >= sanctuaryWorkbench.x - 30 &&
+          snapX <= sanctuaryWorkbench.x + sanctuaryWorkbench.width + 30 &&
+          snapY >= sanctuaryWorkbench.y - 30 &&
+          snapY <= sanctuaryWorkbench.y + sanctuaryWorkbench.height + 30) ||
+        (snapX >= sanctuaryZenLibrary.x - 30 &&
+          snapX <= sanctuaryZenLibrary.x + sanctuaryZenLibrary.width + 30 &&
+          snapY >= sanctuaryZenLibrary.y - 30 &&
+          snapY <= sanctuaryZenLibrary.y + sanctuaryZenLibrary.height + 30) ||
+        (snapX >= sanctuaryBonsaiSociety.x - 30 &&
+          snapX <= sanctuaryBonsaiSociety.x + sanctuaryBonsaiSociety.width + 30 &&
+          snapY >= sanctuaryBonsaiSociety.y - 30 &&
+          snapY <= sanctuaryBonsaiSociety.y + sanctuaryBonsaiSociety.height + 30) ||
+        (snapX >= sanctuaryRoverGarage.x - 30 &&
+          snapX <= sanctuaryRoverGarage.x + sanctuaryRoverGarage.width + 30 &&
+          snapY >= sanctuaryRoverGarage.y - 30 &&
+          snapY <= sanctuaryRoverGarage.y + sanctuaryRoverGarage.height + 30) ||
+        (snapX >= sanctuaryShopStand.x - 30 &&
+          snapX <= sanctuaryShopStand.x + sanctuaryShopStand.width + 30 &&
+          snapY >= sanctuaryShopStand.y - 30 &&
+          snapY <= sanctuaryShopStand.y + sanctuaryShopStand.height + 30);
+
+      if (nearStation) return false;
+
+      const checkOccupied = (x: number, y: number) => {
+        const isTreeOccupied = plantedBonsaisRef.current.some(
+          (b) => Math.hypot(b.x - x, b.y - y) < 30,
+        );
+        const isStructureOccupied = deployedStructuresRef.current.some((s) => {
+          if (s.type === 'torii_gate') {
+            if (s.orientation === 'vertical') {
+              return (
+                Math.hypot(s.x - x, s.y - SANCTUARY_GRID.cellH - y) < 30 ||
+                Math.hypot(s.x - x, s.y + SANCTUARY_GRID.cellH - y) < 30 ||
+                Math.hypot(s.x - x, s.y - y) < 30
+              );
+            } else {
+              return (
+                Math.hypot(s.x - SANCTUARY_GRID.cellW - x, s.y - y) < 30 ||
+                Math.hypot(s.x + SANCTUARY_GRID.cellW - x, s.y - y) < 30 ||
+                Math.hypot(s.x - x, s.y - y) < 30
+              );
+            }
+          }
+          return Math.hypot(s.x - x, s.y - y) < 30;
+        });
+        return isTreeOccupied || isStructureOccupied;
+      };
+
+      if (preview.payload === 'torii_gate') {
+        const isVert = preview.orientation === 'vertical';
+        if (isVert) {
+          if (plot.row - 1 < 0 || plot.row + 1 >= SANCTUARY_GRID.rows) return false;
+          const topUnlocked = isGridPlotUnlocked(snapX, snapY - SANCTUARY_GRID.cellH);
+          const botUnlocked = isGridPlotUnlocked(snapX, snapY + SANCTUARY_GRID.cellH);
+          if (!topUnlocked || !botUnlocked) return false;
+          if (checkOccupied(snapX, snapY)) return false;
+          if (checkOccupied(snapX, snapY - SANCTUARY_GRID.cellH)) return false;
+          if (checkOccupied(snapX, snapY + SANCTUARY_GRID.cellH)) return false;
+          return true;
+        } else {
+          if (plot.col - 1 < 0 || plot.col + 1 >= SANCTUARY_GRID.cols) return false;
+          const leftUnlocked = isGridPlotUnlocked(snapX - SANCTUARY_GRID.cellW, snapY);
+          const rightUnlocked = isGridPlotUnlocked(snapX + SANCTUARY_GRID.cellW, snapY);
+          if (!leftUnlocked || !rightUnlocked) return false;
+          if (checkOccupied(snapX, snapY)) return false;
+          if (checkOccupied(snapX - SANCTUARY_GRID.cellW, snapY)) return false;
+          if (checkOccupied(snapX + SANCTUARY_GRID.cellW, snapY)) return false;
+          return true;
+        }
+      }
+
+      return !checkOccupied(snapX, snapY);
+    },
+    [
+      isGridPlotUnlocked,
+      sanctuaryBonsaiSociety,
+      sanctuaryRoverGarage,
+      sanctuaryShopStand,
+      sanctuaryWorkbench,
+      sanctuaryZenLibrary,
+    ],
+  );
+
+  const handleConfirmPlacement = useCallback(() => {
+    const preview = placementPreviewRef.current;
+    if (!preview) return;
+
+    const av = avatarRef.current;
+    const inv = sanctuaryInventoryRef.current;
+    const currentPlot = getPreviewPlot(av.x, av.y, inv.sanctuary_expansion_tier || 0);
+
+    if (!currentPlot || !checkPlotPlacementValid(currentPlot, preview)) {
+      gameAudio.playErrorBuzz();
+      triggerNotification('Cannot place item here! Choose an empty unlocked plot.', '#ef4444');
+      return;
+    }
+
+    if (preview.category === 'seedling') {
+      plantIndividualSeedling(
+        preview.payload,
+        (preview.style as BonsaiStyle) || 'CHOKAN',
+        preview.nature,
+      );
+    } else if (preview.category === 'bonsai') {
+      plantStoredPottedBonsai(preview.payload.id);
+    } else if (preview.category === 'infrastructure' || preview.category === 'decoration') {
+      if (preview.payload === 'torii_gate') {
+        const type: DeployedStructureType = 'torii_gate';
+        const key = getInventoryStructureKey(type);
+        const stock = getStructureInventoryCount(inv, type);
+        if (stock <= 0) {
+          gameAudio.playErrorBuzz();
+          triggerNotification('No Torii Gates in stock!', '#ef4444');
+          setPlacementPreview(null);
+          return;
+        }
+        inv[key] = Math.max(0, (inv[key] ?? stock) - 1);
+        if (inv.decorations) {
+          inv.decorations.toriiGate = Math.max(0, (inv.decorations.toriiGate || 1) - 1);
+        }
+        const snapX = currentPlot.centerX;
+        const snapY = currentPlot.centerY;
+        const newStruct: DeployedStructure = {
+          id: `struct_torii_gate_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          type: 'torii_gate',
+          x: snapX,
+          y: snapY,
+          gridX: snapX,
+          gridY: snapY,
+          orientation: preview.orientation || 'horizontal',
+          variant: 0,
+        };
+        deployedStructuresRef.current.push(newStruct);
+        invalidateSynergiesCache();
+        gameAudio.playPowerupChime();
+        addFloatingText(snapX, snapY - 40, 'Placed ⛩️ Torii Gate!', '#ef4444');
+        triggerNotification('Placed ⛩️ Torii Gate on Sanctuary plot! [Q] to Dismantle anytime.', '#10b981');
+        refreshHud();
+      } else {
+        deployStructureOnGrid(preview.payload as DeployedStructureType);
+      }
+    }
+
+    setPlacementPreview(null);
+  }, [
+    checkPlotPlacementValid,
+    deployStructureOnGrid,
+    plantIndividualSeedling,
+    plantStoredPottedBonsai,
+    addFloatingText,
+    invalidateSynergiesCache,
+    refreshHud,
+    triggerNotification,
+  ]);
+
   // --- ATTACH / SWAP / DETACH TIERED WATERING AUTOMATON ---
   const attachAutomatonTier = useCallback(
     (bonsaiId: string, tier: 1 | 2 | 3) => {
@@ -7857,7 +8568,7 @@ export default function App() {
     const tabLengths = {
       MAPS: 2,
       EXPANSIONS: 4,
-      DECOR: 8,
+      DECOR: 9,
       GUIDES: 18,
       EQUIPMENT: 2,
     };
@@ -7897,6 +8608,7 @@ export default function App() {
             { type: 'decor_rock_formation' as const, cost: 15, name: 'Zen Rock Formation' },
             { type: 'decor_shrubbery_bush' as const, cost: 25, name: 'Topiary Shrubbery Bush' },
             { type: 'decor_woven_wall' as const, cost: 40, name: 'Woven Wooden Lattice Wall' },
+            { type: 'torii_gate' as const, cost: 0, name: 'Torii Gate (3x1)' },
             { type: 'crystal_pedestal_foliage' as const, cost: 100, name: 'Emerald Leaf Crystal Pedestal' },
             { type: 'crystal_pedestal_branches' as const, cost: 100, name: 'Amber Branch Crystal Pedestal' },
             { type: 'crystal_pedestal_trunk' as const, cost: 100, name: 'Coral Trunk Crystal Pedestal' },
@@ -8077,7 +8789,7 @@ export default function App() {
     if (!isGameMenuOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      const menuOptionsCount = 5;
+      const menuOptionsCount = 7;
       if (e.key === 'w' || e.key === 'W') {
         e.preventDefault();
         setFocusedMenuIdx((i) => Math.max(0, i - 1));
@@ -8093,16 +8805,21 @@ export default function App() {
           if (gameState.status === 'START') setGameState((p) => ({...p, status: 'PLAYING'}));
           gameAudio.playCrispClick();
         } else if (focusedMenuIdx === 1) {
-          setIsGoalModalOpen(true);
+          toggleFullscreen();
           gameAudio.playCrispClick();
         } else if (focusedMenuIdx === 2) {
-          setIsHowToPlayOpen(true);
+          setIsGoalModalOpen(true);
           gameAudio.playCrispClick();
         } else if (focusedMenuIdx === 3) {
+          setIsHowToPlayOpen(true);
+          gameAudio.playCrispClick();
+        } else if (focusedMenuIdx === 4) {
           const muted = gameAudio.toggleMute();
           setIsSfxMuted(muted);
-        } else if (focusedMenuIdx === 4) {
+        } else if (focusedMenuIdx === 5) {
           setIsMusicMuted((p) => !p);
+        } else if (focusedMenuIdx === 6) {
+          initGame();
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
@@ -8111,7 +8828,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isGameMenuOpen, focusedMenuIdx, gameState.status]);
+  }, [isGameMenuOpen, focusedMenuIdx, gameState.status, toggleFullscreen, initGame]);
 
   // Keyboard navigation for How to Play Guide
   useEffect(() => {
@@ -8142,7 +8859,31 @@ export default function App() {
 
       if (e.repeat) return;
 
+      // PRIORITY: If in placement preview mode, intercept Arrow keys, Q, and R for immediate rotation
+      if (
+        placementPreviewRef.current &&
+        (e.key === 'ArrowLeft' ||
+          e.key === 'ArrowRight' ||
+          e.key === 'ArrowUp' ||
+          e.key === 'ArrowDown' ||
+          e.key === 'q' ||
+          e.key === 'Q' ||
+          e.key === 'r' ||
+          e.key === 'R')
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        togglePreviewOrientation();
+        return;
+      }
+
       if (e.key === 'Escape') {
+        if (placementPreviewRef.current) {
+          e.preventDefault();
+          setPlacementPreview(null);
+          gameAudio.playCrispClick();
+          return;
+        }
         if (quickRadialBonsai) {
           setQuickRadialBonsai(null);
           gameAudio.playCrispClick();
@@ -8256,7 +8997,18 @@ export default function App() {
             roverRef.current.moveCooldown = 0.18;
           }
         }
+      } else if (e.key === 'r' || e.key === 'R' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        if (placementPreviewRef.current?.payload === 'torii_gate') {
+          e.preventDefault();
+          togglePreviewOrientation();
+          return;
+        }
       } else if (e.key === 'e' || e.key === 'E') {
+        if (placementPreviewRef.current) {
+          e.preventDefault();
+          handleConfirmPlacement();
+          return;
+        }
         if (digStateRef.current.active) return;
         if (excursionReport) {
           e.preventDefault();
@@ -8436,6 +9188,11 @@ export default function App() {
           }
         }
       } else if (e.key === ' ' || e.key === 'Enter') {
+        if (placementPreviewRef.current) {
+          e.preventDefault();
+          handleConfirmPlacement();
+          return;
+        }
         if (excursionReport) {
           e.preventDefault();
           depositHaulAndReturnToSanctuary();
@@ -8504,6 +9261,7 @@ export default function App() {
     stylingModalSapling,
     triggerNotification,
     triggerRadialDig,
+    handleConfirmPlacement,
   ]);
 
   // Pointer click on canvas in Sanctuary
@@ -8842,6 +9600,11 @@ export default function App() {
 
         // Button 1 (B / Circle): Cancel / Close / Back / Leave
         if (justPressed(1)) {
+          if (placementPreviewRef.current) {
+            setPlacementPreview(null);
+            gameAudio.playCrispClick();
+            return;
+          }
           if (quickRadialBonsai) {
             setQuickRadialBonsai(null);
             gameAudio.playCrispClick();
@@ -8919,6 +9682,10 @@ export default function App() {
 
         // Button 4 (LB / Left Bumper): Cycle / Tabs Left
         if (justPressed(4)) {
+          if (placementPreviewRef.current?.payload === 'torii_gate') {
+            togglePreviewOrientation();
+            return;
+          }
           window.dispatchEvent(new CustomEvent('gamepad-bumper', { detail: { direction: 'left' } }));
           if (isShopModalOpen) {
             const tabs: ('MAPS' | 'EXPANSIONS' | 'DECOR' | 'GUIDES' | 'EQUIPMENT')[] = ['MAPS', 'EXPANSIONS', 'DECOR', 'GUIDES', 'EQUIPMENT'];
@@ -8943,6 +9710,10 @@ export default function App() {
 
         // Button 5 (RB / Right Bumper): Cycle / Tabs Right
         if (justPressed(5)) {
+          if (placementPreviewRef.current?.payload === 'torii_gate') {
+            togglePreviewOrientation();
+            return;
+          }
           window.dispatchEvent(new CustomEvent('gamepad-bumper', { detail: { direction: 'right' } }));
           if (isShopModalOpen) {
             const tabs: ('MAPS' | 'EXPANSIONS' | 'DECOR' | 'GUIDES' | 'EQUIPMENT')[] = ['MAPS', 'EXPANSIONS', 'DECOR', 'GUIDES', 'EQUIPMENT'];
@@ -9051,7 +9822,10 @@ export default function App() {
         const onGridPebblePath = deployedStructuresRef.current.some(
           (s) => s.type === 'decor_pebble_path' && Math.hypot(s.x - snapAvX, s.y - snapAvY) < 32
         );
-        const onPebblePath = inPromenadeCorridor || onGridPebblePath;
+        const onToriiGateCenter = deployedStructuresRef.current.some(
+          (s) => s.type === 'torii_gate' && Math.hypot(s.x - snapAvX, s.y - snapAvY) < 32
+        );
+        const onPebblePath = inPromenadeCorridor || onGridPebblePath || onToriiGateCenter;
         const speedMultiplier = onPebblePath ? 1.35 : 1.0;
         const moveSpeed = baseSpeed * speedMultiplier;
 
@@ -9510,10 +10284,23 @@ export default function App() {
         let closestStruct: DeployedStructure | null = null;
         let minStructDist = Infinity;
         for (const s of deployedStructuresRef.current) {
-          const dx = Math.abs(av.x - s.x);
-          const dy = Math.abs(av.y - s.y);
           const dist = Math.hypot(av.x - s.x, av.y - s.y);
-          const isWithinTile = dx <= halfTileW + 4 && dy <= halfTileH + 4;
+          let isWithinTile = false;
+          if (s.type === 'torii_gate') {
+            if (s.orientation === 'vertical') {
+              const dx = Math.abs(av.x - s.x);
+              const dy = Math.abs(av.y - s.y);
+              isWithinTile = dx <= halfTileW + 4 && dy <= SANCTUARY_GRID.cellH + halfTileH + 4;
+            } else {
+              const dx = Math.abs(av.x - s.x);
+              const dy = Math.abs(av.y - s.y);
+              isWithinTile = dx <= SANCTUARY_GRID.cellW + halfTileW + 4 && dy <= halfTileH + 4;
+            }
+          } else {
+            const dx = Math.abs(av.x - s.x);
+            const dy = Math.abs(av.y - s.y);
+            isWithinTile = dx <= halfTileW + 4 && dy <= halfTileH + 4;
+          }
           if (isWithinTile && dist < minStructDist) {
             minStructDist = dist;
             closestStruct = s;
@@ -9527,6 +10314,15 @@ export default function App() {
 
         const currentPlot = getPlotAtCoords(av.x, av.y, inv.sanctuary_expansion_tier || 0);
         activePlotRef.current = currentPlot;
+
+        if (placementPreviewRef.current) {
+          const prevPlot = getPreviewPlot(av.x, av.y, inv.sanctuary_expansion_tier || 0);
+          const pKey = `${prevPlot.col},${prevPlot.row},${placementPreviewRef.current.orientation}`;
+          if (lastPreviewPlotKeyRef.current !== pKey) {
+            lastPreviewPlotKeyRef.current = pKey;
+            refreshHud();
+          }
+        }
 
         const isAnyStationNear = isZenNear || isWbNear || isSocietyNear || isGarageNear || isShopNear;
         const isPlotEmpty =
@@ -9760,7 +10556,216 @@ export default function App() {
           const ph = currentPlot.height + 4;
           const radius = 6;
 
-          if (currentPlot.isUnlocked) {
+          if (placementPreview) {
+            // Placement Preview Plot Highlight
+            const isValid = checkPlotPlacementValid(currentPlot, placementPreview);
+            const outlineColor = isValid ? '#10b981' : '#ef4444';
+            const fillColor = isValid ? 'rgba(16, 185, 129, 0.22)' : 'rgba(239, 68, 68, 0.22)';
+
+            if (placementPreview.payload === 'torii_gate') {
+              const isVert = placementPreview.orientation === 'vertical';
+              if (isVert) {
+                // Highlight top, center, and bottom plots
+                ctx.fillStyle = fillColor;
+                ctx.strokeStyle = outlineColor;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(px, py - SANCTUARY_GRID.cellH, pw, ph * 3 + (SANCTUARY_GRID.cellH - ph) * 2, 8);
+                ctx.fill();
+                ctx.stroke();
+              } else {
+                // Highlight left, center, and right plots
+                ctx.fillStyle = fillColor;
+                ctx.strokeStyle = outlineColor;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(px - SANCTUARY_GRID.cellW, py, pw * 3 + (SANCTUARY_GRID.cellW - pw) * 2, ph, 8);
+                ctx.fill();
+                ctx.stroke();
+              }
+            } else {
+              ctx.fillStyle = fillColor;
+              ctx.beginPath();
+              ctx.roundRect(px, py, pw, ph, radius);
+              ctx.fill();
+
+              ctx.strokeStyle = outlineColor;
+              ctx.lineWidth = 2.5;
+              ctx.shadowColor = outlineColor;
+              ctx.shadowBlur = 8;
+              ctx.stroke();
+              ctx.shadowBlur = 0;
+            }
+
+            // Draw 3x3 Halo Preview Box for Seedlings & Bonsais
+            if (placementPreview.category === 'seedling' || placementPreview.category === 'bonsai') {
+              const centerCol = currentPlot.col;
+              const centerRow = currentPlot.row;
+              ctx.strokeStyle = isValid ? 'rgba(52, 211, 153, 0.75)' : 'rgba(239, 68, 68, 0.75)';
+              ctx.lineWidth = 1.8;
+              ctx.setLineDash([4, 4]);
+              for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                  if (dr === 0 && dc === 0) continue;
+                  const gc = centerCol + dc;
+                  const gr = centerRow + dr;
+                  if (gc >= 0 && gc < SANCTUARY_GRID.cols && gr >= 0 && gr < SANCTUARY_GRID.rows) {
+                    const hX = SANCTUARY_GRID.startX + gc * SANCTUARY_GRID.cellW;
+                    const hY = SANCTUARY_GRID.startY + gr * SANCTUARY_GRID.cellH;
+                    ctx.strokeRect(hX - halfTileW, hY - halfTileH, halfTileW * 2, halfTileH * 2);
+                  }
+                }
+              }
+              ctx.setLineDash([]);
+            }
+
+            // Render Ghost Vector Artwork right on that plot!
+            ctx.save();
+            ctx.globalAlpha = 0.65;
+            if (placementPreview.category === 'seedling') {
+              const sPayload = placementPreview.payload;
+              const sLeaf = (sPayload.leafType || 'circle') as BonsaiLeafType;
+              const sStyle = (placementPreview.style as BonsaiStyle) || 'CHOKAN';
+              const sDef = getLeafTypeDef(sLeaf);
+              const sColor = sPayload.color || sDef.color;
+              const sAccent = sPayload.flowerColor || sDef.accentColor;
+
+              ctx.shadowColor = '#10b981';
+              ctx.shadowBlur = 14;
+
+              ctx.fillStyle = '#1e293b';
+              ctx.beginPath();
+              ctx.roundRect(currentPlot.centerX - 18, currentPlot.centerY + 2, 36, 11, [2, 2, 4, 4]);
+              ctx.fill();
+              ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+              ctx.lineWidth = 1;
+              ctx.stroke();
+
+              ctx.fillStyle = '#3b1802';
+              ctx.beginPath();
+              ctx.ellipse(currentPlot.centerX, currentPlot.centerY + 3, 15, 3, 0, 0, Math.PI * 2);
+              ctx.fill();
+
+              drawBonsaiTrunkAndCanopy(
+                ctx,
+                currentPlot.centerX,
+                currentPlot.centerY + 4,
+                0.65,
+                36,
+                5,
+                sStyle,
+                sLeaf,
+                sColor,
+                sAccent,
+              );
+            } else if (placementPreview.category === 'bonsai') {
+              const bPayload = placementPreview.payload;
+              const bLeaf = (bPayload.leafType || 'circle') as BonsaiLeafType;
+              const bStyle = (bPayload.style as BonsaiStyle) || 'CHOKAN';
+              const bDef = getLeafTypeDef(bLeaf);
+              const bColor = bPayload.color || bDef.color;
+              const bAccent = bPayload.flowerColor || bDef.accentColor;
+              const stageScale = Math.min(1.0, 0.60 + (bPayload.level / 100) * 0.40);
+
+              ctx.shadowColor = '#10b981';
+              ctx.shadowBlur = 14;
+
+              ctx.fillStyle = bPayload.potColor || '#1e293b';
+              ctx.beginPath();
+              ctx.roundRect(
+                currentPlot.centerX - (26 * stageScale + 4),
+                currentPlot.centerY,
+                (26 * stageScale + 4) * 2,
+                16 * stageScale + 2,
+                [2, 2, 6, 6],
+              );
+              ctx.fill();
+              ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+              ctx.lineWidth = 1.2;
+              ctx.stroke();
+
+              ctx.fillStyle = '#3b1802';
+              ctx.beginPath();
+              ctx.ellipse(currentPlot.centerX, currentPlot.centerY + 1, 23 * stageScale + 2, 5 * stageScale, 0, 0, Math.PI * 2);
+              ctx.fill();
+
+              drawBonsaiTrunkAndCanopy(
+                ctx,
+                currentPlot.centerX,
+                currentPlot.centerY + 4,
+                stageScale,
+                32 + stageScale * 26,
+                4.5 + stageScale * 4,
+                bStyle,
+                bLeaf,
+                bColor,
+                bAccent,
+              );
+            } else if (placementPreview.payload === 'torii_gate') {
+              if (placementPreview.orientation === 'vertical') {
+                drawToriiGateVertical(ctx, currentPlot.centerX, currentPlot.centerY, true);
+              } else {
+                drawToriiGateHorizontal(ctx, currentPlot.centerX, currentPlot.centerY, true);
+              }
+            } else if (placementPreview.payload === 'solar_panel') {
+              ctx.fillStyle = '#0284c7';
+              ctx.beginPath();
+              ctx.roundRect(currentPlot.centerX - 24, currentPlot.centerY - 18, 48, 28, 4);
+              ctx.fill();
+              ctx.strokeStyle = '#38bdf8';
+              ctx.lineWidth = 1.5;
+              ctx.stroke();
+            } else if (placementPreview.payload === 'wind_turbine') {
+              ctx.fillStyle = '#b45309';
+              ctx.fillRect(currentPlot.centerX - 2.5, currentPlot.centerY - 22, 5, 34);
+              ctx.fillStyle = '#fbbf24';
+              ctx.beginPath();
+              ctx.arc(currentPlot.centerX, currentPlot.centerY - 12, 12, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (placementPreview.payload === 'tool_garden_well') {
+              ctx.fillStyle = '#64748b';
+              ctx.beginPath();
+              ctx.roundRect(currentPlot.centerX - 19, currentPlot.centerY - 2, 38, 17, [2, 2, 7, 7]);
+              ctx.fill();
+              ctx.strokeStyle = '#38bdf8';
+              ctx.lineWidth = 1.2;
+              ctx.stroke();
+            } else if (placementPreview.payload === 'tool_compost_heap') {
+              ctx.fillStyle = '#853e0d';
+              ctx.beginPath();
+              ctx.roundRect(currentPlot.centerX - 22, currentPlot.centerY - 17, 44, 34, 2);
+              ctx.fill();
+              ctx.strokeStyle = '#84cc16';
+              ctx.lineWidth = 1.2;
+              ctx.stroke();
+            } else if (placementPreview.payload === 'decor_rock_formation') {
+              ctx.fillStyle = '#475569';
+              ctx.beginPath();
+              ctx.ellipse(currentPlot.centerX, currentPlot.centerY, 20, 12, 0, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (placementPreview.payload === 'decor_shrubbery_bush') {
+              ctx.fillStyle = '#047857';
+              ctx.beginPath();
+              ctx.arc(currentPlot.centerX, currentPlot.centerY - 8, 16, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (placementPreview.payload === 'decor_woven_wall') {
+              ctx.fillStyle = '#92400e';
+              ctx.fillRect(currentPlot.centerX - 18, currentPlot.centerY - 15, 36, 26);
+            } else if (typeof placementPreview.payload === 'string' && placementPreview.payload.startsWith('crystal_pedestal')) {
+              const isFoliage = placementPreview.payload === 'crystal_pedestal_foliage';
+              const isBranches = placementPreview.payload === 'crystal_pedestal_branches';
+              const isTrunk = placementPreview.payload === 'crystal_pedestal_trunk';
+              const pCol = isFoliage ? '#22c55e' : isBranches ? '#eab308' : isTrunk ? '#ef4444' : '#3b82f6';
+              ctx.fillStyle = '#1e293b';
+              ctx.fillRect(currentPlot.centerX - 10, currentPlot.centerY - 8, 20, 16);
+              ctx.fillStyle = pCol;
+              ctx.beginPath();
+              ctx.arc(currentPlot.centerX, currentPlot.centerY - 20, 10, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.restore();
+
+          } else if (currentPlot.isUnlocked) {
             // Subtle glowing backdrop tint
             const pulse = 0.08 + 0.04 * Math.sin(Date.now() * 0.005);
             ctx.fillStyle = `rgba(16, 185, 129, ${pulse})`;
@@ -11649,23 +12654,45 @@ export default function App() {
               ? '#38bdf8'
               : struct.type === 'wind_turbine'
               ? '#f59e0b'
+              : struct.type === 'torii_gate'
+              ? '#ef4444'
               : '#10b981';
             ctx.lineWidth = 2.5;
             ctx.setLineDash([4, 4]);
             ctx.beginPath();
-            ctx.roundRect(
-              sx - halfTileW,
-              sy - halfTileH,
-              halfTileW * 2,
-              halfTileH * 2,
-              6,
-            );
+            if (struct.type === 'torii_gate') {
+              if (struct.orientation === 'vertical') {
+                ctx.roundRect(
+                  sx - halfTileW,
+                  sy - SANCTUARY_GRID.cellH - halfTileH,
+                  halfTileW * 2,
+                  SANCTUARY_GRID.cellH * 2 + halfTileH * 2,
+                  8,
+                );
+              } else {
+                ctx.roundRect(
+                  sx - SANCTUARY_GRID.cellW - halfTileW,
+                  sy - halfTileH,
+                  SANCTUARY_GRID.cellW * 2 + halfTileW * 2,
+                  halfTileH * 2,
+                  8,
+                );
+              }
+            } else {
+              ctx.roundRect(
+                sx - halfTileW,
+                sy - halfTileH,
+                halfTileW * 2,
+                halfTileH * 2,
+                6,
+              );
+            }
             ctx.stroke();
             ctx.setLineDash([]);
           }
 
-          // Ground shadow (Only for non-pebble-path structures)
-          if (struct.type !== 'decor_pebble_path') {
+          // Ground shadow (Only for non-pebble-path and non-torii-gate structures)
+          if (struct.type !== 'decor_pebble_path' && struct.type !== 'torii_gate') {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
             ctx.beginPath();
             ctx.ellipse(sx, sy + 14, 24, 8, 0, 0, Math.PI * 2);
@@ -12705,6 +13732,15 @@ export default function App() {
             ctx.textBaseline = 'middle';
             ctx.fillText(isIrrigating ? 'Watering' : 'Empty', sx, wellBoxY + wellBoxH / 2);
             ctx.textBaseline = 'alphabetic';
+          } else if (struct.type === 'torii_gate') {
+            // =========================================================================
+            // 7. TORII GATE (SHINTO ARCHWAY WITH INTEGRATED PEBBLE PATHWAY)
+            // =========================================================================
+            if (struct.orientation === 'vertical') {
+              drawToriiGateVertical(ctx, sx, sy, false);
+            } else {
+              drawToriiGateHorizontal(ctx, sx, sy, false);
+            }
           } else if (
             struct.type === 'crystal_pedestal_foliage' ||
             struct.type === 'crystal_pedestal_branches' ||
@@ -15516,6 +16552,30 @@ export default function App() {
 
   return (
     <div className="fixed inset-0 overflow-hidden touch-none flex flex-col items-center justify-center bg-slate-950 text-white font-sans select-none">
+      <style>{`
+        body.pseudo-fullscreen {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          z-index: 999999 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: hidden !important;
+          background-color: #020617 !important;
+        }
+        body.pseudo-fullscreen #root,
+        body.pseudo-fullscreen #root > div {
+          width: 100vw !important;
+          height: 100vh !important;
+          position: fixed !important;
+          inset: 0 !important;
+        }
+      `}</style>
+
       {!assetsReady && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-950 text-white">
           <Sparkles className="w-10 h-10 text-emerald-400 animate-spin mb-4" />
@@ -15731,9 +16791,9 @@ export default function App() {
 
       {/* MAIN CANVAS VIEWPORT */}
       <div className="flex-1 w-full min-h-0 relative flex items-center justify-center bg-slate-950 overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          width={canvasWidth}
+              <canvas
+                ref={canvasRef}
+                width={canvasWidth}
           height={canvasHeight}
           style={{
             aspectRatio: `${canvasWidth} / ${canvasHeight}`,
@@ -15744,8 +16804,136 @@ export default function App() {
 
         {/* SANCTUARY PROXIMITY INTERACTION BAR */}
         {location === 'SANCTUARY' && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-900/95 border border-slate-800 px-4 py-2 rounded-2xl flex items-center gap-3 shadow-2xl z-20 max-w-xl w-full justify-between">
-            {isNearShop ? (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-900/95 border border-slate-800 px-4 py-2 rounded-2xl flex items-center gap-3 shadow-2xl z-20 max-w-2xl w-full justify-between">
+            {placementPreview ? (() => {
+              const currentPlot = activePlotRef.current || getPlotAtCoords(avatarRef.current.x, avatarRef.current.y, inv.sanctuary_expansion_tier || 0);
+              const isValid = checkPlotPlacementValid(currentPlot, placementPreview);
+              const isRotatable = placementPreview.payload === 'torii_gate';
+              const isPlantable = placementPreview.category === 'seedling' || placementPreview.category === 'bonsai';
+
+              let haloText = '';
+              if (isPlantable && currentPlot) {
+                // Calculate the exact halo effects that this bonsai WOULD receive from adjacent plots around (currentPlot.centerX, currentPlot.centerY)
+                const simBonsai: PlantedBonsai = {
+                  id: 'sim_preview',
+                  leafType: placementPreview.category === 'seedling' ? placementPreview.payload.leafType : placementPreview.payload.leafType,
+                  group: placementPreview.category === 'seedling' ? placementPreview.payload.group : placementPreview.payload.group,
+                  style: (placementPreview.style as BonsaiStyle) || 'CHOKAN',
+                  maturity: placementPreview.category === 'seedling' ? placementPreview.payload.maturity : placementPreview.payload.maturity,
+                  name: placementPreview.payload.name || 'Preview',
+                  level: placementPreview.category === 'bonsai' ? placementPreview.payload.level : 1,
+                  progressSeconds: 0,
+                  gridX: currentPlot.centerX,
+                  gridY: currentPlot.centerY,
+                  x: currentPlot.centerX,
+                  y: currentPlot.centerY,
+                  radius: 36,
+                  color: '#10b981',
+                  flowerColor: '#34d399',
+                  potColor: '#1e293b',
+                  potStyle: 'Carved Ceramic',
+                  automatonTier: 0,
+                  pruneBoostTimer: 0,
+                  waterSprayAnim: 0,
+                };
+                const simSynergies = getBonsaiSynergies(simBonsai, plantedBonsaisRef.current, deployedStructuresRef.current);
+
+                const haloParts: string[] = [];
+                if (simSynergies.isStalled) {
+                  haloParts.push(`⛔ Stalling Surroundings (>4 ${simSynergies.stalledEntityLabel || 'identical neighbors'})`);
+                } else {
+                  if (simSynergies.bonsaiCount > 0) {
+                    haloParts.push(`Growing Together x${simSynergies.bonsaiCount} (+${simSynergies.bonsaiCount * 10}% Hydration)`);
+                  }
+                  if (simSynergies.wallCount > 0) {
+                    haloParts.push(`Private Growing x${simSynergies.wallCount} (+${simSynergies.wallCount * 10}% Hydration)`);
+                  }
+                  if (simSynergies.rockCount > 0) {
+                    haloParts.push(`Quick Prune x${simSynergies.rockCount} (+${(simSynergies.rockCount * 0.25).toFixed(2)}s Prune)`);
+                  }
+                  if (simSynergies.bushCount > 0) {
+                    haloParts.push(`XP Boosted x${simSynergies.bushCount} (+${simSynergies.bushCount * 15}% EXP)`);
+                  }
+                  if (simSynergies.crystalPedestals && simSynergies.crystalPedestals.total > 0) {
+                    haloParts.push(`Cultivating Potential (${formatCrystalPedestalBonus(simSynergies.crystalPedestals)})`);
+                  }
+                  if (simSynergies.energyCount > 0) {
+                    haloParts.push(`Disrupted Zen x${simSynergies.energyCount} (-${simSynergies.energyCount * 10}% Growth)`);
+                  }
+                }
+                haloText = haloParts.length > 0 ? haloParts.join(' • ') : 'No adjacent halos detected';
+              }
+
+              return (
+                <div className="w-full flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-xl shrink-0">
+                      {placementPreview.payload === 'torii_gate' ? '⛩️' : isPlantable ? '🌱' : '📦'}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`font-bold ${isValid ? 'text-emerald-300' : 'text-rose-400'}`}>
+                          {isValid ? 'Placement Preview Active' : 'Invalid Placement Location (Occupied or Off-Grid)'}
+                        </span>
+                        {isRotatable && (
+                          <span className="bg-sky-950 text-sky-300 border border-sky-500/50 px-2 py-0.5 rounded text-[10px] font-mono font-bold">
+                            Orientation: {placementPreview.orientation}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-300 truncate">
+                        {isPlantable ? (
+                          <span>
+                            <strong>Halo Preview:</strong>{' '}
+                            <span className={haloText.startsWith('⛔') ? 'text-rose-400 font-bold' : 'text-emerald-400'}>
+                              {haloText || 'No adjacent halos detected'}
+                            </span>
+                          </span>
+                        ) : isRotatable ? (
+                          <span className="text-slate-400">
+                            Spans 3 plots with open center pebble path (+35% Speed) • [← / → or LB / RB] Rotate ({placementPreview.orientation})
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">
+                            Deploy onto open plot
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isRotatable && (
+                      <button
+                        onClick={togglePreviewOrientation}
+                        className="bg-sky-700 hover:bg-sky-600 text-white font-bold text-xs px-2.5 py-1.5 rounded-xl shadow transition-transform active:scale-95 flex items-center gap-1 cursor-pointer">
+                        <span>🔄</span>
+                        <span>[← / →] Rotate</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setPlacementPreview(null);
+                        gameAudio.playCrispClick();
+                      }}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs px-3 py-1.5 rounded-xl transition-all border border-slate-700 cursor-pointer">
+                      [Esc / B] Cancel
+                    </button>
+                    <button
+                      disabled={!isValid}
+                      onClick={handleConfirmPlacement}
+                      className={`font-bold text-xs px-3.5 py-1.5 rounded-xl shadow transition-transform active:scale-95 flex items-center gap-1.5 cursor-pointer ${
+                        isValid
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-1 ring-emerald-400/50'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                      }`}>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>{isPlantable ? '[E / A] Place Bonsai' : '[E / A] Place Item'}</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })() : isNearShop ? (
               <>
                 <div className="flex items-center gap-2">
                   <ShoppingBag className="w-5 h-5 text-amber-400" />
@@ -15881,6 +17069,8 @@ export default function App() {
                       <span className="text-xl">🍂</span>
                     ) : isWell ? (
                       <Droplets className="w-5 h-5 text-sky-400" />
+                    ) : nearbyStructure.type === 'torii_gate' ? (
+                      <span className="text-xl">⛩️</span>
                     ) : nearbyStructure.type === 'decor_shrubbery_bush' ? (
                       <Trees className="w-5 h-5 text-emerald-400" />
                     ) : nearbyStructure.type === 'decor_woven_wall' ? (
@@ -15945,6 +17135,8 @@ export default function App() {
                               ? `☀️ Solar Panel Array (+${totalStructKw.toFixed(1)} kW)`
                               : isTurbine
                               ? `💨 Wind Turbine Generator (+${totalStructKw.toFixed(1)} kW)`
+                              : nearbyStructure.type === 'torii_gate'
+                              ? `⛩️ Torii Gate (${nearbyStructure.orientation === 'vertical' ? '1x3' : '3x1'})`
                               : nearbyStructure.type === 'decor_pebble_path'
                               ? '🪨 Zen Pebble Stepping Path'
                               : nearbyStructure.type === 'decor_rock_formation'
@@ -15973,7 +17165,9 @@ export default function App() {
                       </div>
 
                       <div className="text-[11px] text-emerald-400">
-                        {isCompost
+                        {nearbyStructure.type === 'torii_gate'
+                          ? `Torii Gate (${nearbyStructure.orientation === 'vertical' ? '1x3' : '3x1'}) • [E / A] Inspect • [Q / Y] Store`
+                          : isCompost
                           ? compostReady > 0
                             ? '[E / A] Collect Compost | [Q / Y] Store to Bag'
                             : compostWaste > 0
@@ -16372,6 +17566,7 @@ export default function App() {
         onPlantSeedling={plantIndividualSeedling}
         onPlantStoredBonsai={plantStoredPottedBonsai}
         onDeployStructure={deployStructureOnGrid}
+        onStartPlacementPreview={handleStartPlacementPreview}
         onOpenFullInventory={() => {
           setIsPlantingModalOpen(false);
           setIsUnifiedStorageOpen(true);
@@ -17430,9 +18625,46 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 5. Emerald Leaf Crystal Pedestal (100 Verdure) */}
+                {/* 5. Torii Gate (0 Verdure / Free) */}
                 <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
                   focusedShopIdx === 4
+                    ? 'bg-slate-850 ring-4 ring-red-400 border-red-300 scale-[1.01] shadow-[0_0_20px_rgba(239,68,68,0.5)]'
+                    : 'bg-slate-900/80 border-red-500/30'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-xl bg-red-950/80 border border-red-500/50 flex items-center justify-center text-xl shrink-0 shadow-inner">
+                          <span>⛩️</span>
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-red-200 flex items-center gap-1.5">
+                            {focusedShopIdx === 4 && <span className="text-red-400 text-xs">► [E/A]</span>}
+                            <span>Torii Gate (3x1 / 1x3)</span>
+                          </h4>
+                          <span className="text-[10px] text-amber-400 font-bold">3x1 / 1x3 Multi-Plot • Open Center Walkway</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-slate-950 text-red-300 border border-red-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Owned: {inv.torii_gate_inv || 0}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Majestic vermilion shinto archway spanning 3 plots. Outer pillars anchor the sides, while the central archway plot remains open, walkable, and placeable!
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => buyDecoration('torii_gate', 0, 'Torii Gate (3x1)')}
+                    className="w-full py-2 rounded-xl font-bold text-xs bg-red-600 hover:bg-red-500 text-white transition-all shadow flex items-center justify-center gap-1.5 active:scale-95 ring-1 ring-red-400/50 cursor-pointer">
+                    <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                    <span>Claim Free Torii Gate (0 Verdure)</span>
+                  </button>
+                </div>
+
+                {/* 6. Emerald Leaf Crystal Pedestal (100 Verdure) */}
+                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                  focusedShopIdx === 5
                     ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
                     : 'bg-slate-900/80 border-emerald-500/40'
                 }`}>
@@ -17444,7 +18676,7 @@ export default function App() {
                         </div>
                         <div>
                           <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 4 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
+                            {focusedShopIdx === 5 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
                             <span>Emerald Leaf Crystal Pedestal</span>
                           </h4>
                           <span className="text-[10px] text-emerald-400 font-semibold">+1 Foliage Cultivation Potential / lvl</span>
@@ -17472,9 +18704,9 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 6. Amber Branch Crystal Pedestal (100 Verdure) */}
+                {/* 7. Amber Branch Crystal Pedestal (100 Verdure) */}
                 <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
-                  focusedShopIdx === 5
+                  focusedShopIdx === 6
                     ? 'bg-slate-850 ring-4 ring-amber-400 border-amber-300 scale-[1.01] shadow-[0_0_20px_rgba(245,158,11,0.5)]'
                     : 'bg-slate-900/80 border-amber-500/40'
                 }`}>
@@ -17486,7 +18718,7 @@ export default function App() {
                         </div>
                         <div>
                           <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 5 && <span className="text-amber-400 text-xs">► [E/A]</span>}
+                            {focusedShopIdx === 6 && <span className="text-amber-400 text-xs">► [E/A]</span>}
                             <span>Amber Branch Crystal Pedestal</span>
                           </h4>
                           <span className="text-[10px] text-amber-400 font-semibold">+1 Branches Cultivation Potential / lvl</span>
@@ -17514,9 +18746,9 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 7. Coral Trunk Crystal Pedestal (100 Verdure) */}
+                {/* 8. Coral Trunk Crystal Pedestal (100 Verdure) */}
                 <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
-                  focusedShopIdx === 6
+                  focusedShopIdx === 7
                     ? 'bg-slate-850 ring-4 ring-rose-400 border-rose-300 scale-[1.01] shadow-[0_0_20px_rgba(244,63,94,0.5)]'
                     : 'bg-slate-900/80 border-rose-500/40'
                 }`}>
@@ -17528,7 +18760,7 @@ export default function App() {
                         </div>
                         <div>
                           <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 6 && <span className="text-rose-400 text-xs">► [E/A]</span>}
+                            {focusedShopIdx === 7 && <span className="text-rose-400 text-xs">► [E/A]</span>}
                             <span>Coral Trunk Crystal Pedestal</span>
                           </h4>
                           <span className="text-[10px] text-rose-400 font-semibold">+1 Trunk Cultivation Potential / lvl</span>
@@ -17556,9 +18788,9 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 8. Azure Root Crystal Pedestal (100 Verdure) */}
+                {/* 9. Azure Root Crystal Pedestal (100 Verdure) */}
                 <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
-                  focusedShopIdx === 7
+                  focusedShopIdx === 8
                     ? 'bg-slate-850 ring-4 ring-blue-400 border-blue-300 scale-[1.01] shadow-[0_0_20px_rgba(59,130,246,0.5)]'
                     : 'bg-slate-900/80 border-blue-500/40'
                 }`}>
@@ -17570,7 +18802,7 @@ export default function App() {
                         </div>
                         <div>
                           <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 7 && <span className="text-blue-400 text-xs">► [E/A]</span>}
+                            {focusedShopIdx === 8 && <span className="text-blue-400 text-xs">► [E/A]</span>}
                             <span>Azure Root Crystal Pedestal</span>
                           </h4>
                           <span className="text-[10px] text-blue-400 font-semibold">+1 Roots Cultivation Potential / lvl</span>
@@ -19696,13 +20928,30 @@ export default function App() {
                 {gameState.status === 'START' ? 'Enter Sanctuary [E / A]' : 'Resume Cultivation [E / A]'}
               </button>
 
+              {/* Fullscreen Mode Toggle Button */}
+              <button
+                onClick={() => {
+                  toggleFullscreen();
+                  gameAudio.playCrispClick();
+                }}
+                className={`w-full font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[44px] border ${
+                  focusedMenuIdx === 1
+                    ? 'bg-sky-500 text-slate-950 border-sky-300 ring-2 ring-sky-300/80 scale-[1.02] shadow-[0_0_15px_rgba(56,189,248,0.5)]'
+                    : isFullscreen
+                    ? 'bg-sky-950/80 hover:bg-sky-900 text-sky-200 border-sky-500/50'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}>
+                <Maximize2 className="w-4 h-4 text-sky-400" />
+                <span>Fullscreen Mode: [{isFullscreen ? 'ON' : 'OFF'}]</span>
+              </button>
+
               <button
                 onClick={() => {
                   setIsGoalModalOpen(true);
                   gameAudio.playCrispClick();
                 }}
                 className={`w-full font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[44px] border ${
-                  focusedMenuIdx === 1
+                  focusedMenuIdx === 2
                     ? 'bg-yellow-900 text-yellow-100 border-yellow-400 ring-2 ring-yellow-400/50 scale-[1.02]'
                     : 'bg-yellow-950/80 hover:bg-yellow-900 text-yellow-200 border-yellow-500/40'
                 }`}>
@@ -19716,7 +20965,7 @@ export default function App() {
                   gameAudio.playCrispClick();
                 }}
                 className={`w-full font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[44px] border ${
-                  focusedMenuIdx === 2
+                  focusedMenuIdx === 3
                     ? 'bg-slate-700 text-white border-emerald-400 ring-2 ring-emerald-400/50 scale-[1.02]'
                     : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
                 }`}>
@@ -19731,7 +20980,7 @@ export default function App() {
                     setIsSfxMuted(muted);
                   }}
                   className={`font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[44px] border ${
-                    focusedMenuIdx === 3
+                    focusedMenuIdx === 4
                       ? 'bg-slate-700 text-white border-sky-400 ring-2 ring-sky-400/50 scale-[1.02]'
                       : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
                   }`}>
@@ -19742,7 +20991,7 @@ export default function App() {
                 <button
                   onClick={() => setIsMusicMuted((prev) => !prev)}
                   className={`font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[44px] border ${
-                    focusedMenuIdx === 4
+                    focusedMenuIdx === 5
                       ? 'bg-slate-700 text-white border-sky-400 ring-2 ring-sky-400/50 scale-[1.02]'
                       : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
                   }`}>
@@ -19753,7 +21002,11 @@ export default function App() {
 
               <button
                 onClick={initGame}
-                className="w-full bg-slate-800/80 hover:bg-slate-700 text-amber-400 font-semibold text-xs py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 min-h-[44px] border border-slate-700">
+                className={`w-full font-semibold text-xs py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 min-h-[44px] border ${
+                  focusedMenuIdx === 6
+                    ? 'bg-amber-900/90 text-amber-200 border-amber-400 ring-2 ring-amber-400/50 scale-[1.02]'
+                    : 'bg-slate-800/80 hover:bg-slate-700 text-amber-400 border-slate-700'
+                }`}>
                 <RotateCw className="w-4 h-4" />
                 Restart Sanctuary
               </button>
