@@ -314,7 +314,17 @@ export default function InventoryModal({
               : 'bg-slate-800 text-slate-400 hover:bg-slate-750'
           }`}>
           <span>🎋</span>
-          <span>Decor ({(inv.decor_pebble_path_inv || 0) + (inv.decor_rock_formation_inv || 0) + (inv.decor_shrubbery_bush_inv || 0) + (inv.decor_woven_wall_inv || 0)})</span>
+          <span>Decor ({
+            (inv.decor_pebble_path_inv || 0) +
+            (inv.decor_rock_formation_inv || 0) +
+            (inv.decor_shrubbery_bush_inv || 0) +
+            (inv.decor_woven_wall_inv || 0) +
+            (inv.torii_gate_inv || inv.decorations?.toriiGate || inv.decorations?.['torii_gate'] || 0) +
+            (inv.crystal_pedestal_foliage_inv || 0) +
+            (inv.crystal_pedestal_branches_inv || 0) +
+            (inv.crystal_pedestal_trunk_inv || 0) +
+            (inv.crystal_pedestal_roots_inv || 0)
+          })</span>
         </button>
       </div>
 
@@ -910,7 +920,7 @@ export default function InventoryModal({
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-lg font-black text-red-300">{inv.torii_gate_inv || 0} in Stock</div>
+                <div className="text-lg font-black text-red-300">{inv.torii_gate_inv || inv.decorations?.toriiGate || inv.decorations?.['torii_gate'] || 0} in Stock</div>
                 <span className="text-[10px] text-slate-400">
                   {deployedStructures.filter((s) => s.type === 'torii_gate').length} Placed
                 </span>

@@ -236,6 +236,9 @@ export interface GridPlacementPreview {
   orientation: 'horizontal' | 'vertical'; // default 'horizontal'
   style?: GrowthStyle;
   nature?: BonsaiNature;
+  bonsai?: any;
+  data?: any;
+  item?: any;
 }
 
 export const STYLE_ATTRIBUTE_WEIGHTS: Record<

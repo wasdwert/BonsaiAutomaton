@@ -1656,6 +1656,8 @@ export interface SanctuaryInventory {
     shrubbery: number;
     wovenWall: number;
     toriiGate?: number;
+    torii_gate?: number;
+    [key: string]: any;
   };
   tool_compost_heap_inv?: number;
   tool_garden_well_inv?: number;
@@ -3130,11 +3132,1003 @@ export const SANCTUARY_EXPANSIONS = [
   },
 ];
 
+/**
+ * Complete standalone vector rendering for Solar Panel Array.
+ */
+export function renderSolarPanel(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  struct: DeployedStructure,
+  structures: DeployedStructure[] = [],
+) {
+  const {total: totalSolarOutput, count: solarAdjCount} = getSolarPanelOutput(struct, structures);
+  const hasAdjacentSolar = solarAdjCount > 0;
+
+  // Timber mount legs
+  ctx.fillStyle = '#78350f';
+  ctx.fillRect(sx - 20, sy + 6, 5, 10);
+  ctx.fillRect(sx + 15, sy + 6, 5, 10);
+  ctx.fillRect(sx - 22, sy + 14, 44, 4);
+
+  // Brass joint brackets
+  ctx.fillStyle = '#f59e0b';
+  ctx.fillRect(sx - 21, sy + 6, 6, 3);
+  ctx.fillRect(sx + 15, sy + 6, 6, 3);
+
+  // Tilted Solar Panel Substrate Frame
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.roundRect(sx - 24, sy - 18, 48, 28, 4);
+  ctx.fill();
+  ctx.strokeStyle = hasAdjacentSolar ? '#fbbf24' : '#38bdf8';
+  ctx.lineWidth = hasAdjacentSolar ? 2 : 1.5;
+  ctx.stroke();
+
+  // Photovoltaic Crystalline Blue Gradient
+  const pvGrad = ctx.createLinearGradient(sx - 22, sy - 16, sx + 22, sy + 8);
+  pvGrad.addColorStop(0, '#0284c7');
+  pvGrad.addColorStop(0.5, '#0369a1');
+  pvGrad.addColorStop(1, '#075985');
+  ctx.fillStyle = pvGrad;
+  ctx.beginPath();
+  ctx.roundRect(sx - 22, sy - 16, 44, 24, 2);
+  ctx.fill();
+
+  // Cell dividing grid lines & gold busbars
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - 16);
+  ctx.lineTo(sx, sy + 8);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(sx - 22, sy - 4);
+  ctx.lineTo(sx + 22, sy - 4);
+  ctx.stroke();
+
+  // Specular sun reflection glint
+  const glintPulse = 0.4 + Math.sin(Date.now() * 0.003 + sx) * 0.3;
+  ctx.fillStyle = `rgba(255, 255, 255, ${glintPulse})`;
+  ctx.beginPath();
+  ctx.moveTo(sx - 18, sy - 14);
+  ctx.lineTo(sx - 6, sy - 14);
+  ctx.lineTo(sx - 14, sy + 6);
+  ctx.lineTo(sx - 20, sy + 6);
+  ctx.closePath();
+  ctx.fill();
+
+  // Power Inverter unit with live green LED
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath();
+  ctx.roundRect(sx + 12, sy + 4, 10, 10, 2);
+  ctx.fill();
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  ctx.fillStyle = hasAdjacentSolar ? '#fbbf24' : '#10b981';
+  ctx.beginPath();
+  ctx.arc(sx + 17, sy + 9, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Generation Badge with Clean Total kW Output
+  const formattedKw = `+${totalSolarOutput % 1 === 0 ? totalSolarOutput : totalSolarOutput.toFixed(1)} kW`;
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.beginPath();
+  ctx.roundRect(sx - 24, sy + 18, 48, 14, 4);
+  ctx.fill();
+  ctx.strokeStyle = hasAdjacentSolar ? '#fbbf24' : 'rgba(56, 189, 248, 0.8)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = hasAdjacentSolar ? '#fef08a' : '#ffffff';
+  ctx.font = 'bold 10px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(formattedKw, sx, sy + 28.5);
+}
+
+/**
+ * Complete standalone vector rendering for Wind Turbine Generator.
+ */
+export function renderWindTurbine(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  struct: DeployedStructure,
+  structures: DeployedStructure[] = [],
+  turbineAngle = 0,
+) {
+  const {total: totalTurbineOutput, count: turbineAdjCount} = getWindTurbineOutput(struct, structures);
+  const hasAdjacentTurbine = turbineAdjCount > 0;
+
+  ctx.fillStyle = '#475569';
+  ctx.beginPath();
+  ctx.roundRect(sx - 14, sy + 10, 28, 7, 3);
+  ctx.fill();
+  ctx.strokeStyle = hasAdjacentTurbine ? '#38bdf8' : '#94a3b8';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Central vertical bronze mast
+  ctx.fillStyle = '#b45309';
+  ctx.fillRect(sx - 2.5, sy - 22, 5, 34);
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 0.8;
+  ctx.strokeRect(sx - 2.5, sy - 22, 5, 34);
+
+  // Animated spinning vertical helical aero blades
+  const spin = turbineAngle + (sx % 10);
+  const bladeOffset = Math.sin(spin) * 16;
+
+  // Left / Front Helical Blade
+  ctx.fillStyle = '#fbbf24';
+  ctx.beginPath();
+  ctx.ellipse(sx + bladeOffset, sy - 8, Math.max(3, Math.abs(bladeOffset * 0.8)), 14, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#d97706';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Counter Helical Blade
+  ctx.fillStyle = '#f59e0b';
+  ctx.beginPath();
+  ctx.ellipse(sx - bladeOffset, sy - 8, Math.max(3, Math.abs(bladeOffset * 0.8)), 14, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#b45309';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Top brass spinner cap
+  ctx.fillStyle = '#fde047';
+  ctx.beginPath();
+  ctx.arc(sx, sy - 24, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Cyan base dynamo coil glow
+  const dynamoPulse = 0.5 + Math.sin(Date.now() * 0.008) * 0.4;
+  ctx.fillStyle = hasAdjacentTurbine ? `rgba(56, 189, 248, ${dynamoPulse + 0.3})` : `rgba(56, 189, 248, ${dynamoPulse})`;
+  ctx.beginPath();
+  ctx.arc(sx, sy + 8, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Generation Badge with Clean Total kW Output
+  const formattedTurbineKw = `+${totalTurbineOutput % 1 === 0 ? totalTurbineOutput : totalTurbineOutput.toFixed(1)} kW`;
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.beginPath();
+  ctx.roundRect(sx - 24, sy + 18, 48, 14, 4);
+  ctx.fill();
+  ctx.strokeStyle = hasAdjacentTurbine ? '#38bdf8' : 'rgba(245, 158, 11, 0.8)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = hasAdjacentTurbine ? '#7dd3fc' : '#ffffff';
+  ctx.font = 'bold 10px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(formattedTurbineKw, sx, sy + 28.5);
+}
+
+/**
+ * Complete standalone vector rendering for Compost Heap.
+ */
+export function renderCompostHeap(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  struct: DeployedStructure,
+) {
+  const waste = struct.depositedWaste || 0;
+  const ready = struct.readyCompost || 0;
+  const timer = struct.timer || 0;
+  const boxW = 44;
+  const boxH = 34;
+  const bx = sx - boxW / 2;
+  const by = sy - boxH / 2 - 1;
+
+  // Ground shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 15, 24, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Clean dark compost loam interior
+  ctx.fillStyle = '#1e140a';
+  ctx.beginPath();
+  ctx.roundRect(bx + 2, by + 2, boxW - 4, boxH - 4, 3);
+  ctx.fill();
+  ctx.strokeStyle = '#451a03';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Organic compost soil layer fill based on waste capacity
+  const fillPct = Math.min(1.0, waste / 20);
+  const mulchH = Math.max(6, (boxH - 10) * fillPct);
+  const soilY = by + boxH - 4 - mulchH;
+
+  // Crisp dark compost layer
+  const soilGrad = ctx.createLinearGradient(bx, soilY, bx, by + boxH - 4);
+  soilGrad.addColorStop(0, '#38200f');
+  soilGrad.addColorStop(0.6, '#291408');
+  soilGrad.addColorStop(1, '#1a0c04');
+  ctx.fillStyle = soilGrad;
+  ctx.beginPath();
+  ctx.roundRect(bx + 3, soilY, boxW - 6, mulchH, [2, 2, 0, 0]);
+  ctx.fill();
+
+  if (waste > 0) {
+    const mulchColors = ['#84cc16', '#65a30d', '#a16207', '#d97706', '#4d7c0f'];
+    for (let i = 0; i < 7; i++) {
+      const lx = bx + 7 + ((i * 9 + 4) % (boxW - 14));
+      const ly = by + boxH - 5 - ((i * 5 + 3) % Math.max(4, mulchH - 3));
+      const rot = i * 0.7;
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(rot);
+      ctx.fillStyle = mulchColors[i % mulchColors.length];
+      ctx.strokeStyle = '#291408';
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(0, -2.5);
+      ctx.lineTo(2.2, 0);
+      ctx.lineTo(0, 2.5);
+      ctx.lineTo(-2.2, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // Crisp Horizontal Slatted Cedar Wood Planks
+  const slatCount = 4;
+  const slatH = 5.2;
+  const slatGap = 2;
+  for (let s = 0; s < slatCount; s++) {
+    const slatY = by + boxH - 4 - (s + 1) * (slatH + slatGap);
+
+    const cedarGrad = ctx.createLinearGradient(bx, slatY, bx, slatY + slatH);
+    cedarGrad.addColorStop(0, '#a14d14');
+    cedarGrad.addColorStop(0.5, '#853e0d');
+    cedarGrad.addColorStop(1, '#652d08');
+    ctx.fillStyle = cedarGrad;
+    ctx.beginPath();
+    ctx.roundRect(bx, slatY, boxW, slatH, 1);
+    ctx.fill();
+
+    ctx.strokeStyle = '#451a03';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(254, 215, 170, 0.25)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(bx + 1, slatY + 1);
+    ctx.lineTo(bx + boxW - 1, slatY + 1);
+    ctx.stroke();
+  }
+
+  // Vertical Cedar Framing Posts
+  const postW = 5;
+  ctx.fillStyle = '#652d08';
+  ctx.beginPath();
+  ctx.roundRect(bx - 0.5, by + 1, postW, boxH - 2, 1);
+  ctx.fill();
+  ctx.strokeStyle = '#3b1802';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = '#652d08';
+  ctx.beginPath();
+  ctx.roundRect(bx + boxW - postW + 0.5, by + 1, postW, boxH - 2, 1);
+  ctx.fill();
+  ctx.strokeStyle = '#3b1802';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Brass Corner Brackets
+  const drawBrassBracket = (cornerX: number, cornerY: number, flipX: boolean, flipY: boolean) => {
+    ctx.save();
+    ctx.translate(cornerX, cornerY);
+    ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(7, 0);
+    ctx.lineTo(7, 3);
+    ctx.lineTo(3, 3);
+    ctx.lineTo(3, 7);
+    ctx.lineTo(0, 7);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = '#b45309';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.arc(1.5, 1.5, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+
+  drawBrassBracket(bx - 0.5, by + 1, false, false);
+  drawBrassBracket(bx + boxW + 0.5, by + 1, true, false);
+  drawBrassBracket(bx - 0.5, by + boxH - 1, false, true);
+  drawBrassBracket(bx + boxW + 0.5, by + boxH - 1, true, true);
+
+  if (waste >= 2 && ready === 0) {
+    const dTime = Date.now() * 0.004;
+    for (let w = 0; w < 3; w++) {
+      const wx = sx - 10 + w * 10 + Math.sin(dTime * 2 + w) * 2.5;
+      const wy = by - 2 - ((dTime * 14 + w * 9) % 12);
+      ctx.fillStyle = 'rgba(163, 230, 53, 0.85)';
+      ctx.beginPath();
+      ctx.arc(wx, wy, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Status Box
+  const statusBoxW = 62;
+  const statusBoxH = 15;
+  const statusBoxX = sx - statusBoxW / 2;
+  const statusBoxY = sy + 18;
+  const cycleProgress = waste >= 2 ? Math.min(1.0, timer / 10) : 0;
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.beginPath();
+  ctx.roundRect(statusBoxX, statusBoxY, statusBoxW, statusBoxH, 4);
+  ctx.fill();
+
+  if (cycleProgress > 0) {
+    const fillW = Math.max(3, (statusBoxW - 2) * cycleProgress);
+    const progGrad = ctx.createLinearGradient(statusBoxX + 1, statusBoxY + 1, statusBoxX + 1 + fillW, statusBoxY + 1);
+    progGrad.addColorStop(0, '#15803d');
+    progGrad.addColorStop(1, '#84cc16');
+    ctx.fillStyle = progGrad;
+    ctx.beginPath();
+    ctx.roundRect(statusBoxX + 1, statusBoxY + 1, fillW, statusBoxH - 2, 3);
+    ctx.fill();
+  } else if (ready > 0) {
+    ctx.fillStyle = 'rgba(132, 204, 22, 0.35)';
+    ctx.beginPath();
+    ctx.roundRect(statusBoxX + 1, statusBoxY + 1, statusBoxW - 2, statusBoxH - 2, 3);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = ready > 0 ? '#a3e635' : waste >= 2 ? '#84cc16' : '#475569';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(statusBoxX, statusBoxY, statusBoxW, statusBoxH, 4);
+  ctx.stroke();
+
+  let statusText = 'Empty';
+  let statusTextColor = '#94a3b8';
+  if (ready > 0) {
+    statusText = `${ready} Compost`;
+    statusTextColor = '#bef264';
+  } else if (waste > 0) {
+    statusText = 'Composting';
+    statusTextColor = '#fef08a';
+  }
+
+  ctx.fillStyle = statusTextColor;
+  ctx.font = 'bold 9.5px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(statusText, sx, statusBoxY + statusBoxH / 2);
+  ctx.textBaseline = 'alphabetic';
+}
+
+/**
+ * Complete standalone vector rendering for Garden Stone Well.
+ */
+export function renderGardenWell(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  struct: DeployedStructure,
+) {
+  const isIrrigating = (struct.activeWateringRemaining || 0) > 0;
+  const basinW = 38;
+  const basinH = 17;
+  const bx = sx - basinW / 2;
+  const by = sy - 2;
+
+  // Ground shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 15, 25, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Cylindrical Dressed-Stone Basin Body
+  const stoneGrad = ctx.createLinearGradient(bx, by, bx + basinW, by);
+  stoneGrad.addColorStop(0, '#475569');
+  stoneGrad.addColorStop(0.3, '#64748b');
+  stoneGrad.addColorStop(0.7, '#475569');
+  stoneGrad.addColorStop(1, '#334155');
+  ctx.fillStyle = stoneGrad;
+  ctx.beginPath();
+  ctx.roundRect(bx, by, basinW, basinH, [2, 2, 7, 7]);
+  ctx.fill();
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Mortar Lines
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(bx + 1, by + 8);
+  ctx.lineTo(bx + basinW - 1, by + 8);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(bx + 10, by); ctx.lineTo(bx + 10, by + 8);
+  ctx.moveTo(bx + 26, by); ctx.lineTo(bx + 26, by + 8);
+  ctx.moveTo(bx + 18, by + 8); ctx.lineTo(bx + 18, by + basinH);
+  ctx.moveTo(bx + 6, by + 8); ctx.lineTo(bx + 6, by + basinH);
+  ctx.moveTo(bx + 31, by + 8); ctx.lineTo(bx + 31, by + basinH);
+  ctx.stroke();
+
+  // Upper Rim
+  ctx.fillStyle = '#64748b';
+  ctx.beginPath();
+  ctx.ellipse(sx, by, basinW / 2, 6.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Inner Opening
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.ellipse(sx, by, basinW / 2 - 3, 4.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Water Sheen
+  const waterGlow = 0.6 + Math.sin(Date.now() * 0.005) * 0.3;
+  ctx.fillStyle = isIrrigating ? `rgba(56, 189, 248, ${waterGlow})` : 'rgba(14, 116, 144, 0.8)';
+  ctx.beginPath();
+  ctx.ellipse(sx, by + 0.5, basinW / 2 - 5, 3.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Upright Posts
+  const postW = 4;
+  const postH = 26;
+  const leftPostX = bx + 1;
+  const rightPostX = bx + basinW - postW - 1;
+  const postTopY = by - postH;
+
+  ctx.fillStyle = '#78350f';
+  ctx.fillRect(leftPostX, postTopY, postW, postH + 4);
+  ctx.strokeStyle = '#451a03';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(leftPostX, postTopY, postW, postH + 4);
+
+  ctx.fillStyle = '#78350f';
+  ctx.fillRect(rightPostX, postTopY, postW, postH + 4);
+  ctx.strokeStyle = '#451a03';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(rightPostX, postTopY, postW, postH + 4);
+
+  // Brass brackets
+  ctx.fillStyle = '#f59e0b';
+  ctx.fillRect(leftPostX - 0.5, by - 2, postW + 1, 3);
+  ctx.fillRect(rightPostX - 0.5, by - 2, postW + 1, 3);
+  ctx.fillRect(leftPostX - 0.5, postTopY + 2, postW + 1, 2.5);
+  ctx.fillRect(rightPostX - 0.5, postTopY + 2, postW + 1, 2.5);
+
+  // Windlass Axle & Rope
+  const windlassY = postTopY + 9;
+  ctx.fillStyle = '#92400e';
+  ctx.fillRect(leftPostX + postW, windlassY, rightPostX - (leftPostX + postW), 3.5);
+  ctx.strokeStyle = '#451a03';
+  ctx.lineWidth = 0.8;
+  ctx.strokeRect(leftPostX + postW, windlassY, rightPostX - (leftPostX + postW), 3.5);
+
+  ctx.fillStyle = '#fef08a';
+  ctx.fillRect(sx - 3, windlassY - 0.5, 6, 4.5);
+  ctx.strokeStyle = '#b45309';
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(sx - 3, windlassY - 0.5, 6, 4.5);
+
+  ctx.strokeStyle = '#fde047';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(sx, windlassY + 4);
+  ctx.lineTo(sx, windlassY + 11);
+  ctx.stroke();
+
+  // Bucket
+  const bucketW = 8;
+  const bucketH = 7.5;
+  const bucketX = sx - bucketW / 2;
+  const bucketY = windlassY + 11;
+
+  ctx.fillStyle = '#78350f';
+  ctx.beginPath();
+  ctx.roundRect(bucketX, bucketY, bucketW, bucketH, [1, 1, 2, 2]);
+  ctx.fill();
+  ctx.strokeStyle = '#451a03';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  ctx.fillStyle = '#f59e0b';
+  ctx.fillRect(bucketX, bucketY + 1.5, bucketW, 1.2);
+  ctx.fillRect(bucketX, bucketY + 4.5, bucketW, 1.2);
+
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.arc(sx, bucketY + 1.5, bucketW / 2, Math.PI, 0);
+  ctx.stroke();
+
+  // Crank
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(rightPostX + postW, windlassY + 1.75);
+  ctx.lineTo(rightPostX + postW + 5, windlassY + 1.75);
+  ctx.lineTo(rightPostX + postW + 5, windlassY + 7);
+  ctx.stroke();
+
+  ctx.fillStyle = '#78350f';
+  ctx.beginPath();
+  ctx.arc(rightPostX + postW + 5, windlassY + 7, 1.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Gable Roof Awning
+  const roofApexY = postTopY - 9;
+  const roofOverhang = 5;
+  const roofLeftX = leftPostX - roofOverhang;
+  const roofRightX = rightPostX + postW + roofOverhang;
+
+  ctx.fillStyle = '#5c2b09';
+  ctx.beginPath();
+  ctx.moveTo(roofLeftX + 2, postTopY + 1);
+  ctx.lineTo(sx, roofApexY + 2);
+  ctx.lineTo(roofRightX - 2, postTopY + 1);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#92400e';
+  ctx.beginPath();
+  ctx.moveTo(sx, roofApexY);
+  ctx.lineTo(roofLeftX, postTopY + 2);
+  ctx.lineTo(roofLeftX + 2, postTopY + 4.5);
+  ctx.lineTo(sx, roofApexY + 2.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#451a03';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = '#b45309';
+  ctx.beginPath();
+  ctx.moveTo(sx, roofApexY);
+  ctx.lineTo(roofRightX, postTopY + 2);
+  ctx.lineTo(roofRightX - 2, postTopY + 4.5);
+  ctx.lineTo(sx, roofApexY + 2.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#451a03';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = '#fbbf24';
+  ctx.beginPath();
+  ctx.arc(sx, roofApexY, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#b45309';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // Status Box
+  const wellBoxW = 54;
+  const wellBoxH = 15;
+  const wellBoxX = sx - wellBoxW / 2;
+  const wellBoxY = sy + 18;
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.beginPath();
+  ctx.roundRect(wellBoxX, wellBoxY, wellBoxW, wellBoxH, 4);
+  ctx.fill();
+
+  if (isIrrigating) {
+    const wellTotal = struct.totalActiveDuration || 20;
+    const wellPct = Math.max(0, Math.min(1, (struct.activeWateringRemaining || 0) / wellTotal));
+    const fillW = Math.max(2, (wellBoxW - 2) * wellPct);
+    const wellGrad = ctx.createLinearGradient(wellBoxX + 1, wellBoxY + 1, wellBoxX + 1 + fillW, wellBoxY + 1);
+    wellGrad.addColorStop(0, '#0284c7');
+    wellGrad.addColorStop(1, '#38bdf8');
+    ctx.fillStyle = wellGrad;
+    ctx.beginPath();
+    ctx.roundRect(wellBoxX + 1, wellBoxY + 1, fillW, wellBoxH - 2, 3);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = isIrrigating ? '#38bdf8' : '#475569';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(wellBoxX, wellBoxY, wellBoxW, wellBoxH, 4);
+  ctx.stroke();
+
+  ctx.fillStyle = isIrrigating ? '#e0f2fe' : '#94a3b8';
+  ctx.font = 'bold 9.5px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(isIrrigating ? 'Watering' : 'Empty', sx, wellBoxY + wellBoxH / 2);
+  ctx.textBaseline = 'alphabetic';
+}
+
+/**
+ * Complete standalone vector rendering for Crystal Pedestal.
+ */
+export function renderCrystalPedestal(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  struct: DeployedStructure,
+) {
+  const isFoliage = struct.type === 'crystal_pedestal_foliage';
+  const isBranches = struct.type === 'crystal_pedestal_branches';
+  const isTrunk = struct.type === 'crystal_pedestal_trunk';
+  const isRoots = struct.type === 'crystal_pedestal_roots';
+
+  const themeColor = isFoliage
+    ? '#22c55e'
+    : isBranches
+    ? '#eab308'
+    : isTrunk
+    ? '#ef4444'
+    : '#3b82f6';
+  const lightColor = isFoliage
+    ? '#86efac'
+    : isBranches
+    ? '#fef08a'
+    : isTrunk
+    ? '#fca5a5'
+    : '#93c5fd';
+  const darkColor = isFoliage
+    ? '#14532d'
+    : isBranches
+    ? '#78350f'
+    : isTrunk
+    ? '#7f1d1d'
+    : '#1e3a8a';
+
+  const pulse = 0.55 + 0.35 * Math.sin(Date.now() * 0.005 + sx);
+
+  // Ground shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 15, 20, 6.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Stepped base plinth
+  const plinthGrad = ctx.createLinearGradient(sx - 16, sy + 6, sx + 16, sy + 6);
+  plinthGrad.addColorStop(0, '#1e293b');
+  plinthGrad.addColorStop(0.5, '#334155');
+  plinthGrad.addColorStop(1, '#0f172a');
+  ctx.fillStyle = plinthGrad;
+  ctx.beginPath();
+  ctx.roundRect(sx - 16, sy + 6, 32, 9, 2.5);
+  ctx.fill();
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Column shaft
+  const shaftGrad = ctx.createLinearGradient(sx - 11, sy - 8, sx + 11, sy - 8);
+  shaftGrad.addColorStop(0, '#0f172a');
+  shaftGrad.addColorStop(0.3, '#1e293b');
+  shaftGrad.addColorStop(0.7, '#334155');
+  shaftGrad.addColorStop(1, '#0f172a');
+  ctx.fillStyle = shaftGrad;
+  ctx.beginPath();
+  ctx.roundRect(sx - 10, sy - 8, 20, 15, 1.5);
+  ctx.fill();
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Capital top platform
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath();
+  ctx.roundRect(sx - 14, sy - 12, 28, 5, 2);
+  ctx.fill();
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Runic trims
+  ctx.save();
+  ctx.strokeStyle = themeColor;
+  ctx.shadowColor = themeColor;
+  ctx.shadowBlur = 4 * pulse;
+  ctx.globalAlpha = 0.5 + 0.4 * pulse;
+  ctx.lineWidth = 1.1;
+
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - 7);
+  ctx.lineTo(sx, sy + 5);
+  ctx.moveTo(sx - 5, sy - 4);
+  ctx.lineTo(sx, sy - 1);
+  ctx.lineTo(sx + 5, sy - 4);
+  ctx.moveTo(sx - 5, sy + 1);
+  ctx.lineTo(sx, sy + 4);
+  ctx.lineTo(sx + 5, sy + 1);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(sx - 10, sy - 9.5);
+  ctx.lineTo(sx + 10, sy - 9.5);
+  ctx.stroke();
+  ctx.restore();
+
+  // Crystal on top
+  const crystalCy = sy - 21;
+  const crystalGlow = ctx.createRadialGradient(sx, crystalCy, 2, sx, crystalCy, 22);
+  crystalGlow.addColorStop(0, `${themeColor}${Math.round(pulse * 100).toString(16).padStart(2, '0')}`);
+  crystalGlow.addColorStop(0.6, `${themeColor}25`);
+  crystalGlow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = crystalGlow;
+  ctx.beginPath();
+  ctx.arc(sx, crystalCy, 22, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.shadowColor = themeColor;
+  ctx.shadowBlur = 6 * pulse;
+
+  if (isFoliage) {
+    const leafGradL = ctx.createLinearGradient(sx - 10, crystalCy, sx, crystalCy);
+    leafGradL.addColorStop(0, darkColor);
+    leafGradL.addColorStop(1, themeColor);
+    ctx.fillStyle = leafGradL;
+    ctx.beginPath();
+    ctx.moveTo(sx, crystalCy - 12);
+    ctx.bezierCurveTo(sx - 10, crystalCy - 6, sx - 9, crystalCy + 6, sx, crystalCy + 9);
+    ctx.closePath();
+    ctx.fill();
+
+    const leafGradR = ctx.createLinearGradient(sx, crystalCy, sx + 10, crystalCy);
+    leafGradR.addColorStop(0, themeColor);
+    leafGradR.addColorStop(1, lightColor);
+    ctx.fillStyle = leafGradR;
+    ctx.beginPath();
+    ctx.moveTo(sx, crystalCy - 12);
+    ctx.bezierCurveTo(sx + 10, crystalCy - 6, sx + 9, crystalCy + 6, sx, crystalCy + 9);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = lightColor;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(sx, crystalCy - 12);
+    ctx.lineTo(sx, crystalCy + 9);
+    ctx.moveTo(sx, crystalCy - 5);
+    ctx.lineTo(sx - 6, crystalCy - 2);
+    ctx.moveTo(sx, crystalCy - 1);
+    ctx.lineTo(sx + 6, crystalCy + 2);
+    ctx.moveTo(sx, crystalCy + 3);
+    ctx.lineTo(sx - 5, crystalCy + 6);
+    ctx.stroke();
+
+  } else if (isBranches) {
+    const bSpireGrad = ctx.createLinearGradient(sx - 4, crystalCy, sx + 4, crystalCy);
+    bSpireGrad.addColorStop(0, themeColor);
+    bSpireGrad.addColorStop(0.5, lightColor);
+    bSpireGrad.addColorStop(1, darkColor);
+    ctx.fillStyle = bSpireGrad;
+    ctx.beginPath();
+    ctx.moveTo(sx, crystalCy - 14);
+    ctx.lineTo(sx + 3.5, crystalCy + 8);
+    ctx.lineTo(sx - 3.5, crystalCy + 8);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = themeColor;
+    ctx.beginPath();
+    ctx.moveTo(sx - 1.5, crystalCy + 2);
+    ctx.lineTo(sx - 9, crystalCy - 7);
+    ctx.lineTo(sx - 6, crystalCy - 1);
+    ctx.lineTo(sx - 1.5, crystalCy + 7);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = lightColor;
+    ctx.beginPath();
+    ctx.moveTo(sx + 1.5, crystalCy - 1);
+    ctx.lineTo(sx + 8.5, crystalCy - 10);
+    ctx.lineTo(sx + 7, crystalCy - 3);
+    ctx.lineTo(sx + 1.5, crystalCy + 5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx, crystalCy - 14);
+    ctx.lineTo(sx, crystalCy + 8);
+    ctx.moveTo(sx - 1.5, crystalCy + 2);
+    ctx.lineTo(sx - 9, crystalCy - 7);
+    ctx.moveTo(sx + 1.5, crystalCy - 1);
+    ctx.lineTo(sx + 8.5, crystalCy - 10);
+    ctx.stroke();
+
+  } else if (isTrunk) {
+    ctx.fillStyle = darkColor;
+    ctx.beginPath();
+    ctx.moveTo(sx - 8, crystalCy + 8);
+    ctx.lineTo(sx - 8, crystalCy - 6);
+    ctx.lineTo(sx - 4, crystalCy - 10);
+    ctx.lineTo(sx - 1, crystalCy + 8);
+    ctx.closePath();
+    ctx.fill();
+
+    const trunkGrad = ctx.createLinearGradient(sx - 4, crystalCy, sx + 4, crystalCy);
+    trunkGrad.addColorStop(0, themeColor);
+    trunkGrad.addColorStop(0.5, lightColor);
+    trunkGrad.addColorStop(1, darkColor);
+    ctx.fillStyle = trunkGrad;
+    ctx.beginPath();
+    ctx.moveTo(sx - 4.5, crystalCy + 9);
+    ctx.lineTo(sx - 4.5, crystalCy - 9);
+    ctx.lineTo(sx, crystalCy - 13);
+    ctx.lineTo(sx + 4.5, crystalCy - 9);
+    ctx.lineTo(sx + 4.5, crystalCy + 9);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = themeColor;
+    ctx.beginPath();
+    ctx.moveTo(sx + 1, crystalCy + 8);
+    ctx.lineTo(sx + 4, crystalCy - 8);
+    ctx.lineTo(sx + 7.5, crystalCy - 4);
+    ctx.lineTo(sx + 7.5, crystalCy + 8);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = '#fee2e2';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(sx, crystalCy - 13);
+    ctx.lineTo(sx, crystalCy + 9);
+    ctx.moveTo(sx - 4.5, crystalCy - 9);
+    ctx.lineTo(sx - 4.5, crystalCy + 9);
+    ctx.moveTo(sx + 4.5, crystalCy - 9);
+    ctx.lineTo(sx + 4.5, crystalCy + 9);
+    ctx.stroke();
+
+  } else {
+    ctx.fillStyle = lightColor;
+    ctx.beginPath();
+    ctx.moveTo(sx, crystalCy - 12);
+    ctx.lineTo(sx + 4, crystalCy - 3);
+    ctx.lineTo(sx, crystalCy + 3);
+    ctx.lineTo(sx - 4, crystalCy - 3);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = themeColor;
+    ctx.beginPath();
+    ctx.moveTo(sx - 2, crystalCy - 2);
+    ctx.bezierCurveTo(sx - 8, crystalCy - 1, sx - 10, crystalCy + 5, sx - 8, crystalCy + 9);
+    ctx.lineTo(sx - 5, crystalCy + 8);
+    ctx.bezierCurveTo(sx - 6, crystalCy + 5, sx - 4, crystalCy + 1, sx, crystalCy + 2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = darkColor;
+    ctx.beginPath();
+    ctx.moveTo(sx + 2, crystalCy - 2);
+    ctx.bezierCurveTo(sx + 8, crystalCy - 1, sx + 10, crystalCy + 5, sx + 8, crystalCy + 9);
+    ctx.lineTo(sx + 5, crystalCy + 8);
+    ctx.bezierCurveTo(sx + 6, crystalCy + 5, sx + 4, crystalCy + 1, sx, crystalCy + 2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = themeColor;
+    ctx.beginPath();
+    ctx.moveTo(sx - 2, crystalCy + 3);
+    ctx.lineTo(sx + 2, crystalCy + 3);
+    ctx.lineTo(sx, crystalCy + 9);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = '#bfdbfe';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx, crystalCy - 12);
+    ctx.lineTo(sx, crystalCy + 9);
+    ctx.moveTo(sx - 2, crystalCy - 2);
+    ctx.lineTo(sx - 8, crystalCy + 9);
+    ctx.moveTo(sx + 2, crystalCy - 2);
+    ctx.lineTo(sx + 8, crystalCy + 9);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  for (let sm = 0; sm < 2; sm++) {
+    const smAng = Date.now() * 0.004 + sx + sm * Math.PI;
+    const smDist = 11 + Math.sin(Date.now() * 0.005 + sm) * 4;
+    const smX = sx + Math.cos(smAng) * smDist;
+    const smY = crystalCy + Math.sin(smAng) * (smDist * 0.6);
+    ctx.fillStyle = lightColor;
+    ctx.beginPath();
+    ctx.arc(smX, smY, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/**
+ * Universal composite vector renderer for all decor & infrastructure items.
+ * Dispatches to the exact same complete render function for BOTH world rendering and preview mode!
+ */
+export function renderCompleteDecor(
+  ctx: CanvasRenderingContext2D,
+  type: DeployedStructureType,
+  sx: number,
+  sy: number,
+  orientation: 'horizontal' | 'vertical' = 'horizontal',
+  struct?: DeployedStructure,
+  structures: DeployedStructure[] = [],
+  turbineAngle = 0,
+) {
+  const dummyStruct: DeployedStructure = struct || {
+    id: 'decor_render',
+    type,
+    x: sx,
+    y: sy,
+    gridX: sx,
+    gridY: sy,
+    orientation,
+    variant: 0,
+    depositedWaste: 0,
+    readyCompost: 0,
+    timer: 0,
+    activeWateringRemaining: 0,
+  };
+
+  if (type === 'solar_panel') {
+    renderSolarPanel(ctx, sx, sy, dummyStruct, structures);
+  } else if (type === 'wind_turbine') {
+    renderWindTurbine(ctx, sx, sy, dummyStruct, structures, turbineAngle);
+  } else if (type === 'decor_pebble_path') {
+    renderPebbleCluster(ctx, sx, sy, dummyStruct.variant ?? 0);
+  } else if (type === 'decor_rock_formation') {
+    renderRockFormation(ctx, sx, sy);
+  } else if (type === 'decor_shrubbery_bush') {
+    renderShrubberyBush(ctx, sx, sy);
+  } else if (type === 'decor_woven_wall') {
+    renderWovenWall(ctx, sx, sy);
+  } else if (type === 'tool_compost_heap') {
+    renderCompostHeap(ctx, sx, sy, dummyStruct);
+  } else if (type === 'tool_garden_well') {
+    renderGardenWell(ctx, sx, sy, dummyStruct);
+  } else if (type.startsWith('crystal_pedestal')) {
+    renderCrystalPedestal(ctx, sx, sy, dummyStruct);
+  } else if (type === 'torii_gate') {
+    drawToriiGateGround(ctx, sx, sy, orientation);
+    drawToriiZenBushes(ctx, sx, sy, orientation, false);
+    drawToriiGatePillars(ctx, sx, sy, orientation, false);
+    drawToriiGateRoofLintel(ctx, sx, sy, orientation, false);
+  }
+}
+
 export function renderPebbleCluster(
   ctx: CanvasRenderingContext2D,
   sx: number,
   sy: number,
-  variant: number,
+  variant = 0,
 ) {
   type StoneDef = {
     x: number;
@@ -3604,7 +4598,6 @@ export function drawWildBarrierTree(
  */
 export function drawToriiGateGround(
   ctx: CanvasRenderingContext2D,
-  
   sx: number,
   sy: number,
   orientation: 'horizontal' | 'vertical' = 'horizontal',
@@ -3614,23 +4607,24 @@ export function drawToriiGateGround(
   renderPebbleCluster(ctx, sx, sy, 0);
 
   if (orientation === 'vertical') {
-    const topY = sy - 74;
-    const bottomY = sy + 74;
+    // Proportional Vertical Torii Gate: Pillars placed on inner edges next to center plot
+    const topY = sy - 44;
+    const bottomY = sy + 44;
 
     // 1. Perspective portal ground shadows
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.beginPath();
-    ctx.ellipse(sx - 24, bottomY + 12, 12, 5, 0, 0, Math.PI * 2);
-    ctx.ellipse(sx + 24, bottomY + 12, 12, 5, 0, 0, Math.PI * 2);
-    ctx.ellipse(sx - 20, topY + 12, 10, 4, 0, 0, Math.PI * 2);
-    ctx.ellipse(sx + 20, topY + 12, 10, 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(sx - 22, bottomY + 10, 11, 4.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(sx + 22, bottomY + 10, 11, 4.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(sx - 20, topY + 10, 9, 3.8, 0, 0, Math.PI * 2);
+    ctx.ellipse(sx + 20, topY + 10, 9, 3.8, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // 2. Stepped slate stone pedestals at bottom and top portals
     const drawVerticalPedestal = (px: number, py: number, scale = 1) => {
       ctx.fillStyle = '#334155';
       ctx.beginPath();
-      ctx.roundRect(px - 10 * scale, py + 2, 20 * scale, 8 * scale, 2);
+      ctx.roundRect(px - 9 * scale, py + 2, 18 * scale, 7 * scale, 2);
       ctx.fill();
       ctx.strokeStyle = '#475569';
       ctx.lineWidth = 1;
@@ -3638,41 +4632,44 @@ export function drawToriiGateGround(
 
       ctx.fillStyle = '#1e293b';
       ctx.beginPath();
-      ctx.roundRect(px - 7 * scale, py - 3, 14 * scale, 6 * scale, 1.5);
+      ctx.roundRect(px - 6 * scale, py - 3, 12 * scale, 5 * scale, 1.5);
       ctx.fill();
       ctx.strokeStyle = '#334155';
       ctx.lineWidth = 0.8;
       ctx.stroke();
 
       ctx.fillStyle = '#0f172a';
-      ctx.fillRect(px - 5 * scale, py - 6, 10 * scale, 4);
+      ctx.fillRect(px - 4.5 * scale, py - 6, 9 * scale, 3.5);
       ctx.fillStyle = '#fbbf24';
-      ctx.fillRect(px - 5.5 * scale, py - 7, 11 * scale, 1.2);
+      ctx.fillRect(px - 5 * scale, py - 7, 10 * scale, 1.2);
     };
 
-    drawVerticalPedestal(sx - 24, bottomY + 6, 1.1);
-    drawVerticalPedestal(sx + 24, bottomY + 6, 1.1);
-    drawVerticalPedestal(sx - 20, topY + 6, 0.9);
-    drawVerticalPedestal(sx + 20, topY + 6, 0.9);
+    drawVerticalPedestal(sx - 22, bottomY + 6, 1.05);
+    drawVerticalPedestal(sx + 22, bottomY + 6, 1.05);
+    drawVerticalPedestal(sx - 20, topY + 6, 0.95);
+    drawVerticalPedestal(sx + 20, topY + 6, 0.95);
   } else {
-    // Spans 3 horizontal plots (width = 3 * cellW = 216px).
-    // Outer pillars are positioned at sx - 72 and sx + 72.
-    const leftX = sx - 72;
-    const rightX = sx + 72;
+    // Proportional Horizontal Torii Gate (3x1 plots: left plot, center plot, right plot).
+    // Pillars moved to inner edges of outside grid plots:
+    // Left pillar at sx - 44 (right edge of left plot, right next to center walkway!)
+    // Right pillar at sx + 44 (left edge of right plot, right next to center walkway!)
+    // Gate span is ~1.22 tile widths between pillars instead of distorted 2.5 tile widths.
+    const leftX = sx - 44;
+    const rightX = sx + 44;
     const groundY = sy + 20;
 
     // 1. Ground Shadows for outer stone pedestals
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.beginPath();
-    ctx.ellipse(leftX, groundY + 4, 18, 6, 0, 0, Math.PI * 2);
-    ctx.ellipse(rightX, groundY + 4, 18, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(leftX, groundY + 4, 15, 5.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(rightX, groundY + 4, 15, 5.5, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // 2. Stepped Slate Stone Pedestals (Kamebara)
     const drawPedestal = (px: number) => {
       ctx.fillStyle = '#334155';
       ctx.beginPath();
-      ctx.roundRect(px - 14, groundY - 6, 28, 10, 2);
+      ctx.roundRect(px - 12, groundY - 6, 24, 9, 2);
       ctx.fill();
       ctx.strokeStyle = '#475569';
       ctx.lineWidth = 1;
@@ -3680,7 +4677,7 @@ export function drawToriiGateGround(
 
       ctx.fillStyle = '#1e293b';
       ctx.beginPath();
-      ctx.roundRect(px - 10, groundY - 10, 20, 6, 1.5);
+      ctx.roundRect(px - 9, groundY - 10, 18, 5.5, 1.5);
       ctx.fill();
       ctx.strokeStyle = '#334155';
       ctx.lineWidth = 1;
@@ -3688,9 +4685,9 @@ export function drawToriiGateGround(
 
       // Black lacquered nemaki collar with gold trim
       ctx.fillStyle = '#0f172a';
-      ctx.fillRect(px - 6.5, groundY - 14, 13, 5);
+      ctx.fillRect(px - 6, groundY - 14, 12, 4.5);
       ctx.fillStyle = '#fbbf24';
-      ctx.fillRect(px - 7, groundY - 15, 14, 1.5);
+      ctx.fillRect(px - 6.5, groundY - 15, 13, 1.5);
     };
 
     drawPedestal(leftX);
@@ -3700,14 +4697,124 @@ export function drawToriiGateGround(
 }
 
 /**
- * Procedural overhead / foreground layer rendering for Torii Gate:
- * - Tall vermilion vertical pillar columns extending upwards (raised height)
- * - Arched Kasagi & Shimaki lintels, Nuki crossbeam, and roof caps
- * Drawn in Overhead Layer AFTER player avatar and entities so the player walks UNDER the archway!
+ * Ornamental Zen topiary shrubbery / evergreen bushes planted at the base of the pillars
+ * on the outer footprint plots (plots 0 & 2 for Horizontal 3x1, top & bottom plots for Vertical 1x3).
+ * Makes it unmistakably clear that both outer plots are occupied and styled as part of the Torii Gate installation!
  */
-export function drawToriiGateOverhead(
+export function drawToriiZenBushes(
   ctx: CanvasRenderingContext2D,
-  
+  sx: number,
+  sy: number,
+  orientation: 'horizontal' | 'vertical' = 'horizontal',
+  isGhost = false,
+) {
+  ctx.save();
+  if (isGhost) {
+    ctx.globalAlpha = 0.65;
+  }
+
+  const drawShrubCluster = (cx: number, cy: number, r: number) => {
+    // 1. Loam soil base & ground shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + r * 0.45, r * 1.35, r * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dark soil mound
+    ctx.fillStyle = '#3b1802';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + r * 0.35, r * 1.15, r * 0.38, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Slate stone border curbing
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // 2. Deep forest green evergreen base mounds (#022c22 & #064e3b)
+    ctx.fillStyle = '#064e3b';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.45, cy - r * 0.1, r * 0.7, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.45, cy - r * 0.1, r * 0.7, 0, Math.PI * 2);
+    ctx.arc(cx, cy - r * 0.4, r * 0.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 3. Midtone rich emerald topiary pads (#047857)
+    ctx.fillStyle = '#047857';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.3, cy - r * 0.3, r * 0.55, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.3, cy - r * 0.3, r * 0.55, 0, Math.PI * 2);
+    ctx.arc(cx, cy - r * 0.55, r * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 4. Vibrant sunlit leaf highlights (#10b981)
+    ctx.fillStyle = '#10b981';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.18, cy - r * 0.5, r * 0.38, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.18, cy - r * 0.5, r * 0.38, 0, Math.PI * 2);
+    ctx.arc(cx, cy - r * 0.7, r * 0.42, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 5. Crisp spring-lime tip leaves (#34d399)
+    ctx.fillStyle = '#34d399';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.08, cy - r * 0.75, r * 0.24, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.08, cy - r * 0.75, r * 0.24, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 6. Delicate blossom flecks (blush & white)
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.35, cy - r * 0.35, 1.3, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.3, cy - r * 0.2, 1.3, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.05, cy - r * 0.55, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fbcfe8';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.15, cy - r * 0.4, 1.4, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.25, cy - r * 0.45, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  if (orientation === 'vertical') {
+    const topY = sy - 44;
+    const bottomY = sy + 44;
+
+    // Top outer plot (plots centered at sy - SANCTUARY_GRID.cellH = sy - 74):
+    // Lush manicured bushes framing around and behind top pillar post
+    drawShrubCluster(sx - 28, topY - 18, 11);
+    drawShrubCluster(sx + 28, topY - 18, 11);
+    drawShrubCluster(sx, topY - 28, 13);
+
+    // Bottom outer plot (plots centered at sy + SANCTUARY_GRID.cellH = sy + 74):
+    // Lush manicured bushes flanking the bottom pillar post
+    drawShrubCluster(sx - 28, bottomY + 16, 11);
+    drawShrubCluster(sx + 28, bottomY + 16, 11);
+    drawShrubCluster(sx, bottomY + 24, 13);
+  } else {
+    const groundY = sy + 20;
+
+    // Left outer plot (plot centered at sx - SANCTUARY_GRID.cellW = sx - 72):
+    // Lush layered green foliage shrubbery/bushes on the left side of the vermilion pillar, filling the outer plot
+    drawShrubCluster(sx - 68, groundY - 2, 13);
+    drawShrubCluster(sx - 80, groundY + 2, 10.5);
+    drawShrubCluster(sx - 56, groundY + 1, 10.5);
+
+    // Right outer plot (plot centered at sx + SANCTUARY_GRID.cellW = sx + 72):
+    // Matching lush green bushes on the right side of the vermilion pillar, filling the outer plot
+    drawShrubCluster(sx + 68, groundY - 2, 13);
+    drawShrubCluster(sx + 80, groundY + 2, 10.5);
+    drawShrubCluster(sx + 56, groundY + 1, 10.5);
+  }
+  ctx.restore();
+}
+
+/**
+ * Procedural vermilion pillar posts & lower tie-beam (Hashira & Nuki) rendering for Torii Gate.
+ * Drawn strictly as part of row Y during the Y-sorted entity pass (Layer 2).
+ */
+export function drawToriiGatePillars(
+  ctx: CanvasRenderingContext2D,
   sx: number,
   sy: number,
   orientation: 'horizontal' | 'vertical' = 'horizontal',
@@ -3719,101 +4826,48 @@ export function drawToriiGateOverhead(
   }
 
   if (orientation === 'vertical') {
-    const topY = sy - 74;
-    const bottomY = sy + 74;
+    const topY = sy - 44;
+    const bottomY = sy + 44;
 
-    // Vertical Vermilion Timber Columns flanking the corridor
-    const runnerGradL = ctx.createLinearGradient(sx - 28, 0, sx - 16, 0);
+    // Vertical Vermilion Timber Columns flanking the corridor at sx - 22 and sx + 22
+    const runnerGradL = ctx.createLinearGradient(sx - 26, 0, sx - 16, 0);
     runnerGradL.addColorStop(0, '#991b1b');
     runnerGradL.addColorStop(0.5, '#dc2626');
     runnerGradL.addColorStop(1, '#7f1d1d');
     ctx.fillStyle = runnerGradL;
 
-    ctx.fillRect(sx - 28, bottomY - 32, 8, 32);
+    ctx.fillRect(sx - 26, bottomY - 32, 8, 32);
     ctx.fillRect(sx - 24, topY - 32, 7, 32);
 
-    const runnerGradR = ctx.createLinearGradient(sx + 16, 0, sx + 28, 0);
+    const runnerGradR = ctx.createLinearGradient(sx + 16, 0, sx + 26, 0);
     runnerGradR.addColorStop(0, '#dc2626');
     runnerGradR.addColorStop(0.5, '#ef4444');
     runnerGradR.addColorStop(1, '#991b1b');
     ctx.fillStyle = runnerGradR;
-    ctx.fillRect(sx + 20, bottomY - 32, 8, 32);
+    ctx.fillRect(sx + 18, bottomY - 32, 8, 32);
     ctx.fillRect(sx + 17, topY - 32, 7, 32);
 
     // Longitude side rails connecting top and bottom posts along outer edges
     ctx.strokeStyle = '#991b1b';
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3.5;
     ctx.beginPath();
-    ctx.moveTo(sx - 24, bottomY - 14);
+    ctx.moveTo(sx - 22, bottomY - 14);
     ctx.lineTo(sx - 20, topY - 14);
-    ctx.moveTo(sx + 24, bottomY - 14);
+    ctx.moveTo(sx + 22, bottomY - 14);
     ctx.lineTo(sx + 20, topY - 14);
     ctx.stroke();
-
-    // Northern Top Arch Lintel (Kasagi & Shimaki) - raised comfortably above player head
-    const topSpan = 64;
-    ctx.fillStyle = '#dc2626';
-    ctx.beginPath();
-    ctx.roundRect(sx - topSpan / 2, topY - 44, topSpan, 6, 1);
-    ctx.fill();
-    ctx.strokeStyle = '#7f1d1d';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(sx - topSpan / 2 - 4, topY - 43);
-    ctx.quadraticCurveTo(sx, topY - 41, sx + topSpan / 2 + 4, topY - 43);
-    ctx.lineTo(sx + topSpan / 2 + 8, topY - 51);
-    ctx.quadraticCurveTo(sx, topY - 49, sx - topSpan / 2 - 8, topY - 51);
-    ctx.closePath();
-    ctx.fillStyle = '#0f172a';
-    ctx.fill();
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-
-    ctx.fillStyle = '#fbbf24';
-    ctx.fillRect(sx - topSpan / 2 - 8, topY - 51, 5, 8);
-    ctx.fillRect(sx + topSpan / 2 + 3, topY - 51, 5, 8);
-
-    // Southern Arch Crossbeam - raised comfortably above player head
-    const botSpan = 72;
-    ctx.fillStyle = '#dc2626';
-    ctx.beginPath();
-    ctx.roundRect(sx - botSpan / 2, bottomY - 44, botSpan, 6, 1);
-    ctx.fill();
-    ctx.strokeStyle = '#7f1d1d';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(sx - botSpan / 2 - 4, bottomY - 43);
-    ctx.quadraticCurveTo(sx, bottomY - 41, sx + botSpan / 2 + 4, bottomY - 43);
-    ctx.lineTo(sx + botSpan / 2 + 8, bottomY - 51);
-    ctx.quadraticCurveTo(sx, bottomY - 49, sx - botSpan / 2 - 8, bottomY - 51);
-    ctx.closePath();
-    ctx.fillStyle = '#0f172a';
-    ctx.fill();
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-
-    ctx.fillStyle = '#fbbf24';
-    ctx.fillRect(sx - botSpan / 2 - 8, bottomY - 51, 5, 8);
-    ctx.fillRect(sx + botSpan / 2 + 3, bottomY - 51, 5, 8);
   } else {
-    // Spans 3 horizontal plots (width = 3 * cellW = 216px).
-    // Outer pillars are positioned at sx - 72 and sx + 72.
-    // Elevated archway: groundY = sy + 20, beamY = sy - 46, kasagiY = sy - 64
-    const leftX = sx - 72;
-    const rightX = sx + 72;
+    // Proportional Horizontal Torii Gate
+    // Pillars located at sx - 44 and sx + 44 (88px span, ~1.22 tile widths)
+    const leftX = sx - 44;
+    const rightX = sx + 44;
     const groundY = sy + 20;
     const beamY = sy - 46;
     const kasagiY = sy - 64;
 
     // Main Vermilion Wooden Pillars (Hashira)
     const drawPillar = (px: number, incline: number) => {
-      const postGrad = ctx.createLinearGradient(px - 6, groundY - 14, px + 6, groundY - 14);
+      const postGrad = ctx.createLinearGradient(px - 5.5, groundY - 14, px + 5.5, groundY - 14);
       postGrad.addColorStop(0, '#991b1b');
       postGrad.addColorStop(0.3, '#dc2626');
       postGrad.addColorStop(0.7, '#ef4444');
@@ -3821,10 +4875,10 @@ export function drawToriiGateOverhead(
 
       ctx.fillStyle = postGrad;
       ctx.beginPath();
-      ctx.moveTo(px - 5.5, groundY - 14);
-      ctx.lineTo(px + incline - 4.5, kasagiY + 6);
-      ctx.lineTo(px + incline + 4.5, kasagiY + 6);
-      ctx.lineTo(px + 5.5, groundY - 14);
+      ctx.moveTo(px - 5, groundY - 14);
+      ctx.lineTo(px + incline - 4, kasagiY + 6);
+      ctx.lineTo(px + incline + 4, kasagiY + 6);
+      ctx.lineTo(px + 5, groundY - 14);
       ctx.closePath();
       ctx.fill();
 
@@ -3833,8 +4887,8 @@ export function drawToriiGateOverhead(
       ctx.stroke();
     };
 
-    drawPillar(leftX, 1.5);
-    drawPillar(rightX, -1.5);
+    drawPillar(leftX, 1.2);
+    drawPillar(rightX, -1.2);
 
     // Lower Tie-Beam (Nuki) penetrating both pillars
     const nukiGrad = ctx.createLinearGradient(0, beamY, 0, beamY + 8);
@@ -3843,7 +4897,7 @@ export function drawToriiGateOverhead(
     nukiGrad.addColorStop(1, '#991b1b');
     ctx.fillStyle = nukiGrad;
     ctx.beginPath();
-    ctx.roundRect(leftX - 16, beamY, (rightX - leftX) + 32, 7, 1);
+    ctx.roundRect(leftX - 12, beamY, (rightX - leftX) + 24, 7, 1);
     ctx.fill();
     ctx.strokeStyle = '#7f1d1d';
     ctx.lineWidth = 1;
@@ -3852,9 +4906,9 @@ export function drawToriiGateOverhead(
     // Wedge pins (Kusabi) on outer pillar joints
     ctx.fillStyle = '#f59e0b';
     ctx.beginPath();
-    ctx.moveTo(leftX - 7, beamY - 2); ctx.lineTo(leftX - 10, beamY + 9); ctx.lineTo(leftX - 7, beamY + 9); ctx.closePath(); ctx.fill();
+    ctx.moveTo(leftX - 5, beamY - 2); ctx.lineTo(leftX - 8, beamY + 9); ctx.lineTo(leftX - 5, beamY + 9); ctx.closePath(); ctx.fill();
     ctx.beginPath();
-    ctx.moveTo(rightX + 7, beamY - 2); ctx.lineTo(rightX + 10, beamY + 9); ctx.lineTo(rightX + 7, beamY + 9); ctx.closePath(); ctx.fill();
+    ctx.moveTo(rightX + 5, beamY - 2); ctx.lineTo(rightX + 8, beamY + 9); ctx.lineTo(rightX + 5, beamY + 9); ctx.closePath(); ctx.fill();
 
     // Central Tablet Strut (Gakuzuka) & Framed Dedication Tablet
     ctx.fillStyle = '#b91c1c';
@@ -3872,6 +4926,88 @@ export function drawToriiGateOverhead(
     ctx.font = 'bold 7px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('鳥居', sx, beamY - 4);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Procedural upper Kasagi & Shimaki roof beam lintel rendering for Torii Gate.
+ * Positioned way above player head height (sy - 64). Drawn overhead so player walks under the roof.
+ * CRITICAL: NEVER draws bushes! Bushes are strictly drawn in Layer 2.
+ */
+export function drawToriiGateRoofLintel(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  orientation: 'horizontal' | 'vertical' = 'horizontal',
+  isGhost = false,
+) {
+  ctx.save();
+  if (isGhost) {
+    ctx.globalAlpha = 0.65;
+  }
+
+  if (orientation === 'vertical') {
+    const topY = sy - 44;
+    const bottomY = sy + 44;
+
+    // Northern Top Arch Lintel (Kasagi & Shimaki) - raised comfortably above player head
+    const topSpan = 60;
+    ctx.fillStyle = '#dc2626';
+    ctx.beginPath();
+    ctx.roundRect(sx - topSpan / 2, topY - 44, topSpan, 6, 1);
+    ctx.fill();
+    ctx.strokeStyle = '#7f1d1d';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(sx - topSpan / 2 - 4, topY - 43);
+    ctx.quadraticCurveTo(sx, topY - 41, sx + topSpan / 2 + 4, topY - 43);
+    ctx.lineTo(sx + topSpan / 2 + 7, topY - 51);
+    ctx.quadraticCurveTo(sx, topY - 49, sx - topSpan / 2 - 7, topY - 51);
+    ctx.closePath();
+    ctx.fillStyle = '#0f172a';
+    ctx.fill();
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(sx - topSpan / 2 - 7, topY - 51, 5, 8);
+    ctx.fillRect(sx + topSpan / 2 + 2, topY - 51, 5, 8);
+
+    // Southern Arch Crossbeam - raised comfortably above player head
+    const botSpan = 66;
+    ctx.fillStyle = '#dc2626';
+    ctx.beginPath();
+    ctx.roundRect(sx - botSpan / 2, bottomY - 44, botSpan, 6, 1);
+    ctx.fill();
+    ctx.strokeStyle = '#7f1d1d';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(sx - botSpan / 2 - 4, bottomY - 43);
+    ctx.quadraticCurveTo(sx, bottomY - 41, sx + botSpan / 2 + 4, bottomY - 43);
+    ctx.lineTo(sx + botSpan / 2 + 7, bottomY - 51);
+    ctx.quadraticCurveTo(sx, bottomY - 49, sx - botSpan / 2 - 7, bottomY - 51);
+    ctx.closePath();
+    ctx.fillStyle = '#0f172a';
+    ctx.fill();
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(sx - botSpan / 2 - 7, bottomY - 51, 5, 8);
+    ctx.fillRect(sx + botSpan / 2 + 2, bottomY - 51, 5, 8);
+  } else {
+    const leftX = sx - 44;
+    const rightX = sx + 44;
+    const beamY = sy - 46;
+    const kasagiY = sy - 64;
 
     // Upper Lintel Beams (Shimaki & Kasagi)
     const shimakiGrad = ctx.createLinearGradient(0, kasagiY + 4, 0, kasagiY + 11);
@@ -3879,22 +5015,22 @@ export function drawToriiGateOverhead(
     shimakiGrad.addColorStop(1, '#991b1b');
     ctx.fillStyle = shimakiGrad;
     ctx.beginPath();
-    ctx.roundRect(leftX - 22, kasagiY + 4, (rightX - leftX) + 44, 7, 1);
+    ctx.roundRect(leftX - 16, kasagiY + 4, (rightX - leftX) + 32, 7, 1);
     ctx.fill();
     ctx.strokeStyle = '#7f1d1d';
     ctx.lineWidth = 1;
     ctx.stroke();
 
     // Kasagi (Upper main roof beam with graceful curved upturn ends)
-    const spanHalf = ((rightX - leftX) + 56) / 2;
+    const spanHalf = ((rightX - leftX) + 40) / 2;
     const kLeft = sx - spanHalf;
     const kRight = sx + spanHalf;
 
     ctx.beginPath();
     ctx.moveTo(kLeft, kasagiY + 4);
     ctx.quadraticCurveTo(sx, kasagiY + 6, kRight, kasagiY + 4);
-    ctx.lineTo(kRight + 4, kasagiY - 6);
-    ctx.quadraticCurveTo(sx, kasagiY - 3, kLeft - 4, kasagiY - 6);
+    ctx.lineTo(kRight + 3, kasagiY - 6);
+    ctx.quadraticCurveTo(sx, kasagiY - 3, kLeft - 3, kasagiY - 6);
     ctx.closePath();
 
     const kasagiGrad = ctx.createLinearGradient(0, kasagiY - 6, 0, kasagiY + 6);
@@ -3912,8 +5048,8 @@ export function drawToriiGateOverhead(
     ctx.strokeStyle = '#334155';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(kLeft - 4, kasagiY - 6);
-    ctx.quadraticCurveTo(sx, kasagiY - 3, kRight + 4, kasagiY - 6);
+    ctx.moveTo(kLeft - 3, kasagiY - 6);
+    ctx.quadraticCurveTo(sx, kasagiY - 3, kRight + 3, kasagiY - 6);
     ctx.stroke();
 
     // Gold-tipped corner finials (Kin-kanagu) on both Kasagi ends
@@ -3921,8 +5057,8 @@ export function drawToriiGateOverhead(
       ctx.fillStyle = '#fbbf24';
       ctx.beginPath();
       ctx.moveTo(fx, fy - 6);
-      ctx.lineTo(isRight ? fx + 7 : fx - 4, fy - 4);
-      ctx.lineTo(isRight ? fx + 4 : fx - 4, fy + 4);
+      ctx.lineTo(isRight ? fx + 6 : fx - 3, fy - 4);
+      ctx.lineTo(isRight ? fx + 3 : fx - 3, fy + 4);
       ctx.lineTo(fx, fy + 4);
       ctx.closePath();
       ctx.fill();
@@ -3947,11 +5083,24 @@ export function drawToriiGateOverhead(
       ctx.arc(tx, ty + 7, 2, 0, Math.PI * 2);
       ctx.fill();
     };
-    drawTassel(leftX - 8, beamY + 7);
-    drawTassel(rightX + 8, beamY + 7);
+    drawTassel(leftX - 6, beamY + 7);
+    drawTassel(rightX + 6, beamY + 7);
   }
 
   ctx.restore();
+}
+
+/**
+ * Legacy compatibility alias for overhead Kasagi roof lintel.
+ */
+export function drawToriiGateOverhead(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  orientation: 'horizontal' | 'vertical' = 'horizontal',
+  isGhost = false,
+) {
+  drawToriiGateRoofLintel(ctx, sx, sy, orientation, isGhost);
 }
 
 /**
@@ -3964,7 +5113,9 @@ export function drawToriiGateHorizontal(
   isGhost = false,
 ) {
   drawToriiGateGround(ctx, sx, sy, 'horizontal');
-  drawToriiGateOverhead(ctx, sx, sy, 'horizontal', isGhost);
+  drawToriiZenBushes(ctx, sx, sy, 'horizontal', isGhost);
+  drawToriiGatePillars(ctx, sx, sy, 'horizontal', isGhost);
+  drawToriiGateRoofLintel(ctx, sx, sy, 'horizontal', isGhost);
 }
 
 /**
@@ -3977,8 +5128,389 @@ export function drawToriiGateVertical(
   isGhost = false,
 ) {
   drawToriiGateGround(ctx, sx, sy, 'vertical');
-  drawToriiGateOverhead(ctx, sx, sy, 'vertical', isGhost);
+  drawToriiZenBushes(ctx, sx, sy, 'vertical', isGhost);
+  drawToriiGatePillars(ctx, sx, sy, 'vertical', isGhost);
+  drawToriiGateRoofLintel(ctx, sx, sy, 'vertical', isGhost);
 }
+
+/**
+ * Complete standalone vector rendering for Zen Rock Formation:
+ * Raked circular concentric sand swirls (suiban tray base), ripple lines,
+ * all 3 slate/granite boulders with facets, and emerald moss accents.
+ * Used for BOTH placed world entity and preview mode!
+ */
+export function renderRockFormation(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+) {
+  // Raked circular concentric sand swirls with gentle gravel grooves (suiban base)
+  ctx.fillStyle = 'rgba(231, 229, 228, 0.15)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, 26, 17, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Concentric raked sand ripple lines
+  ctx.strokeStyle = 'rgba(214, 211, 209, 0.45)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, 24, 15, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(214, 211, 209, 0.35)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, 18, 11, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(214, 211, 209, 0.25)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, 12, 7, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Three natural slate and granite garden boulders
+  // Boulder 1: Tall Center-Right Granite Monolith
+  ctx.fillStyle = '#334155';
+  ctx.beginPath();
+  ctx.moveTo(sx - 4, sy + 7);
+  ctx.lineTo(sx - 2, sy - 20);
+  ctx.lineTo(sx + 9, sy - 16);
+  ctx.lineTo(sx + 15, sy + 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Boulder 1: Sunlit rock facet highlight
+  ctx.fillStyle = '#64748b';
+  ctx.beginPath();
+  ctx.moveTo(sx - 2, sy - 20);
+  ctx.lineTo(sx + 4, sy - 18);
+  ctx.lineTo(sx + 2, sy + 6);
+  ctx.lineTo(sx - 4, sy + 7);
+  ctx.closePath();
+  ctx.fill();
+
+  // Boulder 2: Medium Left Slanted Slate Boulder
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath();
+  ctx.moveTo(sx - 18, sy + 8);
+  ctx.lineTo(sx - 14, sy - 8);
+  ctx.lineTo(sx - 5, sy - 3);
+  ctx.lineTo(sx - 4, sy + 9);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  ctx.fillStyle = '#475569';
+  ctx.beginPath();
+  ctx.moveTo(sx - 14, sy - 8);
+  ctx.lineTo(sx - 7, sy - 5);
+  ctx.lineTo(sx - 6, sy + 7);
+  ctx.lineTo(sx - 15, sy + 7);
+  ctx.closePath();
+  ctx.fill();
+
+  // Boulder 3: Small Front Companion Pebble
+  ctx.fillStyle = '#475569';
+  ctx.beginPath();
+  ctx.ellipse(sx + 6, sy + 10, 6, 4, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#64748b';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = '#94a3b8';
+  ctx.beginPath();
+  ctx.ellipse(sx + 5, sy + 9, 3, 2, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tiny emerald moss and lichen accents at boulder bases
+  ctx.fillStyle = '#10b981';
+  ctx.beginPath();
+  ctx.arc(sx - 8, sy + 8, 2.5, 0, Math.PI * 2);
+  ctx.arc(sx + 12, sy + 7, 3, 0, Math.PI * 2);
+  ctx.arc(sx + 1, sy + 8, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#34d399';
+  ctx.beginPath();
+  ctx.arc(sx - 8, sy + 7.5, 1.2, 0, Math.PI * 2);
+  ctx.arc(sx + 12, sy + 6.5, 1.4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
+ * Complete standalone vector rendering for Topiary Shrubbery Bush.
+ */
+export function renderShrubberyBush(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+) {
+  const planterW = 32;
+  const planterH = 16;
+  const planterX = sx - planterW / 2;
+  const planterY = sy + 1;
+
+  // Planter Box Cedar Body
+  const cedarGrad = ctx.createLinearGradient(planterX, planterY, planterX, planterY + planterH);
+  cedarGrad.addColorStop(0, '#92400e');
+  cedarGrad.addColorStop(0.5, '#78350f');
+  cedarGrad.addColorStop(1, '#5c2b09');
+  ctx.fillStyle = cedarGrad;
+  ctx.beginPath();
+  ctx.roundRect(planterX, planterY, planterW, planterH, 3);
+  ctx.fill();
+  ctx.strokeStyle = '#b45309';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Horizontal Cedar Slats
+  ctx.strokeStyle = 'rgba(254, 240, 138, 0.2)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(planterX + 3, planterY + 6);
+  ctx.lineTo(planterX + planterW - 3, planterY + 6);
+  ctx.moveTo(planterX + 3, planterY + 11);
+  ctx.lineTo(planterX + planterW - 3, planterY + 11);
+  ctx.stroke();
+
+  // Polished Brass Corner Brackets & Screws
+  ctx.fillStyle = '#f59e0b';
+  ctx.fillRect(planterX, planterY, 6, 4);
+  ctx.fillRect(planterX, planterY, 4, 6);
+  ctx.fillRect(planterX + planterW - 6, planterY, 6, 4);
+  ctx.fillRect(planterX + planterW - 4, planterY, 4, 6);
+  ctx.fillRect(planterX, planterY + planterH - 4, 6, 4);
+  ctx.fillRect(planterX + planterW - 6, planterY + planterH - 4, 6, 4);
+
+  // Brass rivets
+  ctx.fillStyle = '#fef08a';
+  ctx.beginPath();
+  ctx.arc(planterX + 2.5, planterY + 2.5, 1.2, 0, Math.PI * 2);
+  ctx.arc(planterX + planterW - 2.5, planterY + 2.5, 1.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Dark rich potting soil rim
+  ctx.fillStyle = '#3b1802';
+  ctx.beginPath();
+  ctx.ellipse(sx, planterY, planterW / 2 - 2, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Lush, spherical manicured Japanese boxwood shrub
+  ctx.fillStyle = '#064e3b';
+  ctx.beginPath();
+  ctx.arc(sx, sy - 11, 18, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Rich emerald midtone foliage pads
+  ctx.fillStyle = '#047857';
+  ctx.beginPath();
+  ctx.arc(sx - 5, sy - 14, 13, 0, Math.PI * 2);
+  ctx.arc(sx + 6, sy - 13, 12, 0, Math.PI * 2);
+  ctx.arc(sx, sy - 8, 14, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Vibrant sunlit top foliage highlights
+  ctx.fillStyle = '#10b981';
+  ctx.beginPath();
+  ctx.arc(sx - 3, sy - 18, 9, 0, Math.PI * 2);
+  ctx.arc(sx + 4, sy - 17, 8, 0, Math.PI * 2);
+  ctx.arc(sx - 6, sy - 12, 7, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Crisp lime leaf crest tips
+  ctx.fillStyle = '#34d399';
+  ctx.beginPath();
+  ctx.arc(sx - 2, sy - 20, 5, 0, Math.PI * 2);
+  ctx.arc(sx + 3, sy - 19, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tiny delicate blossom flecks
+  const blossomFlecks = [
+    {x: sx - 8, y: sy - 15, col: '#fbcfe8'},
+    {x: sx + 7, y: sy - 16, col: '#fbcfe8'},
+    {x: sx + 2, y: sy - 10, col: '#ffffff'},
+    {x: sx - 5, y: sy - 8, col: '#fbcfe8'},
+    {x: sx + 8, y: sy - 8, col: '#ffffff'},
+  ];
+
+  blossomFlecks.forEach((b) => {
+    ctx.fillStyle = b.col;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+/**
+ * Complete standalone vector rendering for Flame-shaped Woven Wooden Lattice Wall.
+ */
+export function renderWovenWall(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+) {
+  const fenceW = 40;
+  const baseY = sy + 13;
+  const startX = sx - fenceW / 2;
+
+  // Ground base shadow curved along flame footprint
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+  ctx.beginPath();
+  ctx.ellipse(sx, baseY + 2, 20, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 5 Upward-curving tapered Cedar Bamboo flame-crest vertical posts (Outer posts at sx - 18, sx + 18)
+  const flamePosts = [
+    {offX: -18, topY: sy - 11, lean: -1.2, cedarCol: '#78350f'}, // Left outer upright
+    {offX: -9,  topY: sy - 25, lean: -0.9, cedarCol: '#92400e'}, // Primary Tall Flame Crest
+    {offX: 0,   topY: sy - 18, lean: 0.6,  cedarCol: '#b45309'},
+    {offX: 9,   topY: sy - 23, lean: 1.2,  cedarCol: '#92400e'}, // Secondary Flame Crest
+    {offX: 18,  topY: sy - 12, lean: 1.2,  cedarCol: '#78350f'}, // Right outer upright
+  ];
+
+  // Render flame vertical posts
+  flamePosts.forEach((p) => {
+    const postBaseX = sx + p.offX;
+    const postTopX = postBaseX + p.lean;
+
+    // Dark cedar post core shadow
+    ctx.strokeStyle = '#3b1802';
+    ctx.lineWidth = 3.8;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(postBaseX, baseY);
+    ctx.quadraticCurveTo(postBaseX + p.lean * 0.4, (baseY + p.topY) * 0.5, postTopX, p.topY);
+    ctx.stroke();
+
+    // Post Body with warm Japanese cedar tones
+    ctx.strokeStyle = p.cedarCol;
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(postBaseX, baseY);
+    ctx.quadraticCurveTo(postBaseX + p.lean * 0.4, (baseY + p.topY) * 0.5, postTopX, p.topY);
+    ctx.stroke();
+
+    // Bamboo joints / node rings on posts
+    const nodeCount = 3;
+    for (let n = 1; n <= nodeCount; n++) {
+      const nt = n / (nodeCount + 1);
+      const nx = postBaseX + p.lean * nt;
+      const ny = baseY + (p.topY - baseY) * nt;
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.ellipse(nx, ny, 2.0, 1.1, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#451a03';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+
+    // Tapered flame-tip post peak with brass cap
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.ellipse(postTopX, p.topY - 1, 1.8, 1.2, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Sculptural Sweeping Flame-Crest Top Rails (Upper, Mid, Lower Arches)
+  ctx.strokeStyle = '#451a03';
+  ctx.lineWidth = 2.8;
+  ctx.beginPath();
+  ctx.moveTo(sx - 18, sy - 9);
+  ctx.bezierCurveTo(sx - 12, sy - 26, sx - 5, sy - 23, sx + 2, sy - 16);
+  ctx.bezierCurveTo(sx + 7, sy - 24, sx + 13, sy - 22, sx + 18, sy - 10);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#d97706';
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  ctx.moveTo(sx - 18, sy - 10);
+  ctx.bezierCurveTo(sx - 12, sy - 27, sx - 5, sy - 24, sx + 2, sy - 17);
+  ctx.bezierCurveTo(sx + 7, sy - 25, sx + 13, sy - 23, sx + 18, sy - 11);
+  ctx.stroke();
+
+  // Mid Rail
+  ctx.strokeStyle = '#78350f';
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  ctx.moveTo(sx - 18, sy - 1);
+  ctx.bezierCurveTo(sx - 9, sy - 10, sx + 9, sy - 8, sx + 18, sy - 2);
+  ctx.stroke();
+
+  // Lower Base Rail
+  ctx.strokeStyle = '#92400e';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(sx - 18, sy + 7);
+  ctx.bezierCurveTo(sx - 7, sy + 3, sx + 7, sy + 3, sx + 18, sy + 7);
+  ctx.stroke();
+
+  // Interwoven Diagonal Bamboo Flame Lattice Weave (STRICTLY CLIPPED WITHIN OUTER POSTS)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(sx - 18, sy - 28, 36, baseY - (sy - 28) + 1);
+  ctx.clip();
+
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 1.2;
+  for (let i = -1; i <= 6; i++) {
+    const xStart = startX + i * 6.5;
+    ctx.beginPath();
+    ctx.moveTo(xStart, baseY - 2);
+    ctx.lineTo(xStart + 12, sy - 20 + Math.abs(i - 2) * 2.2);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = '#d97706';
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i <= 7; i++) {
+    const xStart = startX + i * 6.5;
+    ctx.beginPath();
+    ctx.moveTo(xStart, baseY - 2);
+    ctx.lineTo(xStart - 12, sy - 20 + Math.abs(i - 4) * 2.2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Traditional dark twine knots & brass fasteners on posts
+  flamePosts.forEach((p) => {
+    const postBaseX = sx + p.offX;
+    const heights = [sy + 7, sy - 4, (sy + p.topY) * 0.5];
+
+    heights.forEach((hY) => {
+      if (hY > p.topY + 3 && hY < baseY) {
+        ctx.strokeStyle = '#1e1b4b';
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.moveTo(postBaseX - 2.0, hY - 2.0);
+        ctx.lineTo(postBaseX + 2.0, hY + 2.0);
+        ctx.moveTo(postBaseX + 2.0, hY - 2.0);
+        ctx.lineTo(postBaseX - 2.0, hY + 2.0);
+        ctx.stroke();
+
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(postBaseX, hY, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+  });
+
+  // Emerald moss cushions at post bases
+  flamePosts.forEach((p, idx) => {
+    const postBaseX = sx + p.offX;
+    ctx.fillStyle = idx % 2 === 0 ? '#10b981' : '#059669';
+    ctx.beginPath();
+    ctx.arc(postBaseX, baseY + 1, 2.0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -4096,8 +5628,8 @@ export default function App() {
       return {
         ...prev,
         orientation: nextOrientation,
-        width: prev.orientation === 'horizontal' ? 1 : 3,
-        height: prev.orientation === 'horizontal' ? 3 : 1,
+        width: nextOrientation === 'horizontal' ? 3 : 1,
+        height: nextOrientation === 'horizontal' ? 1 : 3,
       };
     });
     gameAudio.playCrispClick();
@@ -4145,16 +5677,8 @@ export default function App() {
   // Global pure scrolling handler for Arrow keys across all scrollable containers
   useEffect(() => {
     const handleGlobalArrows = (e: KeyboardEvent) => {
-      if (
-        placementPreviewRef.current &&
-        (e.key === 'ArrowLeft' ||
-          e.key === 'ArrowRight' ||
-          e.key === 'ArrowUp' ||
-          e.key === 'ArrowDown')
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-        togglePreviewOrientation();
+      if (placementPreviewRef.current) {
+        // Yield arrow keys entirely to the authoritative placement preview handler
         return;
       }
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -7145,18 +8669,17 @@ export default function App() {
       const inv = sanctuaryInventoryRef.current;
       const key = getInventoryStructureKey(struct.type);
 
-      inv[key] = (inv[key] || 0) + 1;
       if (struct.type === 'solar_panel') {
-        inv.solar_panels_inv = inv[key];
-        inv.solar_panel_inv = inv[key];
-        inv.solarPanels = inv[key];
+        inv.solar_panels_inv = (inv.solar_panels_inv || 0) + 1;
+        inv.solar_panel_inv = inv.solar_panels_inv;
+        inv.solarPanels = inv.solar_panels_inv;
       } else if (struct.type === 'wind_turbine') {
-        inv.wind_turbines_inv = inv[key];
-        inv.wind_turbine_inv = inv[key];
-        inv.windTurbines = inv[key];
+        inv.wind_turbines_inv = (inv.wind_turbines_inv || 0) + 1;
+        inv.wind_turbine_inv = inv.wind_turbines_inv;
+        inv.windTurbines = inv.wind_turbines_inv;
       } else if (struct.type === 'tool_compost_heap') {
-        inv.tool_compost_heap_inv = inv[key];
-        if (inv.tools) inv.tools.compostHeap = inv[key];
+        inv.tool_compost_heap_inv = (inv.tool_compost_heap_inv || 0) + 1;
+        if (inv.tools) inv.tools.compostHeap = inv.tool_compost_heap_inv;
         // Refund deposited waste and ready compost
         if (struct.depositedWaste && struct.depositedWaste > 0) {
           inv.organic_waste = (inv.organic_waste || 0) + struct.depositedWaste;
@@ -7167,15 +8690,30 @@ export default function App() {
           inv.enrichedCompost = inv.organic_compost;
         }
       } else if (struct.type === 'tool_garden_well') {
-        inv.tool_garden_well_inv = inv[key];
-        if (inv.tools) inv.tools.gardenWell = inv[key];
-      } else if (struct.type === 'decor_pebble_path') inv.decorations.pebblePath = (inv.decorations.pebblePath || 0) + 1;
-      else if (struct.type === 'decor_rock_formation') inv.decorations.rockFormation = (inv.decorations.rockFormation || 0) + 1;
-      else if (struct.type === 'decor_shrubbery_bush') inv.decorations.shrubbery = (inv.decorations.shrubbery || 0) + 1;
-      else if (struct.type === 'decor_woven_wall') inv.decorations.wovenWall = (inv.decorations.wovenWall || 0) + 1;
-      else if (struct.type === 'torii_gate') {
+        inv.tool_garden_well_inv = (inv.tool_garden_well_inv || 0) + 1;
+        if (inv.tools) inv.tools.gardenWell = inv.tool_garden_well_inv;
+      } else if (struct.type === 'decor_pebble_path') {
+        inv.decor_pebble_path_inv = (inv.decor_pebble_path_inv || 0) + 1;
+        if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
+        inv.decorations.pebblePath = (inv.decorations.pebblePath || 0) + 1;
+      } else if (struct.type === 'decor_rock_formation') {
+        inv.decor_rock_formation_inv = (inv.decor_rock_formation_inv || 0) + 1;
+        if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
+        inv.decorations.rockFormation = (inv.decorations.rockFormation || 0) + 1;
+      } else if (struct.type === 'decor_shrubbery_bush') {
+        inv.decor_shrubbery_bush_inv = (inv.decor_shrubbery_bush_inv || 0) + 1;
+        if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
+        inv.decorations.shrubbery = (inv.decorations.shrubbery || 0) + 1;
+      } else if (struct.type === 'decor_woven_wall') {
+        inv.decor_woven_wall_inv = (inv.decor_woven_wall_inv || 0) + 1;
+        if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
+        inv.decorations.wovenWall = (inv.decorations.wovenWall || 0) + 1;
+      } else if (struct.type === 'torii_gate') {
         inv.torii_gate_inv = (inv.torii_gate_inv || 0) + 1;
-        if (inv.decorations) inv.decorations.toriiGate = (inv.decorations.toriiGate || 0) + 1;
+        if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
+        inv.decorations.toriiGate = (inv.decorations.toriiGate || 0) + 1;
+      } else {
+        inv[key] = (inv[key] || 0) + 1;
       }
 
       deployedStructuresRef.current.splice(idx, 1);
@@ -8153,7 +9691,6 @@ export default function App() {
     } else if (preview.category === 'infrastructure' || preview.category === 'decoration') {
       if (preview.payload === 'torii_gate') {
         const type: DeployedStructureType = 'torii_gate';
-        const key = getInventoryStructureKey(type);
         const stock = getStructureInventoryCount(inv, type);
         if (stock <= 0) {
           gameAudio.playErrorBuzz();
@@ -8161,10 +9698,10 @@ export default function App() {
           setPlacementPreview(null);
           return;
         }
-        inv[key] = Math.max(0, (inv[key] ?? stock) - 1);
-        if (inv.decorations) {
-          inv.decorations.toriiGate = Math.max(0, (inv.decorations.toriiGate || 1) - 1);
-        }
+        inv.torii_gate_inv = Math.max(0, (inv.torii_gate_inv ?? stock) - 1);
+        if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0, torii_gate: 0 };
+        inv.decorations.toriiGate = Math.max(0, (inv.decorations.toriiGate || 1) - 1);
+        inv.decorations['torii_gate'] = Math.max(0, (inv.decorations['torii_gate'] || 1) - 1);
         const snapX = currentPlot.centerX;
         const snapY = currentPlot.centerY;
         const newStruct: DeployedStructure = {
@@ -8859,22 +10396,44 @@ export default function App() {
 
       if (e.repeat) return;
 
-      // PRIORITY: If in placement preview mode, intercept Arrow keys, Q, and R for immediate rotation
-      if (
-        placementPreviewRef.current &&
-        (e.key === 'ArrowLeft' ||
+      // PRIORITY: If in placement preview mode, handle Arrow keys / R to rotate, Enter/E to place, Esc to abort
+      if (placementPreviewRef.current) {
+        if (
+          e.key === 'ArrowLeft' ||
           e.key === 'ArrowRight' ||
           e.key === 'ArrowUp' ||
           e.key === 'ArrowDown' ||
-          e.key === 'q' ||
-          e.key === 'Q' ||
           e.key === 'r' ||
-          e.key === 'R')
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-        togglePreviewOrientation();
-        return;
+          e.key === 'R'
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+          setPlacementPreview((prev) => {
+            if (!prev) return null;
+            const newOrientation = prev.orientation === 'horizontal' ? 'vertical' : 'horizontal';
+            return {
+              ...prev,
+              orientation: newOrientation,
+              width: newOrientation === 'horizontal' ? 3 : 1,
+              height: newOrientation === 'horizontal' ? 1 : 3,
+            };
+          });
+          gameAudio.playCrispClick();
+          return;
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          setPlacementPreview(null);
+          gameAudio.playCrispClick();
+          return;
+        }
+        if (e.key === 'e' || e.key === 'E' || e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          handleConfirmPlacement();
+          return;
+        }
       }
 
       if (e.key === 'Escape') {
@@ -9097,11 +10656,6 @@ export default function App() {
           }
           if (nearbyStructure) {
             dismantleDeployedStructure(nearbyStructure.id);
-            return;
-          }
-          if (nearbyBonsai) {
-            setQuickRadialBonsai(nearbyBonsai);
-            gameAudio.playCrispClick();
             return;
           }
           if (nearbyBonsai) {
@@ -9511,6 +11065,26 @@ export default function App() {
           } else if (justPressed(13) || (rawAxisY > 0.5 && !lastBtns[13])) {
             setTitleMenuIdx((i) => Math.min(2, i + 1));
             gameAudio.playHoverMicroTone();
+          }
+        }
+
+        // Gamepad actions during Placement Preview Mode (A places, B cancels, Bumpers / D-Pad rotate)
+        if (placementPreviewRef.current) {
+          if (justPressed(0)) {
+            handleConfirmPlacement();
+            lastGamepadButtonsRef.current = buttons.map((b) => b.pressed);
+            return;
+          }
+          if (justPressed(1)) {
+            setPlacementPreview(null);
+            gameAudio.playCrispClick();
+            lastGamepadButtonsRef.current = buttons.map((b) => b.pressed);
+            return;
+          }
+          if (justPressed(4) || justPressed(5) || justPressed(14) || justPressed(15)) {
+            togglePreviewOrientation();
+            lastGamepadButtonsRef.current = buttons.map((b) => b.pressed);
+            return;
           }
         }
 
@@ -10542,291 +12116,6 @@ export default function App() {
         }
         if (offscreenTerrainCanvasRef.current) {
           ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
-        }
-
-        // Active Avatar Snapped Grid Tile Highlight (ONLY drawn when player is physically inside a grid plot)
-        const currentPlot = getPlotAtCoords(av.x, av.y, inv.sanctuary_expansion_tier || 0);
-        activePlotRef.current = currentPlot;
-
-        if (currentPlot) {
-          ctx.save();
-          const px = currentPlot.x - 2;
-          const py = currentPlot.y - 2;
-          const pw = currentPlot.width + 4;
-          const ph = currentPlot.height + 4;
-          const radius = 6;
-
-          if (placementPreview) {
-            // Placement Preview Plot Highlight
-            const isValid = checkPlotPlacementValid(currentPlot, placementPreview);
-            const outlineColor = isValid ? '#10b981' : '#ef4444';
-            const fillColor = isValid ? 'rgba(16, 185, 129, 0.22)' : 'rgba(239, 68, 68, 0.22)';
-
-            if (placementPreview.payload === 'torii_gate') {
-              const isVert = placementPreview.orientation === 'vertical';
-              if (isVert) {
-                // Highlight top, center, and bottom plots
-                ctx.fillStyle = fillColor;
-                ctx.strokeStyle = outlineColor;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.roundRect(px, py - SANCTUARY_GRID.cellH, pw, ph * 3 + (SANCTUARY_GRID.cellH - ph) * 2, 8);
-                ctx.fill();
-                ctx.stroke();
-              } else {
-                // Highlight left, center, and right plots
-                ctx.fillStyle = fillColor;
-                ctx.strokeStyle = outlineColor;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.roundRect(px - SANCTUARY_GRID.cellW, py, pw * 3 + (SANCTUARY_GRID.cellW - pw) * 2, ph, 8);
-                ctx.fill();
-                ctx.stroke();
-              }
-            } else {
-              ctx.fillStyle = fillColor;
-              ctx.beginPath();
-              ctx.roundRect(px, py, pw, ph, radius);
-              ctx.fill();
-
-              ctx.strokeStyle = outlineColor;
-              ctx.lineWidth = 2.5;
-              ctx.shadowColor = outlineColor;
-              ctx.shadowBlur = 8;
-              ctx.stroke();
-              ctx.shadowBlur = 0;
-            }
-
-            // Draw 3x3 Halo Preview Box for Seedlings & Bonsais
-            if (placementPreview.category === 'seedling' || placementPreview.category === 'bonsai') {
-              const centerCol = currentPlot.col;
-              const centerRow = currentPlot.row;
-              ctx.strokeStyle = isValid ? 'rgba(52, 211, 153, 0.75)' : 'rgba(239, 68, 68, 0.75)';
-              ctx.lineWidth = 1.8;
-              ctx.setLineDash([4, 4]);
-              for (let dr = -1; dr <= 1; dr++) {
-                for (let dc = -1; dc <= 1; dc++) {
-                  if (dr === 0 && dc === 0) continue;
-                  const gc = centerCol + dc;
-                  const gr = centerRow + dr;
-                  if (gc >= 0 && gc < SANCTUARY_GRID.cols && gr >= 0 && gr < SANCTUARY_GRID.rows) {
-                    const hX = SANCTUARY_GRID.startX + gc * SANCTUARY_GRID.cellW;
-                    const hY = SANCTUARY_GRID.startY + gr * SANCTUARY_GRID.cellH;
-                    ctx.strokeRect(hX - halfTileW, hY - halfTileH, halfTileW * 2, halfTileH * 2);
-                  }
-                }
-              }
-              ctx.setLineDash([]);
-            }
-
-            // Render Ghost Vector Artwork right on that plot!
-            ctx.save();
-            ctx.globalAlpha = 0.65;
-            if (placementPreview.category === 'seedling') {
-              const sPayload = placementPreview.payload;
-              const sLeaf = (sPayload.leafType || 'circle') as BonsaiLeafType;
-              const sStyle = (placementPreview.style as BonsaiStyle) || 'CHOKAN';
-              const sDef = getLeafTypeDef(sLeaf);
-              const sColor = sPayload.color || sDef.color;
-              const sAccent = sPayload.flowerColor || sDef.accentColor;
-
-              ctx.shadowColor = '#10b981';
-              ctx.shadowBlur = 14;
-
-              ctx.fillStyle = '#1e293b';
-              ctx.beginPath();
-              ctx.roundRect(currentPlot.centerX - 18, currentPlot.centerY + 2, 36, 11, [2, 2, 4, 4]);
-              ctx.fill();
-              ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-              ctx.lineWidth = 1;
-              ctx.stroke();
-
-              ctx.fillStyle = '#3b1802';
-              ctx.beginPath();
-              ctx.ellipse(currentPlot.centerX, currentPlot.centerY + 3, 15, 3, 0, 0, Math.PI * 2);
-              ctx.fill();
-
-              drawBonsaiTrunkAndCanopy(
-                ctx,
-                currentPlot.centerX,
-                currentPlot.centerY + 4,
-                0.65,
-                36,
-                5,
-                sStyle,
-                sLeaf,
-                sColor,
-                sAccent,
-              );
-            } else if (placementPreview.category === 'bonsai') {
-              const bPayload = placementPreview.payload;
-              const bLeaf = (bPayload.leafType || 'circle') as BonsaiLeafType;
-              const bStyle = (bPayload.style as BonsaiStyle) || 'CHOKAN';
-              const bDef = getLeafTypeDef(bLeaf);
-              const bColor = bPayload.color || bDef.color;
-              const bAccent = bPayload.flowerColor || bDef.accentColor;
-              const stageScale = Math.min(1.0, 0.60 + (bPayload.level / 100) * 0.40);
-
-              ctx.shadowColor = '#10b981';
-              ctx.shadowBlur = 14;
-
-              ctx.fillStyle = bPayload.potColor || '#1e293b';
-              ctx.beginPath();
-              ctx.roundRect(
-                currentPlot.centerX - (26 * stageScale + 4),
-                currentPlot.centerY,
-                (26 * stageScale + 4) * 2,
-                16 * stageScale + 2,
-                [2, 2, 6, 6],
-              );
-              ctx.fill();
-              ctx.strokeStyle = 'rgba(255,255,255,0.45)';
-              ctx.lineWidth = 1.2;
-              ctx.stroke();
-
-              ctx.fillStyle = '#3b1802';
-              ctx.beginPath();
-              ctx.ellipse(currentPlot.centerX, currentPlot.centerY + 1, 23 * stageScale + 2, 5 * stageScale, 0, 0, Math.PI * 2);
-              ctx.fill();
-
-              drawBonsaiTrunkAndCanopy(
-                ctx,
-                currentPlot.centerX,
-                currentPlot.centerY + 4,
-                stageScale,
-                32 + stageScale * 26,
-                4.5 + stageScale * 4,
-                bStyle,
-                bLeaf,
-                bColor,
-                bAccent,
-              );
-            } else if (placementPreview.payload === 'torii_gate') {
-              if (placementPreview.orientation === 'vertical') {
-                drawToriiGateVertical(ctx, currentPlot.centerX, currentPlot.centerY, true);
-              } else {
-                drawToriiGateHorizontal(ctx, currentPlot.centerX, currentPlot.centerY, true);
-              }
-            } else if (placementPreview.payload === 'solar_panel') {
-              ctx.fillStyle = '#0284c7';
-              ctx.beginPath();
-              ctx.roundRect(currentPlot.centerX - 24, currentPlot.centerY - 18, 48, 28, 4);
-              ctx.fill();
-              ctx.strokeStyle = '#38bdf8';
-              ctx.lineWidth = 1.5;
-              ctx.stroke();
-            } else if (placementPreview.payload === 'wind_turbine') {
-              ctx.fillStyle = '#b45309';
-              ctx.fillRect(currentPlot.centerX - 2.5, currentPlot.centerY - 22, 5, 34);
-              ctx.fillStyle = '#fbbf24';
-              ctx.beginPath();
-              ctx.arc(currentPlot.centerX, currentPlot.centerY - 12, 12, 0, Math.PI * 2);
-              ctx.fill();
-            } else if (placementPreview.payload === 'tool_garden_well') {
-              ctx.fillStyle = '#64748b';
-              ctx.beginPath();
-              ctx.roundRect(currentPlot.centerX - 19, currentPlot.centerY - 2, 38, 17, [2, 2, 7, 7]);
-              ctx.fill();
-              ctx.strokeStyle = '#38bdf8';
-              ctx.lineWidth = 1.2;
-              ctx.stroke();
-            } else if (placementPreview.payload === 'tool_compost_heap') {
-              ctx.fillStyle = '#853e0d';
-              ctx.beginPath();
-              ctx.roundRect(currentPlot.centerX - 22, currentPlot.centerY - 17, 44, 34, 2);
-              ctx.fill();
-              ctx.strokeStyle = '#84cc16';
-              ctx.lineWidth = 1.2;
-              ctx.stroke();
-            } else if (placementPreview.payload === 'decor_rock_formation') {
-              ctx.fillStyle = '#475569';
-              ctx.beginPath();
-              ctx.ellipse(currentPlot.centerX, currentPlot.centerY, 20, 12, 0, 0, Math.PI * 2);
-              ctx.fill();
-            } else if (placementPreview.payload === 'decor_shrubbery_bush') {
-              ctx.fillStyle = '#047857';
-              ctx.beginPath();
-              ctx.arc(currentPlot.centerX, currentPlot.centerY - 8, 16, 0, Math.PI * 2);
-              ctx.fill();
-            } else if (placementPreview.payload === 'decor_woven_wall') {
-              ctx.fillStyle = '#92400e';
-              ctx.fillRect(currentPlot.centerX - 18, currentPlot.centerY - 15, 36, 26);
-            } else if (typeof placementPreview.payload === 'string' && placementPreview.payload.startsWith('crystal_pedestal')) {
-              const isFoliage = placementPreview.payload === 'crystal_pedestal_foliage';
-              const isBranches = placementPreview.payload === 'crystal_pedestal_branches';
-              const isTrunk = placementPreview.payload === 'crystal_pedestal_trunk';
-              const pCol = isFoliage ? '#22c55e' : isBranches ? '#eab308' : isTrunk ? '#ef4444' : '#3b82f6';
-              ctx.fillStyle = '#1e293b';
-              ctx.fillRect(currentPlot.centerX - 10, currentPlot.centerY - 8, 20, 16);
-              ctx.fillStyle = pCol;
-              ctx.beginPath();
-              ctx.arc(currentPlot.centerX, currentPlot.centerY - 20, 10, 0, Math.PI * 2);
-              ctx.fill();
-            }
-            ctx.restore();
-
-          } else if (currentPlot.isUnlocked) {
-            // Subtle glowing backdrop tint
-            const pulse = 0.08 + 0.04 * Math.sin(Date.now() * 0.005);
-            ctx.fillStyle = `rgba(16, 185, 129, ${pulse})`;
-            ctx.beginPath();
-            ctx.roundRect(px, py, pw, ph, radius);
-            ctx.fill();
-
-            // Distinct clean glowing emerald border
-            ctx.shadowColor = 'rgba(52, 211, 153, 0.75)';
-            ctx.shadowBlur = 8;
-            ctx.strokeStyle = '#10b981';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.roundRect(px, py, pw, ph, radius);
-            ctx.stroke();
-            ctx.shadowBlur = 0;
-
-            // Stylish crisp corner bracket accents
-            const bracketLen = 9;
-            ctx.strokeStyle = '#34d399';
-            ctx.lineWidth = 2.5;
-            ctx.lineCap = 'round';
-
-            // Top-left
-            ctx.beginPath();
-            ctx.moveTo(px, py + bracketLen);
-            ctx.lineTo(px, py + 2);
-            ctx.lineTo(px + bracketLen, py);
-            ctx.stroke();
-
-            // Top-right
-            ctx.beginPath();
-            ctx.moveTo(px + pw - bracketLen, py);
-            ctx.lineTo(px + pw, py + 2);
-            ctx.lineTo(px + pw, py + bracketLen);
-            ctx.stroke();
-
-            // Bottom-left
-            ctx.beginPath();
-            ctx.moveTo(px, py + ph - bracketLen);
-            ctx.lineTo(px, py + ph - 2);
-            ctx.lineTo(px + bracketLen, py + ph);
-            ctx.stroke();
-
-            // Bottom-right
-            ctx.beginPath();
-            ctx.moveTo(px + pw - bracketLen, py + ph);
-            ctx.lineTo(px + pw, py + ph - 2);
-            ctx.lineTo(px + pw, py + ph - bracketLen);
-            ctx.stroke();
-          } else {
-            // Locked plot outline (soft warning tone)
-            ctx.strokeStyle = 'rgba(245, 158, 11, 0.75)';
-            ctx.lineWidth = 1.8;
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.roundRect(px, py, pw, ph, radius);
-            ctx.stroke();
-            ctx.setLineDash([]);
-          }
-          ctx.restore();
         }
 
         // Greenhouse Arched Glass Roof Ribs & Skylight God-Rays
@@ -12279,7 +13568,7 @@ export default function App() {
         }
         ctx.restore();
 
-        // --- 6. CLEAN ENERGY 3x3 PROXIMITY RESONANCE HALO & 3x3 EMERALD BONSAI SYNERGY HALO FLOOR OVERLAYS ---
+        const inspectingBonsai = plantedBonsaisRef.current.find((b) => b.id === inspectingBonsaiId);
         const activeHaloGenerator =
           deployedStructuresRef.current.find(
             (s) =>
@@ -12642,1661 +13931,455 @@ export default function App() {
           }
         }
 
-        // --- 6b. DRAW DEPLOYED GRID STRUCTURES (SOLAR PANELS, TURBINES & GARDEN DECORATIONS) ---
+        // =========================================================================
+        // STRICT 4-LAYER RENDERING PIPELINE FOR SANCTUARY
+        // =========================================================================
+
+        // =========================================================================
+        // LAYER 1: Ground Tiles, Paths, Torii Gate Walkway & Placement Preview
+        // =========================================================================
+        // 1.1 Deployed Pebble Paths & Torii Gate Ground Walkways
         deployedStructuresRef.current.forEach((struct) => {
-          ctx.save();
-          const isNearby = nearbyStructure?.id === struct.id;
           const sx = struct.x;
           const sy = struct.y;
+          if (struct.type === 'decor_pebble_path') {
+            renderPebbleCluster(ctx, sx, sy, struct.variant ?? 0);
+          } else if (struct.type === 'torii_gate') {
+            drawToriiGateGround(ctx, sx, sy, struct.orientation || 'horizontal');
+          }
+        });
 
-          if (isNearby) {
-            ctx.strokeStyle = struct.type === 'solar_panel'
-              ? '#38bdf8'
-              : struct.type === 'wind_turbine'
-              ? '#f59e0b'
-              : struct.type === 'torii_gate'
-              ? '#ef4444'
-              : '#10b981';
-            ctx.lineWidth = 2.5;
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            if (struct.type === 'torii_gate') {
-              if (struct.orientation === 'vertical') {
-                ctx.roundRect(
-                  sx - halfTileW,
-                  sy - SANCTUARY_GRID.cellH - halfTileH,
-                  halfTileW * 2,
-                  SANCTUARY_GRID.cellH * 2 + halfTileH * 2,
-                  8,
-                );
+        // 1.2 Placement Preview (Drawn strictly in Layer 1 so Player Avatar walks on top!)
+        if (placementPreviewRef.current) {
+          const prev = placementPreviewRef.current;
+          const currentPlot = activePlotRef.current || getPreviewPlot(av.x, av.y, inv.sanctuary_expansion_tier || 0);
+          if (currentPlot) {
+            const isValid = checkPlotPlacementValid(currentPlot, prev);
+            const px = currentPlot.centerX;
+            const py = currentPlot.centerY;
+            const isVert = prev.payload === 'torii_gate' && prev.orientation === 'vertical';
+
+            ctx.save();
+
+            // Emerald / Rose Bounding Box
+            if (prev.payload === 'torii_gate') {
+              ctx.strokeStyle = isValid ? '#34d399' : '#f43f5e';
+              ctx.lineWidth = 3;
+              ctx.setLineDash([5, 5]);
+              if (isVert) {
+                ctx.beginPath();
+                ctx.roundRect(px - halfTileW, py - SANCTUARY_GRID.cellH - halfTileH, halfTileW * 2, SANCTUARY_GRID.cellH * 2 + halfTileH * 2, 8);
+                ctx.stroke();
+              } else {
+                ctx.beginPath();
+                ctx.roundRect(px - SANCTUARY_GRID.cellW - halfTileW, py - halfTileH, SANCTUARY_GRID.cellW * 2 + halfTileW * 2, halfTileH * 2, 8);
+                ctx.stroke();
+              }
+              ctx.setLineDash([]);
+            } else {
+              ctx.strokeStyle = isValid ? '#34d399' : '#f43f5e';
+              ctx.lineWidth = 3;
+              ctx.strokeRect(currentPlot.x, currentPlot.y, currentPlot.width, currentPlot.height);
+            }
+
+            // Crisp Desaturated (B&W Grayscale) Complete Graphic for ALL preview items
+            ctx.save();
+            ctx.filter = 'grayscale(100%) contrast(120%) brightness(1.05)';
+            ctx.globalAlpha = 0.85;
+
+            const isSeedling = prev.category === 'seedling';
+            const isBonsai = prev.category === 'bonsai';
+
+            if (isSeedling || isBonsai) {
+              const seedlingData = prev.payload || {};
+              const leafType = (seedlingData.leafType || seedlingData.species || 'circle') as BonsaiLeafType;
+              const styleKey = (prev.style || seedlingData.style || 'MOYOGI') as BonsaiStyle;
+              const leafDef = getLeafTypeDef(leafType);
+              const foliageColor = leafDef.color;
+              const foliageAccent = leafDef.accentColor;
+
+              const stageScale = isBonsai ? Math.min(1.0, 0.60 + ((seedlingData.level || 1) / 100) * 0.40) : 0.60;
+              const trunkHeight = 32 + stageScale * 26;
+              const trunkThickness = 4.5 + stageScale * 4;
+              const bx = px;
+              const by = py + 4;
+
+              // Ceramic Pot Body
+              ctx.fillStyle = seedlingData.potColor || '#1e293b';
+              ctx.beginPath();
+              ctx.roundRect(
+                bx - (26 * stageScale + 4),
+                by - 4,
+                (26 * stageScale + 4) * 2,
+                16 * stageScale + 2,
+                [2, 2, 6, 6],
+              );
+              ctx.fill();
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+              ctx.lineWidth = 1.2;
+              ctx.stroke();
+
+              // Soil
+              ctx.fillStyle = '#3b1802';
+              ctx.beginPath();
+              ctx.ellipse(bx, by - 3, 23 * stageScale + 2, 5 * stageScale, 0, 0, Math.PI * 2);
+              ctx.fill();
+
+              // Complete bonsai trunk & canopy
+              drawBonsaiTrunkAndCanopy(
+                ctx,
+                bx,
+                by,
+                stageScale,
+                trunkHeight,
+                trunkThickness,
+                styleKey,
+                leafType,
+                foliageColor,
+                foliageAccent,
+              );
+            } else {
+              // Infrastructure or Decoration - renders the EXACT SAME complete vector graphic!
+              const decorType = (typeof prev.payload === 'string' ? prev.payload : prev.item || 'decor_rock_formation') as DeployedStructureType;
+              renderCompleteDecor(
+                ctx,
+                decorType,
+                px,
+                py,
+                prev.orientation || 'horizontal',
+                undefined,
+                deployedStructuresRef.current,
+                turbineAngleRef.current,
+              );
+            }
+
+            ctx.filter = 'none';
+            ctx.restore();
+            ctx.restore();
+          }
+        }
+
+        // =========================================================================
+        // LAYER 2: Y-Sorted Physical World Entities
+        // =========================================================================
+        type WorldEntity =
+          | { kind: 'bonsai'; data: PlantedBonsai; y: number }
+          | { kind: 'structure'; data: DeployedStructure; y: number };
+
+        const worldEntities: WorldEntity[] = [];
+
+        plantedBonsaisRef.current.forEach((b) => {
+          worldEntities.push({ kind: 'bonsai', data: b, y: b.y });
+        });
+
+        deployedStructuresRef.current.forEach((s) => {
+          if (s.type !== 'decor_pebble_path') {
+            worldEntities.push({ kind: 'structure', data: s, y: s.y });
+          }
+        });
+
+        // Strictly sort by Y ascending (top to bottom) so lower rows render OVER upper rows!
+        worldEntities.sort((a, b) => a.y - b.y);
+
+        worldEntities.forEach((entity) => {
+          ctx.save();
+          if (entity.kind === 'structure') {
+            const struct = entity.data;
+            const sx = struct.x;
+            const sy = struct.y;
+            const isNearby = nearbyStructure?.id === struct.id;
+
+            if (isNearby) {
+              ctx.strokeStyle = struct.type === 'solar_panel'
+                ? '#38bdf8'
+                : struct.type === 'wind_turbine'
+                ? '#f59e0b'
+                : struct.type === 'torii_gate'
+                ? '#ef4444'
+                : '#10b981';
+              ctx.lineWidth = 2.5;
+              ctx.setLineDash([4, 4]);
+              ctx.beginPath();
+              if (struct.type === 'torii_gate') {
+                if (struct.orientation === 'vertical') {
+                  ctx.roundRect(
+                    sx - halfTileW,
+                    sy - SANCTUARY_GRID.cellH - halfTileH,
+                    halfTileW * 2,
+                    SANCTUARY_GRID.cellH * 2 + halfTileH * 2,
+                    8,
+                  );
+                } else {
+                  ctx.roundRect(
+                    sx - SANCTUARY_GRID.cellW - halfTileW,
+                    sy - halfTileH,
+                    SANCTUARY_GRID.cellW * 2 + halfTileW * 2,
+                    halfTileH * 2,
+                    8,
+                  );
+                }
               } else {
                 ctx.roundRect(
-                  sx - SANCTUARY_GRID.cellW - halfTileW,
+                  sx - halfTileW,
                   sy - halfTileH,
-                  SANCTUARY_GRID.cellW * 2 + halfTileW * 2,
+                  halfTileW * 2,
                   halfTileH * 2,
-                  8,
+                  6,
                 );
               }
+              ctx.stroke();
+              ctx.setLineDash([]);
+            }
+
+            if (struct.type === 'torii_gate') {
+              // Torii Gate Flanking Bushes & Pillars drawn strictly in row Y's entity pass!
+              // When row Y+1 renders after row Y, the bonsai tree in row Y+1 renders OVER these bushes!
+              drawToriiZenBushes(ctx, sx, sy, struct.orientation || 'horizontal', false);
+              drawToriiGatePillars(ctx, sx, sy, struct.orientation || 'horizontal', false);
             } else {
+              renderCompleteDecor(
+                ctx,
+                struct.type,
+                sx,
+                sy,
+                struct.orientation || 'horizontal',
+                struct,
+                deployedStructuresRef.current,
+                turbineAngleRef.current,
+              );
+            }
+          } else {
+            // Render Bonsai Physical Artwork (Pot, Loam Soil, Trunk, Branches, Foliage)
+            const bonsai = entity.data;
+            const isNearby = nearbyBonsai?.id === bonsai.id;
+
+            if (isNearby) {
+              ctx.strokeStyle = '#10b981';
+              ctx.lineWidth = 2.5;
+              ctx.setLineDash([4, 4]);
+              ctx.beginPath();
               ctx.roundRect(
-                sx - halfTileW,
-                sy - halfTileH,
+                bonsai.x - halfTileW,
+                bonsai.y - halfTileH,
                 halfTileW * 2,
                 halfTileH * 2,
                 6,
               );
+              ctx.stroke();
+              ctx.setLineDash([]);
             }
-            ctx.stroke();
-            ctx.setLineDash([]);
-          }
 
-          // Ground shadow (Only for non-pebble-path and non-torii-gate structures)
-          if (struct.type !== 'decor_pebble_path' && struct.type !== 'torii_gate') {
+            const bStyle: BonsaiStyle = bonsai.style || 'MOYOGI';
+            const bLeafType: BonsaiLeafType = bonsai.leafType || 'circle';
+            const bDef = getLeafTypeDef(bLeafType);
+            const foliageColor = bDef.color;
+            const foliageAccent = bDef.accentColor;
+
+            // Graceful scaling with level stage (0.60 at Lv.1 up to 1.0 at Lv.100)
+            const stageScale = Math.min(1.0, 0.60 + (bonsai.level / 100) * 0.40);
+            const trunkHeight = 32 + stageScale * 26;
+            const trunkThickness = 4.5 + stageScale * 4;
+
+            const bx = bonsai.x;
+            const by = bonsai.y + 4; // base soil center
+
+            // Ceramic Pot Shadow
             ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
             ctx.beginPath();
-            ctx.ellipse(sx, sy + 14, 24, 8, 0, 0, Math.PI * 2);
-            ctx.fill();
-          }
-
-          if (struct.type === 'solar_panel') {
-            // --- ☀️ Sleek Blue Crystalline Solar Photovoltaic Array on Timber Mount ---
-            const {total: totalSolarOutput, count: solarAdjCount} = getSolarPanelOutput(struct, deployedStructuresRef.current);
-            const hasAdjacentSolar = solarAdjCount > 0;
-
-            // Timber mount legs
-            ctx.fillStyle = '#78350f';
-            ctx.fillRect(sx - 20, sy + 6, 5, 10);
-            ctx.fillRect(sx + 15, sy + 6, 5, 10);
-            ctx.fillRect(sx - 22, sy + 14, 44, 4);
-
-            // Brass joint brackets
-            ctx.fillStyle = '#f59e0b';
-            ctx.fillRect(sx - 21, sy + 6, 6, 3);
-            ctx.fillRect(sx + 15, sy + 6, 6, 3);
-
-            // Tilted Solar Panel Substrate Frame
-            ctx.fillStyle = '#0f172a';
-            ctx.beginPath();
-            ctx.roundRect(sx - 24, sy - 18, 48, 28, 4);
-            ctx.fill();
-            ctx.strokeStyle = hasAdjacentSolar ? '#fbbf24' : '#38bdf8';
-            ctx.lineWidth = hasAdjacentSolar ? 2 : 1.5;
-            ctx.stroke();
-
-            // Photovoltaic Crystalline Blue Gradient
-            const pvGrad = ctx.createLinearGradient(sx - 22, sy - 16, sx + 22, sy + 8);
-            pvGrad.addColorStop(0, '#0284c7');
-            pvGrad.addColorStop(0.5, '#0369a1');
-            pvGrad.addColorStop(1, '#075985');
-            ctx.fillStyle = pvGrad;
-            ctx.beginPath();
-            ctx.roundRect(sx - 22, sy - 16, 44, 24, 2);
+            ctx.ellipse(bx, by + 10, 26 * stageScale + 6, 7, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Cell dividing grid lines & gold busbars
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(sx, sy - 16);
-            ctx.lineTo(sx, sy + 8);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(sx - 22, sy - 4);
-            ctx.lineTo(sx + 22, sy - 4);
-            ctx.stroke();
-
-            // Specular sun reflection glint
-            const glintPulse = 0.4 + Math.sin(Date.now() * 0.003 + sx) * 0.3;
-            ctx.fillStyle = `rgba(255, 255, 255, ${glintPulse})`;
-            ctx.beginPath();
-            ctx.moveTo(sx - 18, sy - 14);
-            ctx.lineTo(sx - 6, sy - 14);
-            ctx.lineTo(sx - 14, sy + 6);
-            ctx.lineTo(sx - 20, sy + 6);
-            ctx.closePath();
-            ctx.fill();
-
-            // Power Inverter unit with live green LED
-            ctx.fillStyle = '#1e293b';
-            ctx.beginPath();
-            ctx.roundRect(sx + 12, sy + 4, 10, 10, 2);
-            ctx.fill();
-            ctx.strokeStyle = '#f59e0b';
-            ctx.lineWidth = 0.8;
-            ctx.stroke();
-
-            ctx.fillStyle = hasAdjacentSolar ? '#fbbf24' : '#10b981';
-            ctx.beginPath();
-            ctx.arc(sx + 17, sy + 9, 2, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Generation Badge with Clean Total kW Output (Matching Bonsai Level Badge)
-            const formattedKw = `+${totalSolarOutput % 1 === 0 ? totalSolarOutput : totalSolarOutput.toFixed(1)} kW`;
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-            ctx.beginPath();
-            ctx.roundRect(sx - 24, sy + 18, 48, 14, 4);
-            ctx.fill();
-            ctx.strokeStyle = hasAdjacentSolar ? '#fbbf24' : 'rgba(56, 189, 248, 0.8)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            ctx.fillStyle = hasAdjacentSolar ? '#fef08a' : '#ffffff';
-            ctx.font = 'bold 10px system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(formattedKw, sx, sy + 28.5);
-
-          } else if (struct.type === 'wind_turbine') {
-            // --- 💨 Spinning Vertical Brass Aero-Helix Micro-Turbine ---
-            const {total: totalTurbineOutput, count: turbineAdjCount} = getWindTurbineOutput(struct, deployedStructuresRef.current);
-            const hasAdjacentTurbine = turbineAdjCount > 0;
-
-            ctx.fillStyle = '#475569';
-            ctx.beginPath();
-            ctx.roundRect(sx - 14, sy + 10, 28, 7, 3);
-            ctx.fill();
-            ctx.strokeStyle = hasAdjacentTurbine ? '#38bdf8' : '#94a3b8';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Central vertical bronze mast
-            ctx.fillStyle = '#b45309';
-            ctx.fillRect(sx - 2.5, sy - 22, 5, 34);
-            ctx.strokeStyle = '#f59e0b';
-            ctx.lineWidth = 0.8;
-            ctx.strokeRect(sx - 2.5, sy - 22, 5, 34);
-
-            // Animated spinning vertical helical aero blades
-            const spin = turbineAngleRef.current + (sx % 10);
-            const bladeOffset = Math.sin(spin) * 16;
-
-            // Left / Front Helical Blade
-            ctx.fillStyle = '#fbbf24';
-            ctx.beginPath();
-            ctx.ellipse(sx + bladeOffset, sy - 8, Math.max(3, Math.abs(bladeOffset * 0.8)), 14, 0.2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#d97706';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Counter Helical Blade
-            ctx.fillStyle = '#f59e0b';
-            ctx.beginPath();
-            ctx.ellipse(sx - bladeOffset, sy - 8, Math.max(3, Math.abs(bladeOffset * 0.8)), 14, -0.2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#b45309';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Top brass spinner cap
-            ctx.fillStyle = '#fde047';
-            ctx.beginPath();
-            ctx.arc(sx, sy - 24, 4, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#f59e0b';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Cyan base dynamo coil glow
-            const dynamoPulse = 0.5 + Math.sin(Date.now() * 0.008) * 0.4;
-            ctx.fillStyle = hasAdjacentTurbine ? `rgba(56, 189, 248, ${dynamoPulse + 0.3})` : `rgba(56, 189, 248, ${dynamoPulse})`;
-            ctx.beginPath();
-            ctx.arc(sx, sy + 8, 3.5, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Generation Badge with Clean Total kW Output (Matching Bonsai Level Badge)
-            const formattedTurbineKw = `+${totalTurbineOutput % 1 === 0 ? totalTurbineOutput : totalTurbineOutput.toFixed(1)} kW`;
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-            ctx.beginPath();
-            ctx.roundRect(sx - 24, sy + 18, 48, 14, 4);
-            ctx.fill();
-            ctx.strokeStyle = hasAdjacentTurbine ? '#38bdf8' : 'rgba(245, 158, 11, 0.8)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            ctx.fillStyle = hasAdjacentTurbine ? '#7dd3fc' : '#ffffff';
-            ctx.font = 'bold 10px system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(formattedTurbineKw, sx, sy + 28.5);
-
-          } else if (struct.type === 'decor_pebble_path') {
-            // =========================================================================
-            // 1. ZEN PEBBLE PATH (5 VARIANTS MATCHING PROMENADE PEBBLE AESTHETIC)
-            // =========================================================================
-            const variant =
-              struct.variant ??
-              (Math.abs(Math.round(sx * 7 + sy * 13)) % 5);
-            renderPebbleCluster(ctx, sx, sy, variant);
-
-          } else if (struct.type === 'decor_rock_formation') {
-            // =========================================================================
-            // 2. ZEN ROCK FORMATION (COZY ARTISANAL ILLUSTRATION, ZERO TEXT)
-            // =========================================================================
-            // Raked circular concentric sand swirls with gentle gravel grooves
-            ctx.fillStyle = 'rgba(231, 229, 228, 0.15)';
-            ctx.beginPath();
-            ctx.ellipse(sx, sy, 26, 17, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Concentric raked sand ripple lines
-            ctx.strokeStyle = 'rgba(214, 211, 209, 0.45)';
-            ctx.lineWidth = 1.2;
-            ctx.beginPath();
-            ctx.ellipse(sx, sy, 24, 15, 0, 0, Math.PI * 2);
-            ctx.stroke();
-
-            ctx.strokeStyle = 'rgba(214, 211, 209, 0.35)';
-            ctx.beginPath();
-            ctx.ellipse(sx, sy, 18, 11, 0, 0, Math.PI * 2);
-            ctx.stroke();
-
-            ctx.strokeStyle = 'rgba(214, 211, 209, 0.25)';
-            ctx.beginPath();
-            ctx.ellipse(sx, sy, 12, 7, 0, 0, Math.PI * 2);
-            ctx.stroke();
-
-            // Three natural slate and granite garden boulders
-            // Boulder 1: Tall Center-Right Granite Monolith
-            ctx.fillStyle = '#334155';
-            ctx.beginPath();
-            ctx.moveTo(sx - 4, sy + 7);
-            ctx.lineTo(sx - 2, sy - 20);
-            ctx.lineTo(sx + 9, sy - 16);
-            ctx.lineTo(sx + 15, sy + 8);
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = '#475569';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-
-            // Boulder 1: Sunlit rock facet highlight
-            ctx.fillStyle = '#64748b';
-            ctx.beginPath();
-            ctx.moveTo(sx - 2, sy - 20);
-            ctx.lineTo(sx + 4, sy - 18);
-            ctx.lineTo(sx + 2, sy + 6);
-            ctx.lineTo(sx - 4, sy + 7);
-            ctx.closePath();
-            ctx.fill();
-
-            // Boulder 2: Medium Left Slanted Slate Boulder
-            ctx.fillStyle = '#1e293b';
-            ctx.beginPath();
-            ctx.moveTo(sx - 18, sy + 8);
-            ctx.lineTo(sx - 14, sy - 8);
-            ctx.lineTo(sx - 5, sy - 3);
-            ctx.lineTo(sx - 4, sy + 9);
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = '#334155';
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
-
-            ctx.fillStyle = '#475569';
-            ctx.beginPath();
-            ctx.moveTo(sx - 14, sy - 8);
-            ctx.lineTo(sx - 7, sy - 5);
-            ctx.lineTo(sx - 6, sy + 7);
-            ctx.lineTo(sx - 15, sy + 7);
-            ctx.closePath();
-            ctx.fill();
-
-            // Boulder 3: Small Front Companion Pebble
-            ctx.fillStyle = '#475569';
-            ctx.beginPath();
-            ctx.ellipse(sx + 6, sy + 10, 6, 4, 0.2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#64748b';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            ctx.fillStyle = '#94a3b8';
-            ctx.beginPath();
-            ctx.ellipse(sx + 5, sy + 9, 3, 2, 0.2, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Tiny emerald moss and lichen accents at boulder bases
-            ctx.fillStyle = '#10b981';
-            ctx.beginPath();
-            ctx.arc(sx - 8, sy + 8, 2.5, 0, Math.PI * 2);
-            ctx.arc(sx + 12, sy + 7, 3, 0, Math.PI * 2);
-            ctx.arc(sx + 1, sy + 8, 2, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = '#34d399';
-            ctx.beginPath();
-            ctx.arc(sx - 8, sy + 7.5, 1.2, 0, Math.PI * 2);
-            ctx.arc(sx + 12, sy + 6.5, 1.4, 0, Math.PI * 2);
-            ctx.fill();
-
-          } else if (struct.type === 'decor_shrubbery_bush') {
-            // =========================================================================
-            // 3. TOPIARY SHRUBBERY BUSH (COZY ARTISANAL ILLUSTRATION, ZERO TEXT)
-            // =========================================================================
-            const planterW = 32;
-            const planterH = 16;
-            const planterX = sx - planterW / 2;
-            const planterY = sy + 1;
-
-            // Planter Box Cedar Body
-            const cedarGrad = ctx.createLinearGradient(planterX, planterY, planterX, planterY + planterH);
-            cedarGrad.addColorStop(0, '#92400e');
-            cedarGrad.addColorStop(0.5, '#78350f');
-            cedarGrad.addColorStop(1, '#5c2b09');
-            ctx.fillStyle = cedarGrad;
-            ctx.beginPath();
-            ctx.roundRect(planterX, planterY, planterW, planterH, 3);
-            ctx.fill();
-            ctx.strokeStyle = '#b45309';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-
-            // Horizontal Cedar Slats
-            ctx.strokeStyle = 'rgba(254, 240, 138, 0.2)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(planterX + 3, planterY + 6);
-            ctx.lineTo(planterX + planterW - 3, planterY + 6);
-            ctx.moveTo(planterX + 3, planterY + 11);
-            ctx.lineTo(planterX + planterW - 3, planterY + 11);
-            ctx.stroke();
-
-            // Polished Brass Corner Brackets & Screws
-            ctx.fillStyle = '#f59e0b';
-            ctx.fillRect(planterX, planterY, 6, 4);
-            ctx.fillRect(planterX, planterY, 4, 6);
-            ctx.fillRect(planterX + planterW - 6, planterY, 6, 4);
-            ctx.fillRect(planterX + planterW - 4, planterY, 4, 6);
-            ctx.fillRect(planterX, planterY + planterH - 4, 6, 4);
-            ctx.fillRect(planterX + planterW - 6, planterY + planterH - 4, 6, 4);
-
-            // Brass rivets
-            ctx.fillStyle = '#fef08a';
-            ctx.beginPath();
-            ctx.arc(planterX + 2.5, planterY + 2.5, 1.2, 0, Math.PI * 2);
-            ctx.arc(planterX + planterW - 2.5, planterY + 2.5, 1.2, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Dark rich potting soil rim
-            ctx.fillStyle = '#3b1802';
-            ctx.beginPath();
-            ctx.ellipse(sx, planterY, planterW / 2 - 2, 4, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Lush, spherical manicured Japanese boxwood shrub
-            ctx.fillStyle = '#064e3b';
-            ctx.beginPath();
-            ctx.arc(sx, sy - 11, 18, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Rich emerald midtone foliage pads
-            ctx.fillStyle = '#047857';
-            ctx.beginPath();
-            ctx.arc(sx - 5, sy - 14, 13, 0, Math.PI * 2);
-            ctx.arc(sx + 6, sy - 13, 12, 0, Math.PI * 2);
-            ctx.arc(sx, sy - 8, 14, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Vibrant sunlit top foliage highlights
-            ctx.fillStyle = '#10b981';
-            ctx.beginPath();
-            ctx.arc(sx - 3, sy - 18, 9, 0, Math.PI * 2);
-            ctx.arc(sx + 4, sy - 17, 8, 0, Math.PI * 2);
-            ctx.arc(sx - 6, sy - 12, 7, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Crisp lime leaf crest tips
-            ctx.fillStyle = '#34d399';
-            ctx.beginPath();
-            ctx.arc(sx - 2, sy - 20, 5, 0, Math.PI * 2);
-            ctx.arc(sx + 3, sy - 19, 4.5, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Tiny delicate blossom flecks
-            const blossomFlecks = [
-              {x: sx - 8, y: sy - 15, col: '#fbcfe8'},
-              {x: sx + 7, y: sy - 16, col: '#fbcfe8'},
-              {x: sx + 2, y: sy - 10, col: '#ffffff'},
-              {x: sx - 5, y: sy - 8, col: '#fbcfe8'},
-              {x: sx + 8, y: sy - 8, col: '#ffffff'},
-            ];
-
-            blossomFlecks.forEach((b) => {
-              ctx.fillStyle = b.col;
-              ctx.beginPath();
-              ctx.arc(b.x, b.y, 1.5, 0, Math.PI * 2);
-              ctx.fill();
-            });
-
-          } else if (struct.type === 'decor_woven_wall') {
-            // =========================================================================
-            // 4. FLAME-SHAPED WOVEN WOODEN LATTICE WALL (ORGANIC FLAME-CREST FORM)
-            // Cleanly bounded by the two outer upright support posts (zero protruding X ends)
-            // =========================================================================
-            const fenceW = 40;
-            const baseY = sy + 13;
-            const startX = sx - fenceW / 2;
-
-            // Ground base shadow curved along flame footprint
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
-            ctx.beginPath();
-            ctx.ellipse(sx, baseY + 2, 20, 5, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // 5 Upward-curving tapered Cedar Bamboo flame-crest vertical posts (Outer posts at sx - 18, sx + 18)
-            const flamePosts = [
-              {offX: -18, topY: sy - 11, lean: -1.2, cedarCol: '#78350f'}, // Left outer upright
-              {offX: -9,  topY: sy - 25, lean: -0.9, cedarCol: '#92400e'}, // Primary Tall Flame Crest
-              {offX: 0,   topY: sy - 18, lean: 0.6,  cedarCol: '#b45309'},
-              {offX: 9,   topY: sy - 23, lean: 1.2,  cedarCol: '#92400e'}, // Secondary Flame Crest
-              {offX: 18,  topY: sy - 12, lean: 1.2,  cedarCol: '#78350f'}, // Right outer upright
-            ];
-
-            // Render flame vertical posts
-            flamePosts.forEach((p) => {
-              const postBaseX = sx + p.offX;
-              const postTopX = postBaseX + p.lean;
-
-              // Dark cedar post core shadow
-              ctx.strokeStyle = '#3b1802';
-              ctx.lineWidth = 3.8;
-              ctx.lineCap = 'round';
-              ctx.beginPath();
-              ctx.moveTo(postBaseX, baseY);
-              ctx.quadraticCurveTo(postBaseX + p.lean * 0.4, (baseY + p.topY) * 0.5, postTopX, p.topY);
-              ctx.stroke();
-
-              // Post Body with warm Japanese cedar tones
-              ctx.strokeStyle = p.cedarCol;
-              ctx.lineWidth = 2.6;
-              ctx.beginPath();
-              ctx.moveTo(postBaseX, baseY);
-              ctx.quadraticCurveTo(postBaseX + p.lean * 0.4, (baseY + p.topY) * 0.5, postTopX, p.topY);
-              ctx.stroke();
-
-              // Bamboo joints / node rings on posts
-              const nodeCount = 3;
-              for (let n = 1; n <= nodeCount; n++) {
-                const nt = n / (nodeCount + 1);
-                const nx = postBaseX + p.lean * nt;
-                const ny = baseY + (p.topY - baseY) * nt;
-                ctx.fillStyle = '#f59e0b';
-                ctx.beginPath();
-                ctx.ellipse(nx, ny, 2.0, 1.1, 0.2, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = '#451a03';
-                ctx.lineWidth = 0.5;
-                ctx.stroke();
-              }
-
-              // Tapered flame-tip post peak with brass cap
-              ctx.fillStyle = '#fef08a';
-              ctx.beginPath();
-              ctx.ellipse(postTopX, p.topY - 1, 1.8, 1.2, 0.3, 0, Math.PI * 2);
-              ctx.fill();
-            });
-
-            // Sculptural Sweeping Flame-Crest Top Rails (Upper, Mid, Lower Arches) - strictly bounded between outer posts
-            ctx.strokeStyle = '#451a03';
-            ctx.lineWidth = 2.8;
-            ctx.beginPath();
-            ctx.moveTo(sx - 18, sy - 9);
-            ctx.bezierCurveTo(
-              sx - 12, sy - 26,
-              sx - 5,  sy - 23,
-              sx + 2,  sy - 16,
-            );
-            ctx.bezierCurveTo(
-              sx + 7,  sy - 24,
-              sx + 13, sy - 22,
-              sx + 18, sy - 10,
-            );
-            ctx.stroke();
-
-            ctx.strokeStyle = '#d97706';
-            ctx.lineWidth = 2.0;
-            ctx.beginPath();
-            ctx.moveTo(sx - 18, sy - 10);
-            ctx.bezierCurveTo(
-              sx - 12, sy - 27,
-              sx - 5,  sy - 24,
-              sx + 2,  sy - 17,
-            );
-            ctx.bezierCurveTo(
-              sx + 7,  sy - 25,
-              sx + 13, sy - 23,
-              sx + 18, sy - 11,
-            );
-            ctx.stroke();
-
-            // Mid Rail
-            ctx.strokeStyle = '#78350f';
-            ctx.lineWidth = 2.0;
-            ctx.beginPath();
-            ctx.moveTo(sx - 18, sy - 1);
-            ctx.bezierCurveTo(
-              sx - 9, sy - 10,
-              sx + 9, sy - 8,
-              sx + 18, sy - 2,
-            );
-            ctx.stroke();
-
-            // Lower Base Rail
-            ctx.strokeStyle = '#92400e';
-            ctx.lineWidth = 2.2;
-            ctx.beginPath();
-            ctx.moveTo(sx - 18, sy + 7);
-            ctx.bezierCurveTo(
-              sx - 7, sy + 3,
-              sx + 7, sy + 3,
-              sx + 18, sy + 7,
-            );
-            ctx.stroke();
-
-            // Interwoven Diagonal Bamboo Flame Lattice Weave (STRICTLY CLIPPED / BOUNDED WITHIN OUTER POSTS)
-            ctx.save();
-            ctx.beginPath();
-            // Clean rectangular/arc bounding box between outer support posts (sx - 18 to sx + 18)
-            ctx.rect(sx - 18, sy - 28, 36, baseY - (sy - 28) + 1);
-            ctx.clip();
-
-            ctx.strokeStyle = '#f59e0b';
-            ctx.lineWidth = 1.2;
-            for (let i = -1; i <= 6; i++) {
-              const xStart = startX + i * 6.5;
-              ctx.beginPath();
-              ctx.moveTo(xStart, baseY - 2);
-              ctx.lineTo(xStart + 12, sy - 20 + Math.abs(i - 2) * 2.2);
-              ctx.stroke();
-            }
-
-            ctx.strokeStyle = '#d97706';
-            ctx.lineWidth = 1.2;
-            for (let i = 0; i <= 7; i++) {
-              const xStart = startX + i * 6.5;
-              ctx.beginPath();
-              ctx.moveTo(xStart, baseY - 2);
-              ctx.lineTo(xStart - 12, sy - 20 + Math.abs(i - 4) * 2.2);
-              ctx.stroke();
-            }
-            ctx.restore();
-
-            // Traditional dark twine knots & brass fasteners on posts
-            flamePosts.forEach((p) => {
-              const postBaseX = sx + p.offX;
-              const heights = [sy + 7, sy - 4, (sy + p.topY) * 0.5];
-
-              heights.forEach((hY) => {
-                if (hY > p.topY + 3 && hY < baseY) {
-                  ctx.strokeStyle = '#1e1b4b';
-                  ctx.lineWidth = 1.1;
-                  ctx.beginPath();
-                  ctx.moveTo(postBaseX - 2.0, hY - 2.0);
-                  ctx.lineTo(postBaseX + 2.0, hY + 2.0);
-                  ctx.moveTo(postBaseX + 2.0, hY - 2.0);
-                  ctx.lineTo(postBaseX - 2.0, hY + 2.0);
-                  ctx.stroke();
-
-                  ctx.fillStyle = '#fef08a';
-                  ctx.beginPath();
-                  ctx.arc(postBaseX, hY, 0.9, 0, Math.PI * 2);
-                  ctx.fill();
-                }
-              });
-            });
-
-            // Emerald moss cushions at post bases
-            flamePosts.forEach((p, idx) => {
-              const postBaseX = sx + p.offX;
-              ctx.fillStyle = idx % 2 === 0 ? '#10b981' : '#059669';
-              ctx.beginPath();
-              ctx.arc(postBaseX, baseY + 1, 2.0, 0, Math.PI * 2);
-              ctx.fill();
-            });
-
-          } else if (struct.type === 'tool_compost_heap') {
-            // =========================================================================
-            // 5. COMPOST HEAP (CRISP VECTOR SLATTED CEDAR BIN WITH BRASS BRACKETS)
-            // =========================================================================
-            const waste = struct.depositedWaste || 0;
-            const ready = struct.readyCompost || 0;
-            const timer = struct.timer || 0;
-            const boxW = 44;
-            const boxH = 34;
-            const bx = sx - boxW / 2;
-            const by = sy - boxH / 2 - 1;
-
-            // Ground shadow
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-            ctx.beginPath();
-            ctx.ellipse(sx, sy + 15, 24, 7, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Clean dark compost loam interior
-            ctx.fillStyle = '#1e140a';
-            ctx.beginPath();
-            ctx.roundRect(bx + 2, by + 2, boxW - 4, boxH - 4, 3);
-            ctx.fill();
-            ctx.strokeStyle = '#451a03';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Organic compost soil layer fill based on waste capacity
-            const fillPct = Math.min(1.0, waste / 20);
-            const mulchH = Math.max(6, (boxH - 10) * fillPct);
-            const soilY = by + boxH - 4 - mulchH;
-
-            // Crisp dark compost layer
-            const soilGrad = ctx.createLinearGradient(bx, soilY, bx, by + boxH - 4);
-            soilGrad.addColorStop(0, '#38200f');
-            soilGrad.addColorStop(0.6, '#291408');
-            soilGrad.addColorStop(1, '#1a0c04');
-            ctx.fillStyle = soilGrad;
-            ctx.beginPath();
-            ctx.roundRect(bx + 3, soilY, boxW - 6, mulchH, [2, 2, 0, 0]);
-            ctx.fill();
-
-            // Subtle geometric leaf mulch shapes (clean diamond facets)
-            if (waste > 0) {
-              const mulchColors = ['#84cc16', '#65a30d', '#a16207', '#d97706', '#4d7c0f'];
-              for (let i = 0; i < 7; i++) {
-                const lx = bx + 7 + ((i * 9 + 4) % (boxW - 14));
-                const ly = by + boxH - 5 - ((i * 5 + 3) % Math.max(4, mulchH - 3));
-                const rot = i * 0.7;
-                ctx.save();
-                ctx.translate(lx, ly);
-                ctx.rotate(rot);
-                ctx.fillStyle = mulchColors[i % mulchColors.length];
-                ctx.strokeStyle = '#291408';
-                ctx.lineWidth = 0.6;
-                ctx.beginPath();
-                ctx.moveTo(0, -2.5);
-                ctx.lineTo(2.2, 0);
-                ctx.lineTo(0, 2.5);
-                ctx.lineTo(-2.2, 0);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-                ctx.restore();
-              }
-            }
-
-            // Crisp Horizontal Slatted Cedar Wood Planks
-            const slatCount = 4;
-            const slatH = 5.2;
-            const slatGap = 2;
-            for (let s = 0; s < slatCount; s++) {
-              const slatY = by + boxH - 4 - (s + 1) * (slatH + slatGap);
-
-              const cedarGrad = ctx.createLinearGradient(bx, slatY, bx, slatY + slatH);
-              cedarGrad.addColorStop(0, '#a14d14');
-              cedarGrad.addColorStop(0.5, '#853e0d');
-              cedarGrad.addColorStop(1, '#652d08');
-              ctx.fillStyle = cedarGrad;
-              ctx.beginPath();
-              ctx.roundRect(bx, slatY, boxW, slatH, 1);
-              ctx.fill();
-
-              ctx.strokeStyle = '#451a03';
-              ctx.lineWidth = 1;
-              ctx.stroke();
-
-              // Polished cedar upper edge highlight
-              ctx.strokeStyle = 'rgba(254, 215, 170, 0.25)';
-              ctx.lineWidth = 0.8;
-              ctx.beginPath();
-              ctx.moveTo(bx + 1, slatY + 1);
-              ctx.lineTo(bx + boxW - 1, slatY + 1);
-              ctx.stroke();
-            }
-
-            // Crisp Vertical Cedar Corner Framing Posts
-            const postW = 5;
-            ctx.fillStyle = '#652d08';
-            ctx.beginPath();
-            ctx.roundRect(bx - 0.5, by + 1, postW, boxH - 2, 1);
-            ctx.fill();
-            ctx.strokeStyle = '#3b1802';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            ctx.fillStyle = '#652d08';
-            ctx.beginPath();
-            ctx.roundRect(bx + boxW - postW + 0.5, by + 1, postW, boxH - 2, 1);
-            ctx.fill();
-            ctx.strokeStyle = '#3b1802';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Polished Brass Corner Brackets & Screws
-            const drawBrassBracket = (cornerX: number, cornerY: number, flipX: boolean, flipY: boolean) => {
-              ctx.save();
-              ctx.translate(cornerX, cornerY);
-              ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-
-              ctx.fillStyle = '#f59e0b';
-              ctx.beginPath();
-              ctx.moveTo(0, 0);
-              ctx.lineTo(7, 0);
-              ctx.lineTo(7, 3);
-              ctx.lineTo(3, 3);
-              ctx.lineTo(3, 7);
-              ctx.lineTo(0, 7);
-              ctx.closePath();
-              ctx.fill();
-
-              ctx.strokeStyle = '#b45309';
-              ctx.lineWidth = 0.8;
-              ctx.stroke();
-
-              ctx.fillStyle = '#fef08a';
-              ctx.beginPath();
-              ctx.arc(1.5, 1.5, 0.9, 0, Math.PI * 2);
-              ctx.fill();
-              ctx.restore();
-            };
-
-            drawBrassBracket(bx - 0.5, by + 1, false, false);
-            drawBrassBracket(bx + boxW + 0.5, by + 1, true, false);
-            drawBrassBracket(bx - 0.5, by + boxH - 1, false, true);
-            drawBrassBracket(bx + boxW + 0.5, by + boxH - 1, true, true);
-
-            // Active microbial decomposition warmth sparkles if decomposing
-            if (waste >= 2 && ready === 0) {
-              const dTime = Date.now() * 0.004;
-              for (let w = 0; w < 3; w++) {
-                const wx = sx - 10 + w * 10 + Math.sin(dTime * 2 + w) * 2.5;
-                const wy = by - 2 - ((dTime * 14 + w * 9) % 12);
-                ctx.fillStyle = 'rgba(163, 230, 53, 0.85)';
-                ctx.beginPath();
-                ctx.arc(wx, wy, 1.2, 0, Math.PI * 2);
-                ctx.fill();
-              }
-            }
-
-            // =========================================================================
-            // STATUS BOX & ANIMATED FILL BAR (BEHIND/INSIDE TEXT BOX)
-            // =========================================================================
-            const statusBoxW = 62;
-            const statusBoxH = 15;
-            const statusBoxX = sx - statusBoxW / 2;
-            const statusBoxY = sy + 18;
-            const cycleProgress = waste >= 2 ? Math.min(1.0, timer / 10) : 0;
-
-            // Box backdrop
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-            ctx.beginPath();
-            ctx.roundRect(statusBoxX, statusBoxY, statusBoxW, statusBoxH, 4);
-            ctx.fill();
-
-            // Animated Smooth Progress Fill Bar (persists filling behind text even when ready compost is available!)
-            if (cycleProgress > 0) {
-              const fillW = Math.max(3, (statusBoxW - 2) * cycleProgress);
-              const progGrad = ctx.createLinearGradient(statusBoxX + 1, statusBoxY + 1, statusBoxX + 1 + fillW, statusBoxY + 1);
-              progGrad.addColorStop(0, '#15803d');
-              progGrad.addColorStop(1, '#84cc16');
-              ctx.fillStyle = progGrad;
-              ctx.beginPath();
-              ctx.roundRect(statusBoxX + 1, statusBoxY + 1, fillW, statusBoxH - 2, 3);
-              ctx.fill();
-            } else if (ready > 0) {
-              ctx.fillStyle = 'rgba(132, 204, 22, 0.35)';
-              ctx.beginPath();
-              ctx.roundRect(statusBoxX + 1, statusBoxY + 1, statusBoxW - 2, statusBoxH - 2, 3);
-              ctx.fill();
-            }
-
-            // Crisp border
-            ctx.strokeStyle = ready > 0 ? '#a3e635' : waste >= 2 ? '#84cc16' : '#475569';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.roundRect(statusBoxX, statusBoxY, statusBoxW, statusBoxH, 4);
-            ctx.stroke();
-
-            // Status Text centered
-            let statusText = 'Empty';
-            let statusTextColor = '#94a3b8';
-            if (ready > 0) {
-              statusText = `${ready} Compost`;
-              statusTextColor = '#bef264';
-            } else if (waste > 0) {
-              statusText = 'Composting';
-              statusTextColor = '#fef08a';
-            }
-
-            ctx.fillStyle = statusTextColor;
-            ctx.font = 'bold 9.5px system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(statusText, sx, statusBoxY + statusBoxH / 2);
-            ctx.textBaseline = 'alphabetic';
-
-          } else if (struct.type === 'tool_garden_well') {
-            // =========================================================================
-            // 6. STONE WELL (CRISP VECTOR DRESSED STONE BASIN & CEDAR GABLE AWNING)
-            // =========================================================================
-            const isIrrigating = (struct.activeWateringRemaining || 0) > 0;
-            const basinW = 38;
-            const basinH = 17;
-            const bx = sx - basinW / 2;
-            const by = sy - 2;
-
-            // Ground shadow
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-            ctx.beginPath();
-            ctx.ellipse(sx, sy + 15, 25, 8, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Cylindrical Dressed-Stone Basin Body
-            const stoneGrad = ctx.createLinearGradient(bx, by, bx + basinW, by);
-            stoneGrad.addColorStop(0, '#475569');
-            stoneGrad.addColorStop(0.3, '#64748b');
-            stoneGrad.addColorStop(0.7, '#475569');
-            stoneGrad.addColorStop(1, '#334155');
-            ctx.fillStyle = stoneGrad;
-            ctx.beginPath();
-            ctx.roundRect(bx, by, basinW, basinH, [2, 2, 7, 7]);
-            ctx.fill();
-            ctx.strokeStyle = '#1e293b';
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
-
-            // Crisp Dressed-Stone Mortar Lines
-            ctx.strokeStyle = '#1e293b';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(bx + 1, by + 8);
-            ctx.lineTo(bx + basinW - 1, by + 8);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(bx + 10, by); ctx.lineTo(bx + 10, by + 8);
-            ctx.moveTo(bx + 26, by); ctx.lineTo(bx + 26, by + 8);
-            ctx.moveTo(bx + 18, by + 8); ctx.lineTo(bx + 18, by + basinH);
-            ctx.moveTo(bx + 6, by + 8); ctx.lineTo(bx + 6, by + basinH);
-            ctx.moveTo(bx + 31, by + 8); ctx.lineTo(bx + 31, by + basinH);
-            ctx.stroke();
-
-            // Circular Dressed-Stone Basin Upper Rim
-            ctx.fillStyle = '#64748b';
-            ctx.beginPath();
-            ctx.ellipse(sx, by, basinW / 2, 6.5, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#1e293b';
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
-
-            // Inner Well Opening
-            ctx.fillStyle = '#0f172a';
-            ctx.beginPath();
-            ctx.ellipse(sx, by, basinW / 2 - 3, 4.5, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Groundwater Water Sheen inside well
-            const waterGlow = 0.6 + Math.sin(Date.now() * 0.005) * 0.3;
-            ctx.fillStyle = isIrrigating ? `rgba(56, 189, 248, ${waterGlow})` : 'rgba(14, 116, 144, 0.8)';
-            ctx.beginPath();
-            ctx.ellipse(sx, by + 0.5, basinW / 2 - 5, 3.5, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Crisp Wooden Upright Posts on Left & Right
-            const postW = 4;
-            const postH = 26;
-            const leftPostX = bx + 1;
-            const rightPostX = bx + basinW - postW - 1;
-            const postTopY = by - postH;
-
-            // Left Post
-            ctx.fillStyle = '#78350f';
-            ctx.fillRect(leftPostX, postTopY, postW, postH + 4);
-            ctx.strokeStyle = '#451a03';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(leftPostX, postTopY, postW, postH + 4);
-
-            // Right Post
-            ctx.fillStyle = '#78350f';
-            ctx.fillRect(rightPostX, postTopY, postW, postH + 4);
-            ctx.strokeStyle = '#451a03';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(rightPostX, postTopY, postW, postH + 4);
-
-            // Brass Base & Top Joint Brackets on Posts
-            ctx.fillStyle = '#f59e0b';
-            ctx.fillRect(leftPostX - 0.5, by - 2, postW + 1, 3);
-            ctx.fillRect(rightPostX - 0.5, by - 2, postW + 1, 3);
-            ctx.fillRect(leftPostX - 0.5, postTopY + 2, postW + 1, 2.5);
-            ctx.fillRect(rightPostX - 0.5, postTopY + 2, postW + 1, 2.5);
-
-            // Horizontal Timber Rope Windlass Axle
-            const windlassY = postTopY + 9;
-            ctx.fillStyle = '#92400e';
-            ctx.fillRect(leftPostX + postW, windlassY, rightPostX - (leftPostX + postW), 3.5);
-            ctx.strokeStyle = '#451a03';
-            ctx.lineWidth = 0.8;
-            ctx.strokeRect(leftPostX + postW, windlassY, rightPostX - (leftPostX + postW), 3.5);
-
-            // Rope Spool around windlass
-            ctx.fillStyle = '#fef08a';
-            ctx.fillRect(sx - 3, windlassY - 0.5, 6, 4.5);
-            ctx.strokeStyle = '#b45309';
-            ctx.lineWidth = 0.5;
-            ctx.strokeRect(sx - 3, windlassY - 0.5, 6, 4.5);
-
-            // Hanging Rope down to bucket
-            ctx.strokeStyle = '#fde047';
-            ctx.lineWidth = 1.2;
-            ctx.beginPath();
-            ctx.moveTo(sx, windlassY + 4);
-            ctx.lineTo(sx, windlassY + 11);
-            ctx.stroke();
-
-            // Centered Wooden Bucket with Brass Hoops
-            const bucketW = 8;
-            const bucketH = 7.5;
-            const bucketX = sx - bucketW / 2;
-            const bucketY = windlassY + 11;
-
-            ctx.fillStyle = '#78350f';
-            ctx.beginPath();
-            ctx.roundRect(bucketX, bucketY, bucketW, bucketH, [1, 1, 2, 2]);
-            ctx.fill();
-            ctx.strokeStyle = '#451a03';
-            ctx.lineWidth = 0.8;
-            ctx.stroke();
-
-            // Brass Hoops on Bucket
-            ctx.fillStyle = '#f59e0b';
-            ctx.fillRect(bucketX, bucketY + 1.5, bucketW, 1.2);
-            ctx.fillRect(bucketX, bucketY + 4.5, bucketW, 1.2);
-
-            // Bucket Handle Wire
-            ctx.strokeStyle = '#94a3b8';
-            ctx.lineWidth = 0.8;
-            ctx.beginPath();
-            ctx.arc(sx, bucketY + 1.5, bucketW / 2, Math.PI, 0);
-            ctx.stroke();
-
-            // Brass Crank Handle on Right Post
-            ctx.strokeStyle = '#f59e0b';
-            ctx.lineWidth = 1.8;
-            ctx.beginPath();
-            ctx.moveTo(rightPostX + postW, windlassY + 1.75);
-            ctx.lineTo(rightPostX + postW + 5, windlassY + 1.75);
-            ctx.lineTo(rightPostX + postW + 5, windlassY + 7);
-            ctx.stroke();
-
-            ctx.fillStyle = '#78350f';
-            ctx.beginPath();
-            ctx.arc(rightPostX + postW + 5, windlassY + 7, 1.2, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Pitched Cedar Gable Roof Awning
-            const roofApexY = postTopY - 9;
-            const roofOverhang = 5;
-            const roofLeftX = leftPostX - roofOverhang;
-            const roofRightX = rightPostX + postW + roofOverhang;
-
-            // Gable Triangular Pediment Fill
-            ctx.fillStyle = '#5c2b09';
-            ctx.beginPath();
-            ctx.moveTo(roofLeftX + 2, postTopY + 1);
-            ctx.lineTo(sx, roofApexY + 2);
-            ctx.lineTo(roofRightX - 2, postTopY + 1);
-            ctx.closePath();
-            ctx.fill();
-
-            // Left Pitched Cedar Roof Eave
-            ctx.fillStyle = '#92400e';
-            ctx.beginPath();
-            ctx.moveTo(sx, roofApexY);
-            ctx.lineTo(roofLeftX, postTopY + 2);
-            ctx.lineTo(roofLeftX + 2, postTopY + 4.5);
-            ctx.lineTo(sx, roofApexY + 2.5);
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = '#451a03';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Right Pitched Cedar Roof Eave
-            ctx.fillStyle = '#b45309';
-            ctx.beginPath();
-            ctx.moveTo(sx, roofApexY);
-            ctx.lineTo(roofRightX, postTopY + 2);
-            ctx.lineTo(roofRightX - 2, postTopY + 4.5);
-            ctx.lineTo(sx, roofApexY + 2.5);
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = '#451a03';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Brass Ridge Cap Ornament at Roof Peak
-            ctx.fillStyle = '#fbbf24';
-            ctx.beginPath();
-            ctx.arc(sx, roofApexY, 2.5, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#b45309';
-            ctx.lineWidth = 0.8;
-            ctx.stroke();
-
-            // Active Water Ripple Animation on Well if Watering
-            if (isIrrigating) {
-              const ripTime = Date.now() * 0.005;
-              for (let r = 1; r <= 2; r++) {
-                const ripRad = ((ripTime * 22 + r * 18) % 48) + 8;
-                const alpha = Math.max(0, 1 - ripRad / 52) * 0.6;
-                ctx.strokeStyle = `rgba(56, 189, 248, ${alpha})`;
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.ellipse(sx, sy + 12, ripRad, ripRad * 0.55, 0, 0, Math.PI * 2);
-                ctx.stroke();
-              }
-            }
-
-            // =========================================================================
-            // STATUS BOX (WHEN INACTIVE: "Empty" / WHEN ACTIVE: "Watering")
-            // =========================================================================
-            const wellBoxW = 54;
-            const wellBoxH = 15;
-            const wellBoxX = sx - wellBoxW / 2;
-            const wellBoxY = sy + 18;
-
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-            ctx.beginPath();
-            ctx.roundRect(wellBoxX, wellBoxY, wellBoxW, wellBoxH, 4);
-            ctx.fill();
-
-            if (isIrrigating) {
-              const wellTotal = struct.totalActiveDuration || 20;
-              const wellPct = Math.max(0, Math.min(1, (struct.activeWateringRemaining || 0) / wellTotal));
-              const fillW = Math.max(2, (wellBoxW - 2) * wellPct);
-              const wellGrad = ctx.createLinearGradient(wellBoxX + 1, wellBoxY + 1, wellBoxX + 1 + fillW, wellBoxY + 1);
-              wellGrad.addColorStop(0, '#0284c7');
-              wellGrad.addColorStop(1, '#38bdf8');
-              ctx.fillStyle = wellGrad;
-              ctx.beginPath();
-              ctx.roundRect(wellBoxX + 1, wellBoxY + 1, fillW, wellBoxH - 2, 3);
-              ctx.fill();
-            }
-
-            ctx.strokeStyle = isIrrigating ? '#38bdf8' : '#475569';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.roundRect(wellBoxX, wellBoxY, wellBoxW, wellBoxH, 4);
-            ctx.stroke();
-
-            ctx.fillStyle = isIrrigating ? '#e0f2fe' : '#94a3b8';
-            ctx.font = 'bold 9.5px system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(isIrrigating ? 'Watering' : 'Empty', sx, wellBoxY + wellBoxH / 2);
-            ctx.textBaseline = 'alphabetic';
-          } else if (struct.type === 'torii_gate') {
-            // =========================================================================
-            // 7. TORII GATE (SHINTO ARCHWAY WITH INTEGRATED PEBBLE PATHWAY)
-            // =========================================================================
-            if (struct.orientation === 'vertical') {
-              drawToriiGateVertical(ctx, sx, sy, false);
-            } else {
-              drawToriiGateHorizontal(ctx, sx, sy, false);
-            }
-          } else if (
-            struct.type === 'crystal_pedestal_foliage' ||
-            struct.type === 'crystal_pedestal_branches' ||
-            struct.type === 'crystal_pedestal_trunk' ||
-            struct.type === 'crystal_pedestal_roots'
-          ) {
-            // =========================================================================
-            // 7. CRYSTAL PEDESTAL DECORATIONS (EMERALD LEAF, AMBER BRANCH, CORAL TRUNK, AZURE ROOT)
-            // Harmonious dark carved slate column pedestal base with glowing runic trims
-            // Topped with multifaceted theme crystal with gentle pulsing luminescence
-            // =========================================================================
-            const isFoliage = struct.type === 'crystal_pedestal_foliage';
-            const isBranches = struct.type === 'crystal_pedestal_branches';
-            const isTrunk = struct.type === 'crystal_pedestal_trunk';
-            const isRoots = struct.type === 'crystal_pedestal_roots';
-
-            const themeColor = isFoliage
-              ? '#22c55e'
-              : isBranches
-              ? '#eab308'
-              : isTrunk
-              ? '#ef4444'
-              : '#3b82f6';
-            const lightColor = isFoliage
-              ? '#86efac'
-              : isBranches
-              ? '#fef08a'
-              : isTrunk
-              ? '#fca5a5'
-              : '#93c5fd';
-            const darkColor = isFoliage
-              ? '#14532d'
-              : isBranches
-              ? '#78350f'
-              : isTrunk
-              ? '#7f1d1d'
-              : '#1e3a8a';
-
-            const pulse = 0.55 + 0.35 * Math.sin(Date.now() * 0.005 + sx);
-
-            // Ground shadow
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-            ctx.beginPath();
-            ctx.ellipse(sx, sy + 15, 20, 6.5, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // 1. UNIFIED PEDESTAL BASE: Elegant dark stone/slate stepped column plinth
-            // Stepped base plinth (bottom tier)
-            const plinthGrad = ctx.createLinearGradient(sx - 16, sy + 6, sx + 16, sy + 6);
-            plinthGrad.addColorStop(0, '#1e293b');
-            plinthGrad.addColorStop(0.5, '#334155');
-            plinthGrad.addColorStop(1, '#0f172a');
-            ctx.fillStyle = plinthGrad;
-            ctx.beginPath();
-            ctx.roundRect(sx - 16, sy + 6, 32, 9, 2.5);
-            ctx.fill();
-            ctx.strokeStyle = '#475569';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Central dark carved stone column shaft
-            const shaftGrad = ctx.createLinearGradient(sx - 11, sy - 8, sx + 11, sy - 8);
-            shaftGrad.addColorStop(0, '#0f172a');
-            shaftGrad.addColorStop(0.3, '#1e293b');
-            shaftGrad.addColorStop(0.7, '#334155');
-            shaftGrad.addColorStop(1, '#0f172a');
-            ctx.fillStyle = shaftGrad;
-            ctx.beginPath();
-            ctx.roundRect(sx - 10, sy - 8, 20, 15, 1.5);
-            ctx.fill();
-            ctx.strokeStyle = '#334155';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Flared stone capital / top platform
-            ctx.fillStyle = '#1e293b';
-            ctx.beginPath();
-            ctx.roundRect(sx - 14, sy - 12, 28, 5, 2);
-            ctx.fill();
-            ctx.strokeStyle = '#475569';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Glowing runic trims carved into dark stone column (matching crystal theme color)
-            ctx.save();
-            ctx.strokeStyle = themeColor;
-            ctx.shadowColor = themeColor;
-            ctx.shadowBlur = 4 * pulse;
-            ctx.globalAlpha = 0.5 + 0.4 * pulse;
-            ctx.lineWidth = 1.1;
-
-            // Runic vertical channel & glyph chevrons
-            ctx.beginPath();
-            ctx.moveTo(sx, sy - 7);
-            ctx.lineTo(sx, sy + 5);
-            // Upper chevron
-            ctx.moveTo(sx - 5, sy - 4);
-            ctx.lineTo(sx, sy - 1);
-            ctx.lineTo(sx + 5, sy - 4);
-            // Lower chevron
-            ctx.moveTo(sx - 5, sy + 1);
-            ctx.lineTo(sx, sy + 4);
-            ctx.lineTo(sx + 5, sy + 1);
-            ctx.stroke();
-
-            // Capital trim runic line
-            ctx.beginPath();
-            ctx.moveTo(sx - 10, sy - 9.5);
-            ctx.lineTo(sx + 10, sy - 9.5);
-            ctx.stroke();
-            ctx.restore();
-
-            // 2. GLOWING CRYSTAL SHAPE ON TOP WITH PULSING LUMINESCENCE
-            const crystalCy = sy - 21;
-
-            // Soft radial luminescence aura
-            const crystalGlow = ctx.createRadialGradient(sx, crystalCy, 2, sx, crystalCy, 22);
-            crystalGlow.addColorStop(0, `${themeColor}${Math.round(pulse * 100).toString(16).padStart(2, '0')}`);
-            crystalGlow.addColorStop(0.6, `${themeColor}25`);
-            crystalGlow.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = crystalGlow;
-            ctx.beginPath();
-            ctx.arc(sx, crystalCy, 22, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.save();
-            ctx.shadowColor = themeColor;
-            ctx.shadowBlur = 6 * pulse;
-
-            if (isFoliage) {
-              // --- A. EMERALD LEAF CRYSTAL (#22c55e) ---
-              // Faceted leaf crystal gem pointing upward with center vein
-              // Left half facet
-              const leafGradL = ctx.createLinearGradient(sx - 10, crystalCy, sx, crystalCy);
-              leafGradL.addColorStop(0, darkColor);
-              leafGradL.addColorStop(1, themeColor);
-              ctx.fillStyle = leafGradL;
-              ctx.beginPath();
-              ctx.moveTo(sx, crystalCy - 12);
-              ctx.bezierCurveTo(sx - 10, crystalCy - 6, sx - 9, crystalCy + 6, sx, crystalCy + 9);
-              ctx.closePath();
-              ctx.fill();
-
-              // Right half facet
-              const leafGradR = ctx.createLinearGradient(sx, crystalCy, sx + 10, crystalCy);
-              leafGradR.addColorStop(0, themeColor);
-              leafGradR.addColorStop(1, lightColor);
-              ctx.fillStyle = leafGradR;
-              ctx.beginPath();
-              ctx.moveTo(sx, crystalCy - 12);
-              ctx.bezierCurveTo(sx + 10, crystalCy - 6, sx + 9, crystalCy + 6, sx, crystalCy + 9);
-              ctx.closePath();
-              ctx.fill();
-
-              // Leaf crystal facet ridge and diagonal cuts
-              ctx.strokeStyle = lightColor;
-              ctx.lineWidth = 1.2;
-              ctx.beginPath();
-              ctx.moveTo(sx, crystalCy - 12);
-              ctx.lineTo(sx, crystalCy + 9);
-              // Angled vein facet lines
-              ctx.moveTo(sx, crystalCy - 5);
-              ctx.lineTo(sx - 6, crystalCy - 2);
-              ctx.moveTo(sx, crystalCy - 1);
-              ctx.lineTo(sx + 6, crystalCy + 2);
-              ctx.moveTo(sx, crystalCy + 3);
-              ctx.lineTo(sx - 5, crystalCy + 6);
-              ctx.stroke();
-
-            } else if (isBranches) {
-              // --- B. AMBER BRANCH CRYSTAL (#eab308) ---
-              // Crystalline branching twigs: central tall spire with flanking ascending twig facets
-              // Central main spire
-              const bSpireGrad = ctx.createLinearGradient(sx - 4, crystalCy, sx + 4, crystalCy);
-              bSpireGrad.addColorStop(0, themeColor);
-              bSpireGrad.addColorStop(0.5, lightColor);
-              bSpireGrad.addColorStop(1, darkColor);
-              ctx.fillStyle = bSpireGrad;
-              ctx.beginPath();
-              ctx.moveTo(sx, crystalCy - 14);
-              ctx.lineTo(sx + 3.5, crystalCy + 8);
-              ctx.lineTo(sx - 3.5, crystalCy + 8);
-              ctx.closePath();
-              ctx.fill();
-
-              // Left branch twig crystal
-              ctx.fillStyle = themeColor;
-              ctx.beginPath();
-              ctx.moveTo(sx - 1.5, crystalCy + 2);
-              ctx.lineTo(sx - 9, crystalCy - 7);
-              ctx.lineTo(sx - 6, crystalCy - 1);
-              ctx.lineTo(sx - 1.5, crystalCy + 7);
-              ctx.closePath();
-              ctx.fill();
-
-              // Right branch twig crystal
-              ctx.fillStyle = lightColor;
-              ctx.beginPath();
-              ctx.moveTo(sx + 1.5, crystalCy - 1);
-              ctx.lineTo(sx + 8.5, crystalCy - 10);
-              ctx.lineTo(sx + 7, crystalCy - 3);
-              ctx.lineTo(sx + 1.5, crystalCy + 5);
-              ctx.closePath();
-              ctx.fill();
-
-              // Branch crystalline facet lines
-              ctx.strokeStyle = '#fef08a';
-              ctx.lineWidth = 1;
-              ctx.beginPath();
-              ctx.moveTo(sx, crystalCy - 14);
-              ctx.lineTo(sx, crystalCy + 8);
-              ctx.moveTo(sx - 1.5, crystalCy + 2);
-              ctx.lineTo(sx - 9, crystalCy - 7);
-              ctx.moveTo(sx + 1.5, crystalCy - 1);
-              ctx.lineTo(sx + 8.5, crystalCy - 10);
-              ctx.stroke();
-
-            } else if (isTrunk) {
-              // --- C. CORAL TRUNK CRYSTAL (#ef4444) ---
-              // Sturdy vertical columnar trunk crystal cluster with rust coral facets
-              // Left column
-              ctx.fillStyle = darkColor;
-              ctx.beginPath();
-              ctx.moveTo(sx - 8, crystalCy + 8);
-              ctx.lineTo(sx - 8, crystalCy - 6);
-              ctx.lineTo(sx - 4, crystalCy - 10);
-              ctx.lineTo(sx - 1, crystalCy + 8);
-              ctx.closePath();
-              ctx.fill();
-
-              // Central main robust trunk column
-              const trunkGrad = ctx.createLinearGradient(sx - 4, crystalCy, sx + 4, crystalCy);
-              trunkGrad.addColorStop(0, themeColor);
-              trunkGrad.addColorStop(0.5, lightColor);
-              trunkGrad.addColorStop(1, darkColor);
-              ctx.fillStyle = trunkGrad;
-              ctx.beginPath();
-              ctx.moveTo(sx - 4.5, crystalCy + 9);
-              ctx.lineTo(sx - 4.5, crystalCy - 9);
-              ctx.lineTo(sx, crystalCy - 13);
-              ctx.lineTo(sx + 4.5, crystalCy - 9);
-              ctx.lineTo(sx + 4.5, crystalCy + 9);
-              ctx.closePath();
-              ctx.fill();
-
-              // Right column
-              ctx.fillStyle = themeColor;
-              ctx.beginPath();
-              ctx.moveTo(sx + 1, crystalCy + 8);
-              ctx.lineTo(sx + 4, crystalCy - 8);
-              ctx.lineTo(sx + 7.5, crystalCy - 4);
-              ctx.lineTo(sx + 7.5, crystalCy + 8);
-              ctx.closePath();
-              ctx.fill();
-
-              // Crisp vertical trunk facet lines
-              ctx.strokeStyle = '#fee2e2';
-              ctx.lineWidth = 1.1;
-              ctx.beginPath();
-              ctx.moveTo(sx, crystalCy - 13);
-              ctx.lineTo(sx, crystalCy + 9);
-              ctx.moveTo(sx - 4.5, crystalCy - 9);
-              ctx.lineTo(sx - 4.5, crystalCy + 9);
-              ctx.moveTo(sx + 4.5, crystalCy - 9);
-              ctx.lineTo(sx + 4.5, crystalCy + 9);
-              ctx.stroke();
-
-            } else {
-              // --- D. AZURE ROOT CRYSTAL (#3b82f6) ---
-              // Spreading root tendril crystals reaching downward and outward
-              // Center crown core
-              ctx.fillStyle = lightColor;
-              ctx.beginPath();
-              ctx.moveTo(sx, crystalCy - 12);
-              ctx.lineTo(sx + 4, crystalCy - 3);
-              ctx.lineTo(sx, crystalCy + 3);
-              ctx.lineTo(sx - 4, crystalCy - 3);
-              ctx.closePath();
-              ctx.fill();
-
-              // Left spreading root tendril
-              ctx.fillStyle = themeColor;
-              ctx.beginPath();
-              ctx.moveTo(sx - 2, crystalCy - 2);
-              ctx.bezierCurveTo(sx - 8, crystalCy - 1, sx - 10, crystalCy + 5, sx - 8, crystalCy + 9);
-              ctx.lineTo(sx - 5, crystalCy + 8);
-              ctx.bezierCurveTo(sx - 6, crystalCy + 5, sx - 4, crystalCy + 1, sx, crystalCy + 2);
-              ctx.closePath();
-              ctx.fill();
-
-              // Right spreading root tendril
-              ctx.fillStyle = darkColor;
-              ctx.beginPath();
-              ctx.moveTo(sx + 2, crystalCy - 2);
-              ctx.bezierCurveTo(sx + 8, crystalCy - 1, sx + 10, crystalCy + 5, sx + 8, crystalCy + 9);
-              ctx.lineTo(sx + 5, crystalCy + 8);
-              ctx.bezierCurveTo(sx + 6, crystalCy + 5, sx + 4, crystalCy + 1, sx, crystalCy + 2);
-              ctx.closePath();
-              ctx.fill();
-
-              // Central anchor root
-              ctx.fillStyle = themeColor;
-              ctx.beginPath();
-              ctx.moveTo(sx - 2, crystalCy + 3);
-              ctx.lineTo(sx + 2, crystalCy + 3);
-              ctx.lineTo(sx, crystalCy + 9);
-              ctx.closePath();
-              ctx.fill();
-
-              // Crystalline tendril facet outlines
-              ctx.strokeStyle = '#bfdbfe';
-              ctx.lineWidth = 1;
-              ctx.beginPath();
-              ctx.moveTo(sx, crystalCy - 12);
-              ctx.lineTo(sx, crystalCy + 9);
-              ctx.moveTo(sx - 2, crystalCy - 2);
-              ctx.lineTo(sx - 8, crystalCy + 9);
-              ctx.moveTo(sx + 2, crystalCy - 2);
-              ctx.lineTo(sx + 8, crystalCy + 9);
-              ctx.stroke();
-            }
-
-            ctx.restore();
-
-            // Floating crystal micro-sparkle motes
-            for (let sm = 0; sm < 2; sm++) {
-              const smAng = Date.now() * 0.004 + sx + sm * Math.PI;
-              const smDist = 11 + Math.sin(Date.now() * 0.005 + sm) * 4;
-              const smX = sx + Math.cos(smAng) * smDist;
-              const smY = crystalCy + Math.sin(smAng) * (smDist * 0.6);
-              ctx.fillStyle = lightColor;
-              ctx.beginPath();
-              ctx.arc(smX, smY, 1.2, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          }
-
-          ctx.restore();
-        });
-
-        // --- 7. DRAW GRID-ALIGNED PLANTED BONSAIS WITH 20 LEAF SHAPES & ALL 7 CLASSICAL STYLES ---
-        plantedBonsaisRef.current.forEach((bonsai) => {
-          ctx.save();
-          const isNearby = nearbyBonsai?.id === bonsai.id;
-
-          if (isNearby) {
-            ctx.strokeStyle = '#10b981';
-            ctx.lineWidth = 2.5;
-            ctx.setLineDash([4, 4]);
+            // Ceramic Pot Body
+            ctx.fillStyle = bonsai.potColor || '#1e293b';
             ctx.beginPath();
             ctx.roundRect(
-              bonsai.x - halfTileW,
-              bonsai.y - halfTileH,
-              halfTileW * 2,
-              halfTileH * 2,
-              6,
+              bx - (26 * stageScale + 4),
+              by - 4,
+              (26 * stageScale + 4) * 2,
+              16 * stageScale + 2,
+              [2, 2, 6, 6],
             );
-            ctx.stroke();
-            ctx.setLineDash([]);
-          }
-
-          const bStyle: BonsaiStyle = bonsai.style || 'MOYOGI';
-          const bLeafType: BonsaiLeafType = bonsai.leafType || 'circle';
-          const bDef = getLeafTypeDef(bLeafType);
-          const foliageColor = bDef.color;
-          const foliageAccent = bDef.accentColor;
-
-          // Graceful scaling with level stage (0.60 at Lv.1 up to 1.0 at Lv.100)
-          const stageScale = Math.min(1.0, 0.60 + (bonsai.level / 100) * 0.40);
-          const trunkHeight = 32 + stageScale * 26;
-          const trunkThickness = 4.5 + stageScale * 4;
-
-          const bx = bonsai.x;
-          const by = bonsai.y + 4; // base soil center
-
-          // Ceramic Pot Shadow
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-          ctx.beginPath();
-          ctx.ellipse(bx, by + 10, 26 * stageScale + 6, 7, 0, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Ceramic Pot Body (Crisp, proportional, matching style preview)
-          ctx.fillStyle = bonsai.potColor || '#1e293b';
-          ctx.beginPath();
-          ctx.roundRect(
-            bx - (26 * stageScale + 4),
-            by - 4,
-            (26 * stageScale + 4) * 2,
-            16 * stageScale + 2,
-            [2, 2, 6, 6],
-          );
-          ctx.fill();
-          ctx.strokeStyle = bonsai.rarity === 'MYTHIC' ? '#fbbf24' : 'rgba(255, 255, 255, 0.45)';
-          ctx.lineWidth = 1.2;
-          ctx.stroke();
-
-          // Pot Rim Detail
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-          ctx.fillRect(bx - (25 * stageScale + 3), by - 4, (25 * stageScale + 3) * 2, 2.5);
-
-          // Rich Dark Loam Soil
-          ctx.fillStyle = '#3b1802';
-          ctx.beginPath();
-          ctx.ellipse(bx, by - 3, 23 * stageScale + 2, 5 * stageScale, 0, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Draw the authentic trunk, branches, and foliage pads supporting all 7 classical styles
-          drawBonsaiTrunkAndCanopy(
-            ctx,
-            bx,
-            by,
-            stageScale,
-            trunkHeight,
-            trunkThickness,
-            bStyle,
-            bLeafType,
-            foliageColor,
-            foliageAccent,
-          );
-
-          // Foliage sparkle / astral aura for Roku-men Star & Elemental Fire
-          if (bLeafType === 'star') {
-            ctx.fillStyle = '#fef08a';
-            for (let g = 0; g < 5; g++) {
-              const gx = bx + Math.sin(g * 2 + Date.now() * 0.003) * 16 * stageScale;
-              const gy = by - 4 - trunkHeight * 0.8 + Math.cos(g * 2) * 12 * stageScale;
-              ctx.beginPath();
-              ctx.arc(gx, gy, 2.2 * stageScale, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          } else if (bLeafType === 'fire') {
-            ctx.fillStyle = '#facc15';
-            for (let b = 0; b < 4; b++) {
-              const sx = bx + Math.sin(b * 1.6 + Date.now() * 0.004) * 14 * stageScale;
-              const sy = by - 4 - trunkHeight * 0.75 + Math.cos(b * 1.6) * 10 * stageScale;
-              ctx.beginPath();
-              ctx.arc(sx, sy, 2.2 * stageScale, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          }
-
-          // Level 100 Mastery Radiant Aura
-          if (bonsai.level >= 100) {
-            ctx.strokeStyle = bonsai.rarity === 'MYTHIC' ? 'rgba(250, 204, 21, 0.85)' : 'rgba(16, 185, 129, 0.75)';
-            ctx.lineWidth = 2.5;
-            ctx.beginPath();
-            ctx.arc(bx, by - 4 - trunkHeight * 0.5, 38 * stageScale, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-
-          // Attached Watering Automaton
-          if (bonsai.automatonTier > 0) {
-            const tier = bonsai.automatonTier;
-            const machX = bx + 26 * stageScale;
-            const machY = by - 8;
-            const tierColor = tier === 1 ? '#38bdf8' : tier === 2 ? '#a855f7' : '#f59e0b';
-
-            ctx.strokeStyle = tierColor;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(machX, machY + 10);
-            ctx.lineTo(machX, machY - 6);
-            ctx.lineTo(bx + 6, machY - 12);
+            ctx.fill();
+            ctx.strokeStyle = bonsai.rarity === 'MYTHIC' ? '#fbbf24' : 'rgba(255, 255, 255, 0.45)';
+            ctx.lineWidth = 1.2;
             ctx.stroke();
 
-            ctx.fillStyle = tierColor;
+            // Pot Rim Detail
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.fillRect(bx - (25 * stageScale + 3), by - 4, (25 * stageScale + 3) * 2, 2.5);
+
+            // Rich Dark Loam Soil
+            ctx.fillStyle = '#3b1802';
             ctx.beginPath();
-            ctx.arc(machX, machY, 4, 0, Math.PI * 2);
+            ctx.ellipse(bx, by - 3, 23 * stageScale + 2, 5 * stageScale, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            ctx.fillStyle = power.isPowerSufficient ? tierColor : '#ef4444';
-            ctx.beginPath();
-            ctx.arc(bx + 6, machY - 12, 3, 0, Math.PI * 2);
-            ctx.fill();
+            // Draw the authentic trunk, branches, and foliage pads supporting all 7 classical styles
+            drawBonsaiTrunkAndCanopy(
+              ctx,
+              bx,
+              by,
+              stageScale,
+              trunkHeight,
+              trunkThickness,
+              bStyle,
+              bLeafType,
+              foliageColor,
+              foliageAccent,
+            );
 
-            if (power.isPowerSufficient) {
-              const spraySin = Math.sin(bonsai.waterSprayAnim);
-              ctx.fillStyle = tier === 3 ? 'rgba(245, 158, 11, 0.7)' : tier === 2 ? 'rgba(168, 85, 247, 0.6)' : 'rgba(56, 189, 248, 0.5)';
-              const sprayCount = tier === 3 ? 4 : tier === 2 ? 3 : 2;
-              for (let d = 0; d < sprayCount; d++) {
+            // Foliage sparkle / astral aura for Roku-men Star & Elemental Fire
+            if (bLeafType === 'star') {
+              ctx.fillStyle = '#fef08a';
+              for (let g = 0; g < 5; g++) {
+                const gx = bx + Math.sin(g * 2 + Date.now() * 0.003) * 16 * stageScale;
+                const gy = by - 4 - trunkHeight * 0.8 + Math.cos(g * 2) * 12 * stageScale;
+                ctx.beginPath();
+                ctx.arc(gx, gy, 2.2 * stageScale, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            } else if (bLeafType === 'fire') {
+              ctx.fillStyle = '#facc15';
+              for (let b = 0; b < 4; b++) {
+                const sx = bx + Math.sin(b * 1.6 + Date.now() * 0.004) * 14 * stageScale;
+                const sy = by - 4 - trunkHeight * 0.75 + Math.cos(b * 1.6) * 10 * stageScale;
+                ctx.beginPath();
+                ctx.arc(sx, sy, 2.2 * stageScale, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            }
+
+            // Level 100 Mastery Radiant Aura
+            if (bonsai.level >= 100) {
+              ctx.strokeStyle = bonsai.rarity === 'MYTHIC' ? 'rgba(250, 204, 21, 0.85)' : 'rgba(16, 185, 129, 0.75)';
+              ctx.lineWidth = 2.5;
+              ctx.beginPath();
+              ctx.arc(bx, by - 4 - trunkHeight * 0.5, 38 * stageScale, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+
+            // Attached Watering Automaton
+            if (bonsai.automatonTier > 0) {
+              const tier = bonsai.automatonTier;
+              const machX = bx + 26 * stageScale;
+              const machY = by - 8;
+              const tierColor = tier === 1 ? '#38bdf8' : tier === 2 ? '#a855f7' : '#f59e0b';
+
+              ctx.strokeStyle = tierColor;
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(machX, machY + 10);
+              ctx.lineTo(machX, machY - 6);
+              ctx.lineTo(bx + 6, machY - 12);
+              ctx.stroke();
+
+              ctx.fillStyle = tierColor;
+              ctx.beginPath();
+              ctx.arc(machX, machY, 4, 0, Math.PI * 2);
+              ctx.fill();
+
+              ctx.fillStyle = power.isPowerSufficient ? tierColor : '#ef4444';
+              ctx.beginPath();
+              ctx.arc(bx + 6, machY - 12, 3, 0, Math.PI * 2);
+              ctx.fill();
+
+              if (power.isPowerSufficient) {
+                const spraySin = Math.sin(bonsai.waterSprayAnim);
+                ctx.fillStyle = tier === 3 ? 'rgba(245, 158, 11, 0.7)' : tier === 2 ? 'rgba(168, 85, 247, 0.6)' : 'rgba(56, 189, 248, 0.5)';
+                const sprayCount = tier === 3 ? 4 : tier === 2 ? 3 : 2;
+                for (let d = 0; d < sprayCount; d++) {
+                  ctx.beginPath();
+                  ctx.arc(
+                    bx + 3 - d * 3.5 + spraySin * 2.5,
+                    machY - 10 + d * 3,
+                    1.8,
+                    0,
+                    Math.PI * 2,
+                  );
+                  ctx.fill();
+                }
+              }
+            }
+
+            // Groundwater hydration ripples
+            if (bonsai.wateredTimer && bonsai.wateredTimer > 0) {
+              const ripTime = Date.now() * 0.005;
+              for (let r = 0; r < 2; r++) {
+                const rRad = ((ripTime * 20 + r * 15) % 32) + 6;
+                const rAlpha = Math.max(0, 1 - rRad / 38) * 0.75;
+                ctx.strokeStyle = `rgba(56, 189, 248, ${rAlpha})`;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.ellipse(bx, by - 2, rRad, rRad * 0.4, 0, 0, Math.PI * 2);
+                ctx.stroke();
+              }
+
+              ctx.fillStyle = '#38bdf8';
+              for (let d = 0; d < 3; d++) {
+                const dAngle = ripTime * 3 + d * 2.1;
+                const dropDist = 12 + d * 4;
                 ctx.beginPath();
                 ctx.arc(
-                  bx + 3 - d * 3.5 + spraySin * 2.5,
-                  machY - 10 + d * 3,
-                  1.8,
+                  bx + Math.cos(dAngle) * dropDist,
+                  by - 14 + Math.sin(dAngle) * 5,
+                  1.6,
                   0,
                   Math.PI * 2,
                 );
                 ctx.fill();
               }
             }
-          }
 
-          // Splashing water ripple animations on hydrated bonsais from stone well groundwater
-          if (bonsai.wateredTimer && bonsai.wateredTimer > 0) {
-            const ripTime = Date.now() * 0.005;
-            for (let r = 0; r < 2; r++) {
-              const rRad = ((ripTime * 20 + r * 15) % 32) + 6;
-              const rAlpha = Math.max(0, 1 - rRad / 38) * 0.75;
-              ctx.strokeStyle = `rgba(56, 189, 248, ${rAlpha})`;
-              ctx.lineWidth = 1.5;
+            // Prune Boost Glow & Expanding Care Ring
+            if (bonsai.lastPruneTime) {
+              const elapsed = Date.now() - bonsai.lastPruneTime;
+              if (elapsed < 1000) {
+                const alpha = Math.max(0, 1 - elapsed / 1000);
+                const ringRadius = 24 * stageScale + (elapsed / 1000) * 26;
+
+                ctx.save();
+                ctx.strokeStyle = `rgba(236, 72, 153, ${alpha * 0.9})`;
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(bx, by - 14, ringRadius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.strokeStyle = `rgba(168, 85, 247, ${alpha * 0.6})`;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(bx, by - 14, ringRadius + 5, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+              }
+            } else if (bonsai.pruneBoostTimer > 0) {
+              ctx.strokeStyle = 'rgba(236, 72, 153, 0.85)';
+              ctx.lineWidth = 2;
               ctx.beginPath();
-              ctx.ellipse(bx, by - 2, rRad, rRad * 0.4, 0, 0, Math.PI * 2);
+              ctx.arc(bx, by - 14, 34 * stageScale, 0, Math.PI * 2);
               ctx.stroke();
             }
 
-            ctx.fillStyle = '#38bdf8';
-            for (let d = 0; d < 3; d++) {
-              const dAngle = ripTime * 3 + d * 2.1;
-              const dropDist = 12 + d * 4;
-              ctx.beginPath();
-              ctx.arc(
-                bx + Math.cos(dAngle) * dropDist,
-                by - 14 + Math.sin(dAngle) * 5,
-                1.6,
-                0,
-                Math.PI * 2,
-              );
-              ctx.fill();
-            }
+            // NOTE: Level badge and progress bar are NOT drawn here!
+            // They are rendered in Layer 3 after all Layer 2 entities finish!
           }
+          ctx.restore();
+        });
 
-          // Prune Boost Glow & Synchronized Expanding Pink/Purple Care Ring (1.0s)
-          if (bonsai.lastPruneTime) {
-            const elapsed = Date.now() - bonsai.lastPruneTime;
-            if (elapsed < 1000) {
-              const alpha = Math.max(0, 1 - elapsed / 1000);
-              const ringRadius = 24 * stageScale + (elapsed / 1000) * 26;
-
-              ctx.save();
-              ctx.strokeStyle = `rgba(236, 72, 153, ${alpha * 0.9})`;
-              ctx.lineWidth = 2.5;
-              ctx.beginPath();
-              ctx.arc(bx, by - 14, ringRadius, 0, Math.PI * 2);
-              ctx.stroke();
-
-              ctx.strokeStyle = `rgba(168, 85, 247, ${alpha * 0.6})`;
-              ctx.lineWidth = 1.5;
-              ctx.beginPath();
-              ctx.arc(bx, by - 14, ringRadius + 5, 0, Math.PI * 2);
-              ctx.stroke();
-              ctx.restore();
-            }
-          } else if (bonsai.pruneBoostTimer > 0) {
-            ctx.strokeStyle = 'rgba(236, 72, 153, 0.85)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(bx, by - 14, 34 * stageScale, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-
-          // Maturity Kanji & Level badge anchored directly on pot base: Kanji | Lv.X
+        // =========================================================================
+        // LAYER 3: Bonsai Level Badges & Growth Progress Bars
+        // (Guaranteed to be above ALL Layer 2 trees and decors!)
+        // =========================================================================
+        plantedBonsaisRef.current.forEach((bonsai) => {
+          ctx.save();
+          const bx = bonsai.x;
+          const by = bonsai.y + 4;
           const mDef = getMaturityDef(bonsai.maturity);
           const badgeY = by + 14;
+
+          // Draw the floating level badge tag: Kanji | Lv.X
           drawBonsaiPotTag(ctx, bx, badgeY, bonsai.maturity, bonsai.level);
 
+          // Draw growth progress bar
           if (bonsai.level < 100) {
             const target = getBonsaiLevelGrowthNeeded(bonsai.level, bonsai.maturity);
             const pct = Math.min(1.0, bonsai.progressSeconds / target);
@@ -14324,11 +14407,13 @@ export default function App() {
             ctx.roundRect(bx - 20, barY, Math.max(2, 40 * pct), 3.5, 2);
             ctx.fill();
           }
-
           ctx.restore();
         });
 
-        // DRAW BOTANIST AVATAR IN SANCTUARY
+        // =========================================================================
+        // LAYER 4: Player Avatar & Overhead Torii Gate Lintel
+        // =========================================================================
+        // 4.1 Player Avatar (Walks on top of Layer 1 preview, Layer 2 world entities, and Layer 3 badges)
         ctx.save();
         ctx.translate(av.x, av.y);
 
@@ -14365,7 +14450,15 @@ export default function App() {
         ctx.fillRect(-6, -26, 4, 3);
         ctx.fillRect(2, -26, 4, 3);
 
-        ctx.restore(); // restores avatar local position
+        ctx.restore();
+
+        // 4.2 Torii Gate Upper Kasagi Roof Lintel (Way above player head at sy - 64)
+        // Player walks underneath this roof beam!
+        deployedStructuresRef.current.forEach((struct) => {
+          if (struct.type === 'torii_gate') {
+            drawToriiGateRoofLintel(ctx, struct.x, struct.y, struct.orientation || 'horizontal', false);
+          }
+        });
 
         // Floating texts rendered within sanctuary camera space
         floatingTextsRef.current.forEach((ft) => {
@@ -14396,7 +14489,7 @@ export default function App() {
 
         ctx.restore(); // restores sanctuary camera transform (0, -sCamY)
       } else {
-        // --- 7. RENDER SCROLLING WILDERNESS EXCURSION MAP WITH DISTINCT BIOME ATMOSPHERES ---
+        // --- RENDER SCROLLING WILDERNESS EXCURSION MAP WITH DISTINCT BIOME ATMOSPHERES ---
         const cam = cameraRef.current;
         const rover = roverRef.current;
         const ts = EXCURSION_TILE_SIZE;

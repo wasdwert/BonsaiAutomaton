@@ -296,6 +296,11 @@ export default function DeploymentModal({
   const wellCount = getStructureInventoryCount(inv, 'tool_garden_well');
   const solarCount = getStructureInventoryCount(inv, 'solar_panel');
   const windCount = getStructureInventoryCount(inv, 'wind_turbine');
+  const toriiGateCount =
+    inv.torii_gate_inv ||
+    inv.decorations?.toriiGate ||
+    inv.decorations?.['torii_gate'] ||
+    0;
 
   const infraItems: DeployedStructureType[] = [
     'solar_panel',
@@ -509,6 +514,7 @@ export default function DeploymentModal({
     (inv.decor_rock_formation_inv || 0) +
     (inv.decor_shrubbery_bush_inv || 0) +
     (inv.decor_woven_wall_inv || 0) +
+    (inv.torii_gate_inv || inv.decorations?.toriiGate || inv.decorations?.['torii_gate'] || 0) +
     (inv.crystal_pedestal_foliage_inv || 0) +
     (inv.crystal_pedestal_branches_inv || 0) +
     (inv.crystal_pedestal_trunk_inv || 0) +
@@ -1623,14 +1629,14 @@ export default function DeploymentModal({
                         </div>
                       </div>
                       <span className="text-xs bg-slate-950 text-red-300 border border-red-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Stock: {inv.torii_gate_inv || 0}
+                        Stock: {toriiGateCount}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
                       Majestic vermilion shinto archway. Outer pillars anchor the sides, while the central archway plot remains open, walkable, and placeable!
                     </p>
                     <button
-                      disabled={(inv.torii_gate_inv || 0) <= 0}
+                      disabled={toriiGateCount <= 0}
                       onClick={() => {
                         if (onStartPlacementPreview) {
                           onStartPlacementPreview({
@@ -1646,11 +1652,11 @@ export default function DeploymentModal({
                         }
                       }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                        (inv.torii_gate_inv || 0) > 0
+                        toriiGateCount > 0
                           ? 'bg-red-600 hover:bg-red-500 text-white active:scale-95 ring-1 ring-red-400/50'
                           : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                       }`}>
-                      {(inv.torii_gate_inv || 0) > 0 ? 'Place Torii Gate [E / A]' : 'Claim Free in Botanical Market'}
+                      {toriiGateCount > 0 ? 'Place Torii Gate [E / A]' : 'Claim Free in Botanical Market'}
                     </button>
                   </div>
 
