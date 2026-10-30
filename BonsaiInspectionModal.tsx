@@ -78,8 +78,8 @@ export interface BonsaiInspectionModalProps {
   onStore: (id: string) => void;
   onCompost: (id: string) => void;
   onPrune: (id: string) => void;
-  onAttachAutomaton: (id: string, tier: 1 | 2 | 3) => void;
-  onDetachAutomaton: (id: string) => void;
+  onAttachAutomaton?: (id: string, tier: 1 | 2 | 3) => void;
+  onDetachAutomaton?: (id: string) => void;
 }
 
 /**
@@ -187,32 +187,10 @@ export default function BonsaiInspectionModal({
   onStore,
   onCompost,
   onPrune,
-  onAttachAutomaton,
-  onDetachAutomaton,
 }: BonsaiInspectionModalProps) {
   // Navigation focus index for interactive buttons:
-  // 0: Prune, 1: Compost, 2: Donate / Sell, 3: Store in Bag, 4: Automaton, 5: Close Inspection
+  // 0: Prune, 1: Compost, 2: Donate / Sell, 3: Store in Bag, 4: Close Inspection
   const [focusedBtnIdx, setFocusedBtnIdx] = useState<number>(0);
-
-  const cycleAutomaton = () => {
-    if (!bonsai) return;
-    const cur = bonsai.automatonTier;
-    if (cur === 0) {
-      if (inv.automatons_tier1 > 0) onAttachAutomaton(bonsai.id, 1);
-      else if (inv.automatons_tier2 > 0) onAttachAutomaton(bonsai.id, 2);
-      else if (inv.automatons_tier3 > 0) onAttachAutomaton(bonsai.id, 3);
-      else gameAudio?.playErrorBuzz?.();
-    } else if (cur === 1) {
-      if (inv.automatons_tier2 > 0) onAttachAutomaton(bonsai.id, 2);
-      else if (inv.automatons_tier3 > 0) onAttachAutomaton(bonsai.id, 3);
-      else onDetachAutomaton(bonsai.id);
-    } else if (cur === 2) {
-      if (inv.automatons_tier3 > 0) onAttachAutomaton(bonsai.id, 3);
-      else onDetachAutomaton(bonsai.id);
-    } else {
-      onDetachAutomaton(bonsai.id);
-    }
-  };
 
   const activateFocusedButton = () => {
     if (!bonsai) return;
@@ -229,8 +207,6 @@ export default function BonsaiInspectionModal({
     } else if (focusedBtnIdx === 3) {
       onStore(bonsai.id);
     } else if (focusedBtnIdx === 4) {
-      cycleAutomaton();
-    } else if (focusedBtnIdx === 5) {
       onClose();
     }
   };
@@ -244,8 +220,7 @@ export default function BonsaiInspectionModal({
         e.preventDefault();
         setFocusedBtnIdx((idx) => {
           if (idx === 2 || idx === 3) return idx - 2; // move to row 1 (0 or 1)
-          if (idx === 5) return 2; // move from close to donate
-          if (idx === 4) return 0; // move from automaton to prune
+          if (idx === 4) return 2; // move from close to donate
           return Math.max(0, idx - 1);
         });
         gameAudio?.playHoverMicroTone?.();
@@ -253,8 +228,8 @@ export default function BonsaiInspectionModal({
         e.preventDefault();
         setFocusedBtnIdx((idx) => {
           if (idx === 0 || idx === 1) return idx + 2; // move to row 2 (2 or 3)
-          if (idx === 2 || idx === 3) return 5; // move to close button
-          return Math.min(5, idx + 1);
+          if (idx === 2 || idx === 3) return 4; // move to close button
+          return Math.min(4, idx + 1);
         });
         gameAudio?.playHoverMicroTone?.();
       } else if (e.key === 'a' || e.key === 'A') {
@@ -270,16 +245,13 @@ export default function BonsaiInspectionModal({
         setFocusedBtnIdx((idx) => {
           if (idx === 0) return 1;
           if (idx === 2) return 3;
-          return Math.min(5, idx + 1);
+          return Math.min(4, idx + 1);
         });
         gameAudio?.playHoverMicroTone?.();
       } else if (e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
         e.preventDefault();
         activateFocusedButton();
-      } else if (e.key === ' ') {
-        e.preventDefault();
-        onPrune(bonsai.id);
-      } else if (e.key === 'x' || e.key === 'X') {
+      } else if (e.key === ' ' || e.key === 'x' || e.key === 'X') {
         e.preventDefault();
         onPrune(bonsai.id);
       } else if (e.key === 'c' || e.key === 'C') {
@@ -292,15 +264,6 @@ export default function BonsaiInspectionModal({
       } else if (e.key === 'v' || e.key === 'V') {
         e.preventDefault();
         onDonate(bonsai.id);
-      } else if (e.key === '1') {
-        e.preventDefault();
-        if (inv.automatons_tier1 > 0 && bonsai.automatonTier !== 1) onAttachAutomaton(bonsai.id, 1);
-      } else if (e.key === '2') {
-        e.preventDefault();
-        if (inv.automatons_tier2 > 0 && bonsai.automatonTier !== 2) onAttachAutomaton(bonsai.id, 2);
-      } else if (e.key === '3') {
-        e.preventDefault();
-        if (inv.automatons_tier3 > 0 && bonsai.automatonTier !== 3) onAttachAutomaton(bonsai.id, 3);
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -309,7 +272,7 @@ export default function BonsaiInspectionModal({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, bonsai, focusedBtnIdx, inv.organic_compost, inv.automatons_tier1, inv.automatons_tier2, inv.automatons_tier3, onPrune, onCompost, onDonate, onStore, onAttachAutomaton, onDetachAutomaton, onClose]);
+  }, [isOpen, bonsai, focusedBtnIdx, inv.organic_compost, onPrune, onCompost, onDonate, onStore, onClose]);
 
   if (!isOpen || !bonsai) return null;
 
@@ -425,7 +388,7 @@ export default function BonsaiInspectionModal({
                 <span>•</span>
                 <span className="text-emerald-300 font-bold flex items-center gap-0.5">
                   <VerdureIcon className="w-3.5 h-3.5" />
-                  <span>+{calculateDonationValue(bonsai)} Verdure</span>
+                  <span>+{calculateDonationValue(bonsai).toFixed(2)} Verdure</span>
                 </span>
               </div>
             </div>
@@ -682,75 +645,6 @@ export default function BonsaiInspectionModal({
                   </div>
                 </div>
               </div>
-
-              {/* Automation Unit Outfitting */}
-              <div className={`bg-slate-950/90 border rounded-xl p-3 space-y-2 transition-all ${
-                focusedBtnIdx === 4 ? 'border-cyan-400 ring-2 ring-cyan-400/70 bg-cyan-950/30' : 'border-slate-800'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Zap className="w-4 h-4 text-cyan-400" />
-                    <span className="font-bold text-xs text-cyan-200">
-                      {focusedBtnIdx === 4 && <span className="text-cyan-400 font-bold mr-1">► [E/A]</span>}
-                      Installed Automaton
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-semibold bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-lg">
-                    {bonsai.automatonTier > 0
-                      ? `Tier ${bonsai.automatonTier} (${getAutomatonConfig(bonsai.automatonTier)?.speedMultiplier || 1}x)`
-                      : 'None Attached'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-1.5">
-                  <button
-                    disabled={inv.automatons_tier1 <= 0 || bonsai.automatonTier === 1}
-                    onClick={() => onAttachAutomaton(bonsai.id, 1)}
-                    className={`py-1.5 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                      bonsai.automatonTier === 1
-                        ? 'bg-sky-950 text-sky-400 border border-sky-500'
-                        : inv.automatons_tier1 > 0
-                        ? 'bg-sky-600 hover:bg-sky-500 text-white'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}>
-                    {bonsai.automatonTier === 1 ? 'T1 Mist ✓' : `T1 (${inv.automatons_tier1})`}
-                  </button>
-
-                  <button
-                    disabled={inv.automatons_tier2 <= 0 || bonsai.automatonTier === 2}
-                    onClick={() => onAttachAutomaton(bonsai.id, 2)}
-                    className={`py-1.5 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                      bonsai.automatonTier === 2
-                        ? 'bg-purple-950 text-purple-400 border border-purple-500'
-                        : inv.automatons_tier2 > 0
-                        ? 'bg-purple-600 hover:bg-purple-500 text-white'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}>
-                    {bonsai.automatonTier === 2 ? 'T2 Pulsar ✓' : `T2 (${inv.automatons_tier2})`}
-                  </button>
-
-                  <button
-                    disabled={inv.automatons_tier3 <= 0 || bonsai.automatonTier === 3}
-                    onClick={() => onAttachAutomaton(bonsai.id, 3)}
-                    className={`py-1.5 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                      bonsai.automatonTier === 3
-                        ? 'bg-amber-950 text-amber-400 border border-amber-500'
-                        : inv.automatons_tier3 > 0
-                        ? 'bg-amber-600 hover:bg-amber-500 text-white'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}>
-                    {bonsai.automatonTier === 3 ? 'T3 Hydro ✓' : `T3 (${inv.automatons_tier3})`}
-                  </button>
-                </div>
-
-                {bonsai.automatonTier > 0 && (
-                  <button
-                    onClick={() => onDetachAutomaton(bonsai.id)}
-                    className="w-full bg-slate-900 hover:bg-red-950 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-500/60 text-[10px] font-bold py-1 rounded-lg transition-all">
-                    Detach Automaton Unit (Return to Bag)
-                  </button>
-                )}
-              </div>
             </div>
 
             {/* Action Buttons Grid */}
@@ -807,7 +701,7 @@ export default function BonsaiInspectionModal({
                   <VerdureIcon className="w-4 h-4" />
                   <span>
                     {focusedBtnIdx === 2 && '► '}
-                    [E / V] Donate (+{calculateDonationValue(bonsai)})
+                    [E / V] Donate (+{calculateDonationValue(bonsai).toFixed(2)})
                   </span>
                 </button>
 
@@ -975,11 +869,11 @@ export default function BonsaiInspectionModal({
           <button
             onClick={onClose}
             className={`flex-1 sm:flex-initial font-bold text-xs py-2.5 px-6 rounded-xl transition-all min-h-[38px] border ${
-              focusedBtnIdx === 5
+              focusedBtnIdx === 4
                 ? 'bg-slate-700 text-white ring-4 ring-slate-300 border-white scale-[1.02] shadow-[0_0_15px_rgba(255,255,255,0.4)]'
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
             }`}>
-            {focusedBtnIdx === 5 && '► '}
+            {focusedBtnIdx === 4 && '► '}
             Close Inspection Menu [Esc / B]
           </button>
         </div>

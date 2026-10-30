@@ -387,7 +387,7 @@ export default function InventoryModal({
                           </button>
                         </div>
                         <div className="text-[10px] text-slate-400 mt-1">
-                          Style: <span className="text-emerald-400 font-medium">{getBonsaiStyleDef(stored.style).japanese}</span> • Shape: <span className="text-slate-300">{sDef.leafShapeName}</span> • BA: <span className="text-amber-300 font-bold font-mono">{ba.total.toFixed(2)} BA</span> • Donation: <span className="text-emerald-300 font-bold">+{calculateDonationValue(stored)} Verdure</span>
+                          Style: <span className="text-emerald-400 font-medium">{getBonsaiStyleDef(stored.style).japanese}</span> • Shape: <span className="text-slate-300">{sDef.leafShapeName}</span> • BA: <span className="text-amber-300 font-bold font-mono">{ba.total.toFixed(2)} BA</span> • Donation: <span className="text-emerald-300 font-bold">+{calculateDonationValue(stored).toFixed(2)} Verdure</span>
                         </div>
                       </div>
 
@@ -608,10 +608,32 @@ export default function InventoryModal({
                 icon={<Droplets className="w-5 h-5 text-sky-400" />}
                 iconBg="bg-sky-950/80"
                 iconBorder="border-sky-500/50"
-                title="Zen Stone Well"
-                subtitle="3×3 Grid Groundwater Irrigation (20s)"
-                stockCount={getStructureInventoryCount(inv, 'tool_garden_well')}
-                activeCount={deployedStructures.filter((s) => s.type === 'tool_garden_well').length}
+                title="T1 Manual Irrigation System"
+                subtitle="Left & Right Plots • 30s Reservoir"
+                stockCount={getStructureInventoryCount(inv, 'irrigation_t1')}
+                activeCount={deployedStructures.filter((s) => s.type === 'irrigation_t1').length}
+                activeLabel="Deployed"
+              />
+
+              <EquipmentCard
+                icon={<Droplets className="w-5 h-5 text-sky-400" />}
+                iconBg="bg-sky-950/80"
+                iconBorder="border-sky-500/50"
+                title="T2 Manual Irrigation System"
+                subtitle="4-Way Cross Plots • 90s Reservoir"
+                stockCount={getStructureInventoryCount(inv, 'irrigation_t2')}
+                activeCount={deployedStructures.filter((s) => s.type === 'irrigation_t2').length}
+                activeLabel="Deployed"
+              />
+
+              <EquipmentCard
+                icon={<Droplets className="w-5 h-5 text-sky-400" />}
+                iconBg="bg-sky-950/80"
+                iconBorder="border-sky-500/50"
+                title="T3 Manual Irrigation System"
+                subtitle="3x3 Grid (8 Plots) • 300s Reservoir"
+                stockCount={getStructureInventoryCount(inv, 'irrigation_t3')}
+                activeCount={deployedStructures.filter((s) => s.type === 'irrigation_t3').length}
                 activeLabel="Deployed"
               />
 
@@ -656,10 +678,10 @@ export default function InventoryModal({
                 icon={<Droplets className="w-5 h-5 text-sky-400" />}
                 iconBg="bg-sky-950/80"
                 iconBorder="border-sky-500/50"
-                title="Basic Mist Automaton (Tier 1)"
-                subtitle="1.0x Growth Speed • 2 kW Grid Drain"
-                stockCount={inv.automatons_tier1 || 0}
-                activeCount={plantedBonsais.filter((b) => b.automatonTier === 1).length}
+                title="T1 Hydration Sprinkler"
+                subtitle="Left & Right Plots (2 Total) • 2 kW Load"
+                stockCount={getStructureInventoryCount(inv, 'automaton_t1')}
+                activeCount={deployedStructures.filter((s) => s.type === 'automaton_t1').length + plantedBonsais.filter((b) => b.automatonTier === 1).length}
                 activeLabel="Deployed"
               />
 
@@ -667,10 +689,10 @@ export default function InventoryModal({
                 icon={<Zap className="w-5 h-5 text-purple-400" />}
                 iconBg="bg-purple-950/80"
                 iconBorder="border-purple-500/50"
-                title="Advanced Pulsar Automaton (Tier 2)"
-                subtitle="2.5x Growth Speed • 4 kW Grid Drain"
-                stockCount={inv.automatons_tier2 || 0}
-                activeCount={plantedBonsais.filter((b) => b.automatonTier === 2).length}
+                title="T2 Hydration Sprinkler"
+                subtitle="4-Way Cross Plots (4 Total) • 4 kW Load"
+                stockCount={getStructureInventoryCount(inv, 'automaton_t2')}
+                activeCount={deployedStructures.filter((s) => s.type === 'automaton_t2').length + plantedBonsais.filter((b) => b.automatonTier === 2).length}
                 activeLabel="Deployed"
               />
 
@@ -678,10 +700,10 @@ export default function InventoryModal({
                 icon={<Sparkles className="w-5 h-5 text-amber-400" />}
                 iconBg="bg-amber-950/80"
                 iconBorder="border-amber-500/50"
-                title="Master Hydro-Automaton (Tier 3)"
-                subtitle="5.0x Ultra Speed • 7 kW Grid Drain"
-                stockCount={inv.automatons_tier3 || 0}
-                activeCount={plantedBonsais.filter((b) => b.automatonTier === 3).length}
+                title="T3 Hydration Sprinkler"
+                subtitle="360° Radial 3x3 (8 Plots) • 7 kW Load"
+                stockCount={getStructureInventoryCount(inv, 'automaton_t3')}
+                activeCount={deployedStructures.filter((s) => s.type === 'automaton_t3').length + plantedBonsais.filter((b) => b.automatonTier === 3).length}
                 activeLabel="Deployed"
               />
             </div>

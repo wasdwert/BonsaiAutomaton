@@ -8,8 +8,7 @@
   "losing_condition": "None. The game is a relaxing zen experience with no fail state or game over. When the expedition backpack reaches maximum capacity, the player simply cannot carry additional items and returns to the starting campsite portal to transport all gathered resources back to the sanctuary.",
   "player_mode": "single_player",
   "supported_orientations": [
-    "landscape",
-    "wide"
+    "landscape"
   ],
   "input_methods": [
     "touch",
@@ -53,8 +52,8 @@
   "sections": [
     {
       "title": "Core Mechanics",
-      "content": "1. Strict 4-Tier Depth Management System: The sanctuary rendering pipeline adheres strictly to four decoupled render passes: Layer 1 (Ground plot base tiles, stone pebble pathways, Torii gate ground walkways, and the complete desaturated placement preview footprint), Layer 2 (Y-sorted physical world entities row-by-row, ensuring specimens on row Y+1 naturally render over Torii gate pillars and flanking bushes from row Y, with all floating telemetry deferred), Layer 3 (Bonsai Level badges and growth progress bars rendered globally across all plots after all world entities have completed rendering, guaranteeing vital growth data is never occluded by foreground trees or structures), and Layer 4 (Player avatar and automatons rendered above Layer 3, with only the elevated Torii gate Kasagi roof archway projecting overhead). 2. Complete Vector Art in Placement Previews: Placement previews render within Layer 1 underneath the roaming avatar, executing the complete vector composition (such as the full suiban tray, sand ripples, moss, and stones for the Zen Rock Formation) in high-contrast desaturated monochrome.",
-      "summary": "Strict 4-Tier Depth Pipeline, Complete Ground-Layer Placement Previews, and Post-Entity HUD Rendering."
+      "content": "1. Proximity-Bound Irrigation Halos: Sprinkler water coverage halos (T1, T2, T3) and manual irrigation auras are strictly bound to player proximity, remaining invisible unless the player avatar is standing directly on top of the installation's grid plot. 2. Unified Crystal Architecture & Non-Botanical Telemetry: Crystals discovered during rover expeditions (Foliage Emerald, Branch Amber, Trunk Coral, Root Azure) render using the exact faceted gemstone vector aesthetics found on pedestal mounts. Crystal scanning and excavation interfaces strictly communicate elemental aspect and power tier (+0.5 or +1.0 strength) without revealing or displaying tree-specific maturity ratings or botanical classifications. 3. Refined T2 Manual Irrigation Engineering: Replaced distorted water sprites on the T2 Manual Irrigation System with an authentic timber A-frame supporting an iron-banded cedar barrel, four directional copper outlet pipes with brass fittings, and microscopic circular water droplets at the nozzle tips.",
+      "summary": "Proximity-Bound Irrigation Halos, Unified Crystal Architecture, and Refined Hydro-Engineering Graphics."
     }
   ]
 }

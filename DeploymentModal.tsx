@@ -11,6 +11,7 @@ import {
   Bookmark,
   ChevronLeft,
   ChevronRight,
+  Zap,
 } from 'lucide-react';
 import {
   BonsaiLeafType,
@@ -33,6 +34,7 @@ import {
   getBonsaiNature,
   calculateBaseAesthetic,
   GridPlacementPreview,
+  getBonsaiMaturityRating,
 } from './types';
 import {
   SanctuaryInventory,
@@ -296,6 +298,12 @@ export default function DeploymentModal({
   const wellCount = getStructureInventoryCount(inv, 'tool_garden_well');
   const solarCount = getStructureInventoryCount(inv, 'solar_panel');
   const windCount = getStructureInventoryCount(inv, 'wind_turbine');
+  const autoT1Count = getStructureInventoryCount(inv, 'automaton_t1');
+  const autoT2Count = getStructureInventoryCount(inv, 'automaton_t2');
+  const autoT3Count = getStructureInventoryCount(inv, 'automaton_t3');
+  const irrigT1Count = getStructureInventoryCount(inv, 'irrigation_t1');
+  const irrigT2Count = getStructureInventoryCount(inv, 'irrigation_t2');
+  const irrigT3Count = getStructureInventoryCount(inv, 'irrigation_t3');
   const toriiGateCount =
     inv.torii_gate_inv ||
     inv.decorations?.toriiGate ||
@@ -303,9 +311,14 @@ export default function DeploymentModal({
     0;
 
   const infraItems: DeployedStructureType[] = [
+    'automaton_t1',
+    'automaton_t2',
+    'automaton_t3',
+    'irrigation_t1',
+    'irrigation_t2',
+    'irrigation_t3',
     'solar_panel',
     'wind_turbine',
-    'tool_garden_well',
     'tool_compost_heap',
   ];
 
@@ -344,11 +357,12 @@ export default function DeploymentModal({
             : undefined;
           gameAudio.playConfirmSelect();
           if (onStartPlacementPreview) {
+            const is2x2 = getBonsaiMaturityRating(selectedSeedlingForStyle) === 5;
             onStartPlacementPreview({
               category: 'seedling',
               payload: selectedSeedlingForStyle,
-              width: 1,
-              height: 1,
+              width: is2x2 ? 2 : 1,
+              height: is2x2 ? 2 : 1,
               orientation: 'horizontal',
               style: curStyleKey,
               nature: natureObj,
@@ -850,11 +864,12 @@ export default function DeploymentModal({
                 onClick={() => {
                   gameAudio.playConfirmSelect();
                   if (onStartPlacementPreview) {
+                    const is2x2 = getBonsaiMaturityRating(seedling) === 5;
                     onStartPlacementPreview({
                       category: 'seedling',
                       payload: seedling,
-                      width: 1,
-                      height: 1,
+                      width: is2x2 ? 2 : 1,
+                      height: is2x2 ? 2 : 1,
                       orientation: 'horizontal',
                       style: curStyleKey,
                       nature: natureObj,
@@ -944,7 +959,7 @@ export default function DeploymentModal({
               <Wrench className="w-4 h-4 text-amber-300" />
               <span>Infrastructure</span>
               <span className="text-[10px] bg-slate-950/60 px-1.5 py-0.5 rounded-full font-mono text-amber-300">
-                {solarCount + windCount + compostCount + wellCount}
+                {solarCount + windCount + compostCount + wellCount + autoT1Count + autoT2Count + autoT3Count + irrigT1Count + irrigT2Count + irrigT3Count}
               </span>
             </button>
 
@@ -1201,7 +1216,7 @@ export default function DeploymentModal({
                               <span>
                                 Donation:{' '}
                                 <strong className="text-emerald-400 font-mono">
-                                  +{donationVal} Verdure
+                                  +{donationVal.toFixed(2)} Verdure
                                 </strong>
                               </span>
                             </div>
@@ -1228,12 +1243,13 @@ export default function DeploymentModal({
                           <button
                             onClick={() => {
                               gameAudio.playPowerupChime();
+                              const is2x2 = getBonsaiMaturityRating(stored) === 5;
                               if (onStartPlacementPreview) {
                                 onStartPlacementPreview({
                                   category: 'bonsai',
                                   payload: stored,
-                                  width: 1,
-                                  height: 1,
+                                  width: is2x2 ? 2 : 1,
+                                  height: is2x2 ? 2 : 1,
                                   orientation: 'horizontal',
                                 });
                               } else {
@@ -1259,19 +1275,277 @@ export default function DeploymentModal({
                 <div className="text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800 flex items-center gap-2">
                   <Wrench className="w-4 h-4 text-amber-400 shrink-0" />
                   <span>
-                    Deploy clean energy generators and utility equipment onto open sanctuary plots. Power misting automatons and maintain sustainable irrigation!
+                    Deploy clean energy generators, sprinkler automatons, and manual irrigation systems onto open nursery plots!
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* T1 Hydration Sprinkler */}
+                  <div className="bg-slate-900/90 border border-sky-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">💧</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T1 Hydration Sprinkler</h4>
+                          <span className="text-[10px] text-sky-400 font-bold">Left &amp; Right Plots (2 Total) • 2 kW Load</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-sky-950 text-sky-300 border border-sky-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {autoT1Count}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Compact brass ground sprinkler head with dual side nozzles. Waters Left and Right plots continuously when power is sufficient.
+                    </p>
+                    <button
+                      disabled={autoT1Count <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'automaton_t1',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('automaton_t1');
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        autoT1Count > 0
+                          ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <Droplets className="w-4 h-4" />
+                      {autoT1Count > 0 ? 'Deploy T1 Sprinkler' : 'Craft at Workbench First'}
+                    </button>
+                  </div>
+
+                  {/* T2 Hydration Sprinkler */}
+                  <div className="bg-slate-900/90 border border-purple-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">⚡</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T2 Hydration Sprinkler</h4>
+                          <span className="text-[10px] text-purple-400 font-bold">4-Way Cross Plots (4 Total) • 4 kW Load</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-purple-950 text-purple-300 border border-purple-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {autoT2Count}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      4-way cross oscillating sprinkler with nozzles facing Up, Down, Left, Right. Waters all 4 adjacent plots at 2.5x speed.
+                    </p>
+                    <button
+                      disabled={autoT2Count <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'automaton_t2',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('automaton_t2');
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        autoT2Count > 0
+                          ? 'bg-purple-600 hover:bg-purple-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <Zap className="w-4 h-4" />
+                      {autoT2Count > 0 ? 'Deploy T2 Sprinkler' : 'Craft at Workbench First'}
+                    </button>
+                  </div>
+
+                  {/* T3 Hydration Sprinkler */}
+                  <div className="bg-slate-900/90 border border-amber-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">✨</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T3 Hydration Sprinkler</h4>
+                          <span className="text-[10px] text-amber-400 font-bold">360° Radial 3x3 (8 Plots) • 7 kW Load</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-amber-950 text-amber-300 border border-amber-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {autoT3Count}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Rotating pulse impact sprinkler with 360-degree radial ring. Waters all 8 surrounding plots in 3x3 at 5.0x ultra speed.
+                    </p>
+                    <button
+                      disabled={autoT3Count <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'automaton_t3',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('automaton_t3');
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        autoT3Count > 0
+                          ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <Sparkles className="w-4 h-4" />
+                      {autoT3Count > 0 ? 'Deploy T3 Sprinkler' : 'Craft at Workbench First'}
+                    </button>
+                  </div>
+
+                  {/* T1 Manual Irrigation System */}
+                  <div className="bg-slate-900/90 border border-sky-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">💧</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T1 Manual Irrigation System</h4>
+                          <span className="text-[10px] text-sky-400 font-bold">Left &amp; Right Plots • 30s Reservoir</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-sky-950 text-sky-300 border border-sky-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {irrigT1Count}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Wooden stool with water bucket and 2 outlet pipes. Refill [E] to provide 30s of continuous watering to Left and Right plots.
+                    </p>
+                    <button
+                      disabled={irrigT1Count <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'irrigation_t1',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('irrigation_t1');
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        irrigT1Count > 0
+                          ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <Droplets className="w-4 h-4" />
+                      {irrigT1Count > 0 ? 'Deploy T1 Irrigation' : 'Buy in Botanical Market'}
+                    </button>
+                  </div>
+
+                  {/* T2 Manual Irrigation System */}
+                  <div className="bg-slate-900/90 border border-sky-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">💧</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T2 Manual Irrigation System</h4>
+                          <span className="text-[10px] text-sky-400 font-bold">4-Way Cross Plots • 90s Reservoir</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-sky-950 text-sky-300 border border-sky-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {irrigT2Count}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Timber trestle supporting wooden water barrel with 4 pipes. Refill [E] for 90s of continuous watering to Up, Down, Left, Right.
+                    </p>
+                    <button
+                      disabled={irrigT2Count <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'irrigation_t2',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('irrigation_t2');
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        irrigT2Count > 0
+                          ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <Droplets className="w-4 h-4" />
+                      {irrigT2Count > 0 ? 'Deploy T2 Irrigation' : 'Buy in Botanical Market'}
+                    </button>
+                  </div>
+
+                  {/* T3 Manual Irrigation System */}
+                  <div className="bg-slate-900/90 border border-sky-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">💧</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T3 Manual Irrigation System</h4>
+                          <span className="text-[10px] text-sky-400 font-bold">3x3 Grid (8 Plots) • 300s Reservoir</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-sky-950 text-sky-300 border border-sky-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {irrigT3Count}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Reinforced iron cistern on stone foundations with 8 branching conduits. Refill [E] for 300s (5 min) of watering to all surrounding plots.
+                    </p>
+                    <button
+                      disabled={irrigT3Count <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'irrigation_t3',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('irrigation_t3');
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        irrigT3Count > 0
+                          ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <Droplets className="w-4 h-4" />
+                      {irrigT3Count > 0 ? 'Deploy T3 Irrigation' : 'Buy in Botanical Market'}
+                    </button>
+                  </div>
+
                   {/* Solar Panel */}
-                  <div className="bg-slate-900/90 border border-sky-500/40 p-4 rounded-2xl flex flex-col justify-between gap-2.5 shadow-lg">
+                  <div className="bg-slate-900/90 border border-sky-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <span className="text-2xl">☀️</span>
                         <div>
-                          <h4 className="font-bold text-sm sm:text-base text-slate-100">Solar Panel Array</h4>
-                          <span className="text-xs text-sky-400 font-bold">+3 kW Clean Power (+0.5 kW/neighbor)</span>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Solar Panel Array</h4>
+                          <span className="text-[10px] text-sky-400 font-bold">+3 kW Clean Power (+0.5 kW/neighbor)</span>
                         </div>
                       </div>
                       <span className="text-xs bg-sky-950 text-sky-300 border border-sky-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
@@ -1297,7 +1571,7 @@ export default function DeploymentModal({
                           onDeployStructure('solar_panel');
                         }
                       }}
-                      className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
                         solarCount > 0
                           ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
                           : 'bg-slate-800 text-slate-500 cursor-not-allowed'
@@ -1308,13 +1582,13 @@ export default function DeploymentModal({
                   </div>
 
                   {/* Wind Turbine */}
-                  <div className="bg-slate-900/90 border border-amber-500/40 p-4 rounded-2xl flex flex-col justify-between gap-2.5 shadow-lg">
+                  <div className="bg-slate-900/90 border border-amber-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <span className="text-2xl">💨</span>
                         <div>
-                          <h4 className="font-bold text-sm sm:text-base text-slate-100">Wind Turbine Generator</h4>
-                          <span className="text-xs text-amber-400 font-bold">+6 kW Clean Power (+1.0 kW/neighbor)</span>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Wind Turbine Generator</h4>
+                          <span className="text-[10px] text-amber-400 font-bold">+6 kW Clean Power (+1.0 kW/neighbor)</span>
                         </div>
                       </div>
                       <span className="text-xs bg-amber-950 text-amber-300 border border-amber-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
@@ -1340,7 +1614,7 @@ export default function DeploymentModal({
                           onDeployStructure('wind_turbine');
                         }
                       }}
-                      className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
                         windCount > 0
                           ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
                           : 'bg-slate-800 text-slate-500 cursor-not-allowed'
@@ -1350,57 +1624,14 @@ export default function DeploymentModal({
                     </button>
                   </div>
 
-                  {/* Stone Well */}
-                  <div className="bg-slate-900/90 border border-sky-500/40 p-4 rounded-2xl flex flex-col justify-between gap-2.5 shadow-lg">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-2xl">💧</span>
-                        <div>
-                          <h4 className="font-bold text-sm sm:text-base text-slate-100">Stone Well</h4>
-                          <span className="text-xs text-sky-400 font-bold">3×3 Grid Irrigation (20 Seconds)</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-sky-950 text-sky-300 border border-sky-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
-                        Stock: {wellCount}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Traditional stone well with timber awning and bucket crank. Draw fresh groundwater [E] to irrigate all Bonsais in its surrounding 3×3 grid for 20 seconds.
-                    </p>
-                    <button
-                      disabled={wellCount <= 0}
-                      onClick={() => {
-                        if (onStartPlacementPreview) {
-                          onStartPlacementPreview({
-                            category: 'infrastructure',
-                            payload: 'tool_garden_well',
-                            width: 1,
-                            height: 1,
-                            orientation: 'horizontal',
-                          });
-                          onClose();
-                        } else {
-                          onDeployStructure('tool_garden_well');
-                        }
-                      }}
-                      className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
-                        wellCount > 0
-                          ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                      }`}>
-                      <Droplets className="w-4 h-4" />
-                      {wellCount > 0 ? 'Deploy Stone Well' : 'Buy in Botanical Market'}
-                    </button>
-                  </div>
-
                   {/* Compost Heap */}
-                  <div className="bg-slate-900/90 border border-lime-500/40 p-4 rounded-2xl flex flex-col justify-between gap-2.5 shadow-lg">
+                  <div className="bg-slate-900/90 border border-lime-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <span className="text-2xl">🍂</span>
                         <div>
-                          <h4 className="font-bold text-sm sm:text-base text-slate-100">Compost Heap</h4>
-                          <span className="text-xs text-lime-400 font-bold">20 Waste Capacity • Passive Fertilizer</span>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Compost Heap</h4>
+                          <span className="text-[10px] text-lime-400 font-bold">20 Waste Capacity • Passive Fertilizer</span>
                         </div>
                       </div>
                       <span className="text-xs bg-lime-950 text-lime-300 border border-lime-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
@@ -1426,7 +1657,7 @@ export default function DeploymentModal({
                           onDeployStructure('tool_compost_heap');
                         }
                       }}
-                      className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
                         compostCount > 0
                           ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
                           : 'bg-slate-800 text-slate-500 cursor-not-allowed'

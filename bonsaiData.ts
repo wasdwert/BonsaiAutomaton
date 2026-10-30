@@ -1,3 +1,18 @@
+import {
+  calculateBaseAesthetic,
+  getBonsaiHaloOffsets,
+  getBonsaiHaloPlots,
+  getBonsaiMaturityRating,
+  getMaturityBadgeColor,
+} from './types';
+export {
+  calculateBaseAesthetic,
+  getBonsaiHaloOffsets,
+  getBonsaiHaloPlots,
+  getBonsaiMaturityRating,
+  getMaturityBadgeColor,
+};
+
 export type BonsaiLeafType =
   | 'circle'
   | 'oval'
@@ -155,7 +170,7 @@ export const MATURITY_CONFIGS: Record<MaturityTier, MaturityDefinition> = {
     color: '#2dd4bf',
     bg: 'rgba(45, 212, 191, 0.2)',
     border: '#2dd4bf',
-    multiplier: 1.8,
+    multiplier: 1.2,
     growthMultiplier: 1.4,
     baseCareRate: 1.0,
     description: 'Developing wood fiber showing balanced poise. 1.4x growth needed to advance levels.',
@@ -168,7 +183,7 @@ export const MATURITY_CONFIGS: Record<MaturityTier, MaturityDefinition> = {
     color: '#34d399',
     bg: 'rgba(52, 211, 153, 0.2)',
     border: '#34d399',
-    multiplier: 3.5,
+    multiplier: 1.5,
     growthMultiplier: 2.0,
     baseCareRate: 1.0,
     description: 'Distinguished botanical form with pronounced bark texture. 2.0x growth needed to advance levels.',
@@ -181,7 +196,7 @@ export const MATURITY_CONFIGS: Record<MaturityTier, MaturityDefinition> = {
     color: '#a3e635',
     bg: 'rgba(163, 230, 53, 0.2)',
     border: '#a3e635',
-    multiplier: 7.0,
+    multiplier: 2.0,
     growthMultiplier: 2.8,
     baseCareRate: 1.0,
     description: 'Masterfully structured natural posture possessing remarkable poise. 2.8x growth needed to advance levels.',
@@ -194,7 +209,7 @@ export const MATURITY_CONFIGS: Record<MaturityTier, MaturityDefinition> = {
     color: '#facc15',
     bg: 'rgba(250, 204, 21, 0.25)',
     border: '#facc15',
-    multiplier: 15.0,
+    multiplier: 3.0,
     growthMultiplier: 4.0,
     baseCareRate: 1.0,
     description: 'Legendary pinnacle specimen radiating golden prestige. 4.0x growth needed for deepest late-game cultivation challenge.',
@@ -278,40 +293,54 @@ export function getSpeciesFindOdds(leafType?: BonsaiLeafType): number {
 }
 
 /**
- * Multi-factor Bonsai Donation Value formula:
- * Donation Value = Math.floor(Baseprice * SpeciesFindOddsMultiplier * MaturityMultiplier * LevelMultiplier)
- * - Baseprice: 10
- * - Species Find Odds Multiplier: 1.8 for 33% odds, +0.1 per -1% down to 1% odds (which yields 5.0)
- * - Maturity Rating Multiplier: Sprout (1.0), Sapling (1.2), Notable (1.5), Refined (2.0), Premium (3.0)
- * - Level Multiplier: 1.05 for Lv.1, +0.05 per level up to 6.00 at Lv.100
- * - Always rounded down using Math.floor(...) (Max value: 900 Verdure)
+ * Exact Formula for Bonsai Valuation with Baseprice = 1:
+ * Donation Value = Baseprice * SpeciesFindOddsMultiplier * MaturityRatingMultiplier * LevelMultiplier
+ * - Baseprice: 1
+ * - SpeciesFindOddsMultiplier: 1.8 for 33% odds, +0.1 per -1% odds decrease (up to 5.0 for 1% odds).
+ *   Formula: Math.min(5.0, 1.8 + Math.max(0, 33 - oddsPercent) * 0.1).
+ * - MaturityRatingMultiplier:
+ *   Rating 1: 1.0, Rating 2: 1.2, Rating 3: 1.5, Rating 4: 2.0, Rating 5: 3.0.
+ * - LevelMultiplier: 1.0 + level * 0.05 (Level 1 = 1.05, Level 100 = 6.00).
+ * - Rounding: Strictly rounded DOWN to two decimal places: Math.floor(value * 100) / 100.
+ * (Maximum specimen donation value = 1 * 5.0 * 3.0 * 6.0 = 90.00 Verdure).
  */
 export function calculateDonationValue(bonsai: {
   leafType?: BonsaiLeafType;
   maturity?: MaturityTier | number;
-  level: number;
+  maturityRating?: number;
+  level?: number;
   findOdds?: number;
   foundOdds?: number;
+  [key: string]: any;
 }): number {
-  const basePrice = 10;
-  const leaf = bonsai.leafType || 'circle';
-  const oddsPercent = bonsai.findOdds ?? bonsai.foundOdds ?? getSpeciesFindOdds(leaf) ?? 25;
-  const oddsMultiplier = Math.min(5.0, Math.max(1.8, 1.8 + (33 - oddsPercent) * 0.1));
-  const matRank =
-    typeof bonsai.maturity === 'number'
-      ? bonsai.maturity
-      : getMaturityDef(bonsai.maturity).rank;
-  const maturityMultiplierMap: Record<number, number> = {
+  const basePrice = 1.0;
+
+  // Species Find Odds Multiplier
+  const oddsPercent = bonsai.findOdds ?? bonsai.foundOdds ?? getSpeciesFindOdds(bonsai.leafType);
+  const speciesFindOddsMultiplier = Math.min(5.0, 1.8 + Math.max(0, 33 - oddsPercent) * 0.1);
+
+  // Maturity Rating Multiplier
+  const rating = getBonsaiMaturityRating(bonsai);
+  const maturityMultipliers: Record<number, number> = {
     1: 1.0,
     2: 1.2,
     3: 1.5,
     4: 2.0,
     5: 3.0,
   };
-  const maturityMultiplier = maturityMultiplierMap[matRank] ?? 1.0;
-  const levelMultiplier = Math.min(6.0, Math.max(1.05, 1.05 + (bonsai.level - 1) * 0.05));
-  return Math.floor(basePrice * oddsMultiplier * maturityMultiplier * levelMultiplier);
+  const maturityRatingMultiplier = maturityMultipliers[rating] ?? 1.0;
+
+  // Level Multiplier (Level 1 = 1.05, Level 100 = 6.00)
+  const level = bonsai.level ?? 1;
+  const levelMultiplier = 1.0 + level * 0.05;
+
+  const rawValue = basePrice * speciesFindOddsMultiplier * maturityRatingMultiplier * levelMultiplier;
+  const roundedValue = Math.floor(rawValue * 100) / 100;
+  return roundedValue;
 }
+
+export const calculateBonsaiSellPrice = calculateDonationValue;
+export const calculateBonsaiValue = calculateDonationValue;
 
 export interface LeafTypeDefinition {
   id: BonsaiLeafType;

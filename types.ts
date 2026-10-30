@@ -73,6 +73,47 @@ export const DEFAULT_BONSAI_ATTRIBUTES: BonsaiAttributes = {
   roots: 50,
 };
 
+export type CrystalAttributeType = 'foliage' | 'branches' | 'trunk' | 'roots';
+
+export interface CrystalItem {
+  id: string;
+  crystalType: CrystalAttributeType;
+  strength: 0.5 | 1.0;
+  name: string;
+  color: string;
+  discoveredAreaId?: string;
+}
+
+export const CRYSTAL_METADATA: Record<
+  CrystalAttributeType,
+  { name: string; attributeName: string; color: string; desc: string }
+> = {
+  foliage: {
+    name: 'Foliage Emerald',
+    attributeName: 'Foliage',
+    color: '#22c55e',
+    desc: 'Emerald crystal shard radiating verdant foliage energy.',
+  },
+  branches: {
+    name: 'Branch Amber',
+    attributeName: 'Branches',
+    color: '#eab308',
+    desc: 'Amber crystal shard radiating golden branching harmony.',
+  },
+  trunk: {
+    name: 'Trunk Coral',
+    attributeName: 'Trunk',
+    color: '#ef4444',
+    desc: 'Coral red crystal shard radiating sturdy trunk strength.',
+  },
+  roots: {
+    name: 'Root Azure',
+    attributeName: 'Roots',
+    color: '#3b82f6',
+    desc: 'Azure blue crystal shard radiating deep anchoring resilience.',
+  },
+};
+
 /**
  * Four Botanical Attributes determining a Bonsai's nurtured Cultivation Potential.
  * Tracks internal cultivation growth points from 0 to 1000 points.
@@ -132,9 +173,11 @@ export function getBonsaiNature(nameOrNature?: string | BonsaiNature): BonsaiNat
 }
 
 /**
- * Four Pedestal Crystal Decorations configuration
+ * Pedestal Crystal Decorations configuration
  */
 export type CrystalPedestalType =
+  | 'empty_crystal_pedestal'
+  | 'crystal_pedestal'
   | 'crystal_pedestal_foliage'
   | 'crystal_pedestal_branches'
   | 'crystal_pedestal_trunk'
@@ -143,22 +186,31 @@ export type CrystalPedestalType =
 export interface CrystalPedestalDef {
   type: CrystalPedestalType;
   name: string;
-  attribute: 'foliage' | 'branches' | 'trunk' | 'roots';
-  attributeName: string;
-  color: string;
+  attribute?: 'foliage' | 'branches' | 'trunk' | 'roots';
+  attributeName?: string;
+  color?: string;
   price: number;
   bonusLabel: string;
   description: string;
 }
 
-export const CRYSTAL_PEDESTALS: Record<CrystalPedestalType, CrystalPedestalDef> = {
+export const EMPTY_CRYSTAL_PEDESTAL: CrystalPedestalDef = {
+  type: 'empty_crystal_pedestal',
+  name: 'Empty Crystal Pedestal',
+  price: 50,
+  bonusLabel: 'Socket with expedition crystals for +CP',
+  description: 'Carved stone pedestal without any crystal on top. Deploy in sanctuary, then interact [E] to socket any crystal shard found during expeditions.',
+};
+
+export const CRYSTAL_PEDESTALS: Record<string, CrystalPedestalDef> = {
+  empty_crystal_pedestal: EMPTY_CRYSTAL_PEDESTAL,
   crystal_pedestal_foliage: {
     type: 'crystal_pedestal_foliage',
     name: 'Emerald Leaf Crystal Pedestal',
     attribute: 'foliage',
     attributeName: 'Foliage',
     color: '#22c55e',
-    price: 100,
+    price: 50,
     bonusLabel: '+1 Foliage Cultivation Potential per level',
     description: 'Carved dark slate pedestal topped with a glowing emerald leaf crystal.',
   },
@@ -168,7 +220,7 @@ export const CRYSTAL_PEDESTALS: Record<CrystalPedestalType, CrystalPedestalDef> 
     attribute: 'branches',
     attributeName: 'Branches',
     color: '#eab308',
-    price: 100,
+    price: 50,
     bonusLabel: '+1 Branches Cultivation Potential per level',
     description: 'Carved dark slate pedestal topped with a glowing warm amber branching twig crystal.',
   },
@@ -178,7 +230,7 @@ export const CRYSTAL_PEDESTALS: Record<CrystalPedestalType, CrystalPedestalDef> 
     attribute: 'trunk',
     attributeName: 'Trunk',
     color: '#ef4444',
-    price: 100,
+    price: 50,
     bonusLabel: '+1 Trunk Cultivation Potential per level',
     description: 'Carved dark slate pedestal topped with a glowing rust coral trunk crystal.',
   },
@@ -188,7 +240,7 @@ export const CRYSTAL_PEDESTALS: Record<CrystalPedestalType, CrystalPedestalDef> 
     attribute: 'roots',
     attributeName: 'Roots',
     color: '#3b82f6',
-    price: 100,
+    price: 50,
     bonusLabel: '+1 Roots Cultivation Potential per level',
     description: 'Carved dark slate pedestal topped with a glowing deep azure root tendril crystal.',
   },
@@ -201,10 +253,10 @@ export function formatCrystalPedestalBonus(pedestals: {
   roots?: number;
 }): string {
   const parts: string[] = [];
-  if (pedestals.trunk && pedestals.trunk > 0) parts.push(`+${pedestals.trunk} Trunk`);
-  if (pedestals.branches && pedestals.branches > 0) parts.push(`+${pedestals.branches} Branches`);
-  if (pedestals.foliage && pedestals.foliage > 0) parts.push(`+${pedestals.foliage} Foliage`);
-  if (pedestals.roots && pedestals.roots > 0) parts.push(`+${pedestals.roots} Roots`);
+  if (pedestals.trunk && pedestals.trunk > 0) parts.push(`+${pedestals.trunk % 1 === 0 ? pedestals.trunk : pedestals.trunk.toFixed(1)} Trunk`);
+  if (pedestals.branches && pedestals.branches > 0) parts.push(`+${pedestals.branches % 1 === 0 ? pedestals.branches : pedestals.branches.toFixed(1)} Branches`);
+  if (pedestals.foliage && pedestals.foliage > 0) parts.push(`+${pedestals.foliage % 1 === 0 ? pedestals.foliage : pedestals.foliage.toFixed(1)} Foliage`);
+  if (pedestals.roots && pedestals.roots > 0) parts.push(`+${pedestals.roots % 1 === 0 ? pedestals.roots : pedestals.roots.toFixed(1)} Roots`);
   if (parts.length === 0) return '';
   return `${parts.join(' & ')} Cultivation Potential per level`;
 }
@@ -224,6 +276,151 @@ export type GrowthStyle =
   | 'SOKAN'
   | 'KENGAI'
   | 'KABUDACHI';
+
+export interface HaloPlotCoord {
+  col: number;
+  row: number;
+}
+
+/**
+ * Returns the exact relative offset array for a bonsai of given maturity rating (1 to 5).
+ * - Rating 1: 4 Spots (Orthogonal only: Up, Down, Left, Right)
+ * - Rating 2: 6 Spots (Up, Down, Left, Right, Upper Left, Lower Right)
+ * - Rating 3: 8 Spots (Standard 3x3 perimeter)
+ * - Rating 4: 10 Spots (Standard 3x3 perimeter [8 spots] PLUS Left and Right 2 plots away)
+ * - Rating 5: 12 Spots (4x4 perimeter around the 2x2 bonsai core [x..x+1] x [y..y+1])
+ */
+export function getBonsaiHaloOffsets(rating: number): { dc: number; dr: number }[] {
+  switch (rating) {
+    case 1:
+      return [
+        { dc: 0, dr: -1 },
+        { dc: 0, dr: 1 },
+        { dc: -1, dr: 0 },
+        { dc: 1, dr: 0 },
+      ];
+    case 2:
+      return [
+        { dc: 0, dr: -1 },
+        { dc: 0, dr: 1 },
+        { dc: -1, dr: 0 },
+        { dc: 1, dr: 0 },
+        { dc: -1, dr: -1 },
+        { dc: 1, dr: 1 },
+      ];
+    case 3:
+      return [
+        { dc: -1, dr: -1 },
+        { dc: 0, dr: -1 },
+        { dc: 1, dr: -1 },
+        { dc: -1, dr: 0 },
+        { dc: 1, dr: 0 },
+        { dc: -1, dr: 1 },
+        { dc: 0, dr: 1 },
+        { dc: 1, dr: 1 },
+      ];
+    case 4:
+      return [
+        { dc: -1, dr: -1 },
+        { dc: 0, dr: -1 },
+        { dc: 1, dr: -1 },
+        { dc: -1, dr: 0 },
+        { dc: 1, dr: 0 },
+        { dc: -1, dr: 1 },
+        { dc: 0, dr: 1 },
+        { dc: 1, dr: 1 },
+        { dc: -2, dr: 0 },
+        { dc: 2, dr: 0 },
+      ];
+    case 5:
+      return [
+        // Top row (4 plots): (x-1, y-1), (x, y-1), (x+1, y-1), (x+2, y-1)
+        { dc: -1, dr: -1 },
+        { dc: 0, dr: -1 },
+        { dc: 1, dr: -1 },
+        { dc: 2, dr: -1 },
+        // Bottom row (4 plots): (x-1, y+2), (x, y+2), (x+1, y+2), (x+2, y+2)
+        { dc: -1, dr: 2 },
+        { dc: 0, dr: 2 },
+        { dc: 1, dr: 2 },
+        { dc: 2, dr: 2 },
+        // Left col (2 plots): (x-1, y), (x-1, y+1)
+        { dc: -1, dr: 0 },
+        { dc: -1, dr: 1 },
+        // Right col (2 plots): (x+2, y), (x+2, y+1)
+        { dc: 2, dr: 0 },
+        { dc: 2, dr: 1 },
+      ];
+    default:
+      return [
+        { dc: 0, dr: -1 },
+        { dc: 0, dr: 1 },
+        { dc: -1, dr: 0 },
+        { dc: 1, dr: 0 },
+      ];
+  }
+}
+
+/**
+ * Returns absolute grid plot coordinates for a bonsai's halo zone.
+ */
+export function getBonsaiHaloPlots(
+  col: number,
+  row: number,
+  rating: number,
+  gridCols = 16,
+  gridRows = 8,
+): HaloPlotCoord[] {
+  const offsets = getBonsaiHaloOffsets(rating);
+  const result: HaloPlotCoord[] = [];
+  for (const { dc, dr } of offsets) {
+    const c = col + dc;
+    const r = row + dr;
+    if (c >= 0 && c < gridCols && r >= 0 && r < gridRows) {
+      result.push({ col: c, row: r });
+    }
+  }
+  return result;
+}
+
+/**
+ * Resolves the numeric Maturity Rating (1 to 5) for a bonsai or seedling.
+ */
+export function getBonsaiMaturityRating(bonsai?: any): number {
+  if (!bonsai) return 1;
+  if (typeof bonsai.maturityRating === 'number') return bonsai.maturityRating;
+  if (typeof bonsai.maturity === 'number') return bonsai.maturity;
+  if (bonsai.maturity === 'premium' || (bonsai.level !== undefined && bonsai.level >= 21)) return 5;
+  if (bonsai.maturity === 'refined') return 4;
+  if (bonsai.maturity === 'notable') return 3;
+  if (bonsai.maturity === 'sapling') return 2;
+  return 1;
+}
+
+/**
+ * Opaque solid colors matching the bonsai's Maturity Rating:
+ * Rating 1 (Sprout): Emerald #10b981
+ * Rating 2 (Sapling): Teal/Cyan #06b6d4
+ * Rating 3 (Young): Blue #3b82f6
+ * Rating 4 (Mature): Purple/Violet #8b5cf6
+ * Rating 5 (Ancient / Master): Amber/Gold #f59e0b
+ */
+export function getMaturityBadgeColor(rating: number): string {
+  switch (rating) {
+    case 1:
+      return '#38bdf8'; // I. Sprout (Baby Blue)
+    case 2:
+      return '#2dd4bf'; // II. Sapling (Turquoise)
+    case 3:
+      return '#34d399'; // III. Notable (Green)
+    case 4:
+      return '#a3e635'; // IV. Refined (Bright Green)
+    case 5:
+      return '#facc15'; // V. Premium (Golden Yellow)
+    default:
+      return '#38bdf8';
+  }
+}
 
 /**
  * Real-time Sanctuary Grid Deployment placement preview state
