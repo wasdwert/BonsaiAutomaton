@@ -21,6 +21,8 @@ import {
   MaturityTier,
   getLeafTypeDef,
   getMaturityDef,
+  getBonsaiDisplayName,
+  getSpeciesName,
 } from './bonsaiData';
 import {gameAudio} from './utils/helper';
 import {
@@ -314,16 +316,15 @@ export default function InventoryModal({
               : 'bg-slate-800 text-slate-400 hover:bg-slate-750'
           }`}>
           <span>🎋</span>
-          <span>Decor ({
+            <span>Decor ({
+            (inv.bamboo_fence_inv || 0) +
             (inv.decor_pebble_path_inv || 0) +
-            (inv.decor_rock_formation_inv || 0) +
-            (inv.decor_shrubbery_bush_inv || 0) +
-            (inv.decor_woven_wall_inv || 0) +
+            (inv.zen_rock_formation_inv || inv.decor_rock_formation_inv || 0) +
+            (inv.growing_bamboo_formation_inv || inv.decor_shrubbery_bush_inv || 0) +
+            (inv.asparagus_fern_ball_inv || 0) +
+            (inv.water_feature_inv || inv.decor_woven_wall_inv || 0) +
             (inv.torii_gate_inv || inv.decorations?.toriiGate || inv.decorations?.['torii_gate'] || 0) +
-            (inv.crystal_pedestal_foliage_inv || 0) +
-            (inv.crystal_pedestal_branches_inv || 0) +
-            (inv.crystal_pedestal_trunk_inv || 0) +
-            (inv.crystal_pedestal_roots_inv || 0)
+            getStructureInventoryCount(inv, 'empty_crystal_pedestal')
           })</span>
         </button>
       </div>
@@ -378,7 +379,7 @@ export default function InventoryModal({
                               <span>{sMat.name}</span>
                               <span className="opacity-80 font-mono">({sMat.multiplier}x)</span>
                             </span>
-                            <span>{stored.name} (Lv.{stored.level} • {ba.total.toFixed(2)} BA)</span>
+                            <span>{getBonsaiDisplayName(stored)} (Lv.{stored.level} • {ba.total.toFixed(2)} BA)</span>
                           </div>
                           <button
                             onClick={() => onPlantStoredBonsai(stored.id)}
@@ -457,20 +458,20 @@ export default function InventoryModal({
                           <span className={`text-[10px] px-1.5 py-0.2 rounded font-black border ${getBonsaiGroupBadgeClass((seedling.group as any) || sDef.group)}`}>
                             {seedling.group || sDef.group}
                           </span>
-                          <span
-                            style={{
-                              backgroundColor: sMat.bg,
-                              borderColor: sMat.border,
-                              color: sMat.color,
-                              boxShadow: `0 0 8px ${sMat.color}30`,
-                            }}
-                            className="text-[10px] px-2 py-0.5 rounded-full font-black border flex items-center gap-1 shrink-0">
-                            <span>{sMat.kanji}</span>
-                            <span>{sMat.name}</span>
-                            <span className="opacity-80 font-mono">({sMat.multiplier}x)</span>
-                          </span>
-                          <span className="truncate">{seedling.name || sDef.name}</span>
-                          {seedling.nature && (() => {
+                            <span
+                              style={{
+                                backgroundColor: sMat.bg,
+                                borderColor: sMat.border,
+                                color: sMat.color,
+                                boxShadow: `0 0 8px ${sMat.color}30`,
+                              }}
+                              className="text-[10px] px-2 py-0.5 rounded-full font-black border flex items-center gap-1 shrink-0">
+                              <span>{sMat.kanji}</span>
+                              <span>{sMat.name}</span>
+                              <span className="opacity-80 font-mono">({sMat.multiplier}x)</span>
+                            </span>
+                            <span className="truncate">{getBonsaiDisplayName(seedling)}</span>
+                            {seedling.nature && (() => {
                             const nat = getBonsaiNature(seedling.nature);
                             return (
                               <span
@@ -568,6 +569,18 @@ export default function InventoryModal({
               <div className="text-[10px] text-slate-500 mt-0.5">Fallen clippings (+1 per level up)</div>
             </div>
 
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-cyan-500/30">
+              <div className="text-xs text-cyan-400 font-semibold mb-1">🧪 Biochemicals</div>
+              <div className="text-2xl font-black text-cyan-400">{inv.biochemicals ?? inv.resources?.biochemicals ?? 0}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Eco-catalyst reagent • For fertilizer distillation</div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-emerald-500/30">
+              <div className="text-xs text-emerald-300 font-semibold mb-1">🧪 Chemical Fertilizer</div>
+              <div className="text-2xl font-black text-emerald-300">{inv.fertilizer ?? inv.resources?.fertilizer ?? 0}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Ultra growth booster (-300s / 5 min boost)</div>
+            </div>
+
             <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-amber-500/30 col-span-2 sm:col-span-3">
               <div className="text-xs text-amber-300 font-semibold mb-1">🌾 Enriched Organic Compost</div>
               <div className="text-2xl font-black text-amber-300">{inv.organic_compost ?? inv.enrichedCompost ?? 0}</div>
@@ -601,6 +614,17 @@ export default function InventoryModal({
                 subtitle="20 Waste Cap • Passive Decomposition"
                 stockCount={getStructureInventoryCount(inv, 'tool_compost_heap')}
                 activeCount={deployedStructures.filter((s) => s.type === 'tool_compost_heap').length}
+                activeLabel="Deployed"
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">🧪</span>}
+                iconBg="bg-emerald-950/80"
+                iconBorder="border-emerald-500/50"
+                title="Fertilizer Station"
+                subtitle="Eco-Chemical Distiller • 300s Growth Boost Yield"
+                stockCount={getStructureInventoryCount(inv, 'fertilizer_station')}
+                activeCount={deployedStructures.filter((s) => s.type === 'fertilizer_station').length}
                 activeLabel="Deployed"
               />
 
@@ -890,45 +914,77 @@ export default function InventoryModal({
                 <span className="text-2xl">🪨</span>
                 <div>
                   <h4 className="font-bold text-xs sm:text-sm text-slate-200">Zen Rock Formations</h4>
-                  <p className="text-[10px] text-amber-400 font-semibold">+0.25s Pruning Effect in 3×3 halo (Quick Prune)</p>
+                  <p className="text-[10px] text-amber-400 font-semibold">+15% Level Up EXP in 3×3 halo (XP Boosted)</p>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-lg font-black text-amber-300">{inv.decor_rock_formation_inv || 0} in Stock</div>
+                <div className="text-lg font-black text-amber-300">{getStructureInventoryCount(inv, 'zen_rock_formation')} in Stock</div>
                 <span className="text-[10px] text-slate-400">
-                  {deployedStructures.filter((s) => s.type === 'decor_rock_formation').length} Placed
+                  {deployedStructures.filter((s) => s.type === 'zen_rock_formation' || s.type === 'decor_rock_formation').length} Placed
                 </span>
               </div>
             </div>
 
             <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-emerald-500/40 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="text-2xl">🌿</span>
+                <span className="text-2xl">🎋</span>
                 <div>
-                  <h4 className="font-bold text-xs sm:text-sm text-slate-200">Topiary Shrubbery Bushes</h4>
-                  <p className="text-[10px] text-emerald-400 font-semibold">+15% Level Up EXP in 3×3 halo (XP Boosted)</p>
+                  <h4 className="font-bold text-xs sm:text-sm text-slate-200">Growing Bamboo Formations</h4>
+                  <p className="text-[10px] text-emerald-400 font-semibold">+0.25s Pruning Effect in 3×3 halo (Quick Prune)</p>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-lg font-black text-emerald-300">{inv.decor_shrubbery_bush_inv || 0} in Stock</div>
+                <div className="text-lg font-black text-emerald-300">{getStructureInventoryCount(inv, 'growing_bamboo_formation')} in Stock</div>
                 <span className="text-[10px] text-slate-400">
-                  {deployedStructures.filter((s) => s.type === 'decor_shrubbery_bush').length} Placed
+                  {deployedStructures.filter((s) => s.type === 'growing_bamboo_formation' || s.type === 'decor_shrubbery_bush').length} Placed
                 </span>
               </div>
             </div>
 
-            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-yellow-600/40 flex items-center justify-between">
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-lime-500/40 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="text-2xl">🎋</span>
+                <span className="text-2xl">🪴</span>
                 <div>
-                  <h4 className="font-bold text-xs sm:text-sm text-slate-200">Woven Wooden Lattice Walls</h4>
-                  <p className="text-[10px] text-yellow-400 font-semibold">+10% Hydration Growth Speed in 3×3 halo (Private Growing)</p>
+                  <h4 className="font-bold text-xs sm:text-sm text-slate-200">Asparagus Fern Balls</h4>
+                  <p className="text-[10px] text-lime-400 font-semibold">+15% Chance for Extra Organic Waste on Level Up (Efficient Pruning)</p>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-lg font-black text-yellow-300">{inv.decor_woven_wall_inv || 0} in Stock</div>
+                <div className="text-lg font-black text-lime-300">{getStructureInventoryCount(inv, 'asparagus_fern_ball')} in Stock</div>
                 <span className="text-[10px] text-slate-400">
-                  {deployedStructures.filter((s) => s.type === 'decor_woven_wall').length} Placed
+                  {deployedStructures.filter((s) => s.type === 'asparagus_fern_ball').length} Placed
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-emerald-600/40 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🎋</span>
+                <div>
+                  <h4 className="font-bold text-xs sm:text-sm text-slate-200">Bamboo Fences (Takegaki)</h4>
+                  <p className="text-[10px] text-emerald-400 font-semibold">Boundary edge-placed takegaki • Physically cuts off halos</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-black text-emerald-300">{inv.bamboo_fence_inv || inv.decorations?.bambooFence || 0} in Stock</div>
+                <span className="text-[10px] text-slate-400">
+                  {deployedStructures.filter((s) => s.type === 'bamboo_fence').length} Placed
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-cyan-500/40 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🌊</span>
+                <div>
+                  <h4 className="font-bold text-xs sm:text-sm text-slate-200">Water Features (Shishi-Odoshi)</h4>
+                  <p className="text-[10px] text-cyan-400 font-semibold">+10% Hydration Growth Speed in 3×3 halo</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-black text-cyan-300">{(inv.water_feature_inv || inv.decor_woven_wall_inv || inv.decorations?.waterFeature || 0)} in Stock</div>
+                <span className="text-[10px] text-slate-400">
+                  {deployedStructures.filter((s) => s.type === 'water_feature' || s.type === 'decor_woven_wall').length} Placed
                 </span>
               </div>
             </div>
@@ -949,66 +1005,18 @@ export default function InventoryModal({
               </div>
             </div>
 
-            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-emerald-500/40 flex items-center justify-between">
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-purple-500/40 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="text-2xl">💎</span>
+                <span className="text-2xl">🏛️</span>
                 <div>
-                  <h4 className="font-bold text-xs sm:text-sm text-emerald-300">Emerald Leaf Crystal Pedestals</h4>
-                  <p className="text-[10px] text-slate-400">+1 Foliage Cultivation Potential per level</p>
+                  <h4 className="font-bold text-xs sm:text-sm text-purple-300">Empty Pedestals</h4>
+                  <p className="text-[10px] text-slate-400">Can Host Crystal Artifacts</p>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-lg font-black text-emerald-400">{inv.crystal_pedestal_foliage_inv || 0} in Stock</div>
+                <div className="text-lg font-black text-purple-400">{getStructureInventoryCount(inv, 'empty_crystal_pedestal')} in Stock</div>
                 <span className="text-[10px] text-slate-400">
-                  {deployedStructures.filter((s) => s.type === 'crystal_pedestal_foliage').length} Placed
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-amber-500/40 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="text-2xl">💎</span>
-                <div>
-                  <h4 className="font-bold text-xs sm:text-sm text-amber-300">Amber Branch Crystal Pedestals</h4>
-                  <p className="text-[10px] text-slate-400">+1 Branches Cultivation Potential per level</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-lg font-black text-amber-400">{inv.crystal_pedestal_branches_inv || 0} in Stock</div>
-                <span className="text-[10px] text-slate-400">
-                  {deployedStructures.filter((s) => s.type === 'crystal_pedestal_branches').length} Placed
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-rose-500/40 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="text-2xl">💎</span>
-                <div>
-                  <h4 className="font-bold text-xs sm:text-sm text-rose-300">Coral Trunk Crystal Pedestals</h4>
-                  <p className="text-[10px] text-slate-400">+1 Trunk Cultivation Potential per level</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-lg font-black text-rose-400">{inv.crystal_pedestal_trunk_inv || 0} in Stock</div>
-                <span className="text-[10px] text-slate-400">
-                  {deployedStructures.filter((s) => s.type === 'crystal_pedestal_trunk').length} Placed
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-blue-500/40 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="text-2xl">💎</span>
-                <div>
-                  <h4 className="font-bold text-xs sm:text-sm text-blue-300">Azure Root Crystal Pedestals</h4>
-                  <p className="text-[10px] text-slate-400">+1 Roots Cultivation Potential per level</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-lg font-black text-blue-400">{inv.crystal_pedestal_roots_inv || 0} in Stock</div>
-                <span className="text-[10px] text-slate-400">
-                  {deployedStructures.filter((s) => s.type === 'crystal_pedestal_roots').length} Placed
+                  {deployedStructures.filter((s) => s.type === 'empty_crystal_pedestal' || s.type === 'crystal_pedestal').length} Placed
                 </span>
               </div>
             </div>

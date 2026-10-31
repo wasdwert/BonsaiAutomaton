@@ -28,6 +28,8 @@ import {
   AREA_SPECIES_DISTRIBUTION,
   getLeafTypeDef,
   getMaturityDef,
+  getSpeciesName,
+  getBonsaiDisplayName,
   drawLeafShape,
   renderLeafFoliage,
   drawBonsaiTrunkAndCanopy,
@@ -878,7 +880,7 @@ export default function ZenLibraryModal({
                             className={`text-xs font-bold truncate ${
                               isDiscovered ? 'text-slate-100' : 'text-slate-500'
                             }`}>
-                            {isDiscovered ? def.name : '??? Unknown Specimen'}
+                            {isDiscovered ? getBonsaiDisplayName(entry.id) : '??? Unknown Specimen'}
                           </h4>
                         </div>
                         <div className="flex items-center gap-1 text-[10px] text-slate-400 truncate">
@@ -917,7 +919,7 @@ export default function ZenLibraryModal({
                     {selectedEntry.num}
                   </span>
                   <h4 className="text-sm sm:text-base font-black text-slate-100">
-                    {isSelectedDiscovered ? selectedDef.name : '??? Undiscovered Specimen'}
+                    {isSelectedDiscovered ? getBonsaiDisplayName(selectedEntry.id) : '??? Undiscovered Specimen'}
                   </h4>
                 </div>
 

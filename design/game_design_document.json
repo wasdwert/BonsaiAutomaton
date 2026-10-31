@@ -51,9 +51,9 @@
   ],
   "sections": [
     {
-      "title": "Core Mechanics",
-      "content": "1. Proximity-Bound Irrigation Halos: Sprinkler water coverage halos (T1, T2, T3) and manual irrigation auras are strictly bound to player proximity, remaining invisible unless the player avatar is standing directly on top of the installation's grid plot. 2. Unified Crystal Architecture & Non-Botanical Telemetry: Crystals discovered during rover expeditions (Foliage Emerald, Branch Amber, Trunk Coral, Root Azure) render using the exact faceted gemstone vector aesthetics found on pedestal mounts. Crystal scanning and excavation interfaces strictly communicate elemental aspect and power tier (+0.5 or +1.0 strength) without revealing or displaying tree-specific maturity ratings or botanical classifications. 3. Refined T2 Manual Irrigation Engineering: Replaced distorted water sprites on the T2 Manual Irrigation System with an authentic timber A-frame supporting an iron-banded cedar barrel, four directional copper outlet pipes with brass fittings, and microscopic circular water droplets at the nozzle tips.",
-      "summary": "Proximity-Bound Irrigation Halos, Unified Crystal Architecture, and Refined Hydro-Engineering Graphics."
+      "title": "Economy and Progression",
+      "content": "1. Consolidated Empty Pedestal Catalog Entry: Removed all individual pre-socketed crystal pedestal entries from the Botanical Market Decor tab and consolidated them into a singular 'Empty Pedestal' for 50 Verdure (Description: 'Can Host Crystal Artifacts'). 2. Dynamic Overworld Socketing: Deployed Empty Pedestals appear as carved standalone stone plinths. Approaching the installation and pressing E / Button A opens an interactive socketing modal allowing players to mount or swap discovered expedition crystals (Foliage Emerald, Branch Amber, Trunk Coral, Root Azure), immediately transforming the vector graphic to display the mounted glowing gem and radiating its cultivation halo to adjacent plots.",
+      "summary": "Consolidated Empty Pedestal Architecture and Crystal Socketing Economy."
     }
   ]
 }

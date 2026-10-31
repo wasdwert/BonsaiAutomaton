@@ -71,6 +71,9 @@ import {
   getBonsaiLevelGrowthNeeded,
   getSpeciesAreaProbability,
   getSpeciesFindOdds,
+  getSpeciesName,
+  getBonsaiDisplayName,
+  getSeedlingDisplayName,
   calculateDonationValue,
   renderLeafFoliage,
   drawLeafShape,
@@ -80,7 +83,17 @@ import {
   getBonsaiMaturityRating,
   getMaturityBadgeColor,
 } from './bonsaiData';
-export {getSpeciesFindOdds, calculateDonationValue, getBonsaiHaloOffsets, getBonsaiHaloPlots, getBonsaiMaturityRating, getMaturityBadgeColor};
+export {
+  getSpeciesFindOdds,
+  getSpeciesName,
+  getBonsaiDisplayName,
+  getSeedlingDisplayName,
+  calculateDonationValue,
+  getBonsaiHaloOffsets,
+  getBonsaiHaloPlots,
+  getBonsaiMaturityRating,
+  getMaturityBadgeColor,
+};
 import {
   createFixedStepper,
   drawAsset,
@@ -104,6 +117,7 @@ import {
 import ZenLibraryModal, { ShrineTab } from './ZenLibraryModal';
 import InventoryModal, { EquipmentCard } from './InventoryModal';
 export { EquipmentCard };
+import BonsaiSocietyModal from './BonsaiSocietyModal';
 import {
   RoverChassisTier,
   RoverModuleType,
@@ -136,6 +150,12 @@ import {
   formatStyleWeightsString,
   STYLE_ATTRIBUTE_WEIGHTS,
   GridPlacementPreview,
+  MasterQuestsState,
+  EcoRequestProgress,
+  ECO_REQUESTS,
+  checkMatchesEcoRequest,
+  isEcoRequestComplete,
+  isHaloBlockedByFence,
 } from './types';
 export { calculateBaseAesthetic };
 import BonsaiExcavationModal, { ExcavationResultData } from './BonsaiExcavationModal';
@@ -280,10 +300,16 @@ export type DeployedStructureType =
   | 'wind_turbine'
   | 'decor_pebble_path'
   | 'decor_rock_formation'
+  | 'zen_rock_formation'
   | 'decor_shrubbery_bush'
+  | 'growing_bamboo_formation'
+  | 'asparagus_fern_ball'
   | 'decor_woven_wall'
+  | 'water_feature'
+  | 'bamboo_fence'
   | 'tool_compost_heap'
   | 'tool_garden_well'
+  | 'fertilizer_station'
   | 'empty_crystal_pedestal'
   | 'crystal_pedestal'
   | 'crystal_pedestal_foliage'
@@ -308,6 +334,8 @@ export interface DeployedStructure {
   rotation?: number;
   variant?: number;
   orientation?: 'horizontal' | 'vertical';
+  side?: 'top' | 'right' | 'bottom' | 'left';
+  edgeKey?: string;
   width?: number;
   height?: number;
   // Compost Heap state
@@ -315,6 +343,10 @@ export interface DeployedStructure {
   maxCapacity?: number;    // default 20
   timer?: number;          // decomposition progress in seconds (e.g. 10s per batch)
   readyCompost?: number;   // finished Enriched Compost ready to harvest
+  // Fertilizer Station state
+  depositedBiochemicals?: number; // up to 10
+  isDistilling?: boolean;
+  readyFertilizer?: number;
   // Manual Irrigation state
   waterDuration?: number;     // active continuous watering duration (seconds)
   maxWaterDuration?: number;  // 30, 90, 300 seconds
@@ -468,7 +500,7 @@ export const EXPEDITION_BIOMES: Record<string, BiomeDefinition> = {
     gridStrokeColor: 'rgba(52, 211, 153, 0.08)',
     description: 'Low resource spread with basic alloys and diverse temperate flora.',
     resourceHighlight: 'Common Scrap Metal, Copper Wire; Rare Gears',
-    saplingHighlight: 'Raundo (Circle, Oval), Erementaru (Rain, Fire), Roku-men (Hex, Star)',
+    saplingHighlight: 'Maru, Daen, Otosu, Hi, Rokkakkei, Asutarisuku',
   },
   HIGHLANDS: {
     id: 'HIGHLANDS',
@@ -485,7 +517,7 @@ export const EXPEDITION_BIOMES: Record<string, BiomeDefinition> = {
     gridStrokeColor: 'rgba(56, 189, 248, 0.1)',
     description: 'Moderate spread of mechanical components and dynamic elemental, nature & pointed flora.',
     resourceHighlight: 'Copper Wire, Brass Gears, Circuit Boards',
-    saplingHighlight: 'Feather, Snail, Triangle, Arrow, Cloud, Donut, Snowflake',
+    saplingHighlight: 'Fezā, Makigai, Sankakkei, Yajirushi, Kumo, Yubiwa, Sunōfurēku',
   },
   OVERGROWTH: {
     id: 'OVERGROWTH',
@@ -502,7 +534,7 @@ export const EXPEDITION_BIOMES: Record<string, BiomeDefinition> = {
     gridStrokeColor: 'rgba(192, 132, 252, 0.12)',
     description: 'Rich, dense nodes of high-tech components, crafted relics and sacred geometric flora.',
     resourceHighlight: 'Circuit Boards, Electronic Chips, Plentiful Gears',
-    saplingHighlight: 'Cube, Bell, Shield, Diamond, Rectangle, Gear, Eye, Snowflake',
+    saplingHighlight: 'Shikaku, Beru, Shīrudo, Daiyamondo, Kukei, Sōbi, Me, Sunōfurēku',
   },
 };
 
@@ -519,6 +551,7 @@ export type CraftingRecipeId =
   | 'solar_panel'
   | 'wind_turbine'
   | 'craft_enriched_compost'
+  | 'craft_biochemicals'
   | 'craft_copper_wire'
   | 'craft_gears'
   | 'craft_microcircuits'
@@ -667,6 +700,15 @@ export const WORKBENCH_RECIPES: Record<CraftingRecipeId, CraftingRecipeDef> = {
     requiresGuide: 'has_compost_guide',
     guideName: 'Compost Guidebook',
     costs: {organic_waste: 2},
+  },
+  craft_biochemicals: {
+    id: 'craft_biochemicals',
+    name: 'Biochemical Reagent',
+    category: 'resources',
+    durationSeconds: 8,
+    description: 'Synthesize 2 Organic Waste and 1 Copper Wire into 1 Biochemical reagent for fertilizer distillation.',
+    icon: '🧪',
+    costs: {organic_waste: 2, copper_wire: 1},
   },
   craft_copper_wire: {
     id: 'craft_copper_wire',
@@ -1036,7 +1078,9 @@ export interface QuickBonsaiRadialMenuProps {
   onSell: (id: string) => void;
   onStore: (id: string) => void;
   onCompost: (id: string) => void;
+  onFertilize: (id: string) => void;
   onClose: () => void;
+  isEcoMatch?: boolean;
 }
 
 export function QuickBonsaiRadialMenu({
@@ -1045,10 +1089,14 @@ export function QuickBonsaiRadialMenu({
   onSell,
   onStore,
   onCompost,
+  onFertilize,
   onClose,
+  isEcoMatch = false,
 }: QuickBonsaiRadialMenuProps) {
-  const sellPrice = calculateDonationValue(bonsai);
+  const basePayout = calculateDonationValue(bonsai);
+  const sellPrice = isEcoMatch ? Number((basePayout * 2).toFixed(2)) : basePayout;
   const compostCount = inventory.organic_compost ?? inventory.enrichedCompost ?? 0;
+  const fertilizerCount = inventory.fertilizer ?? inventory.resources?.fertilizer ?? 0;
   const matDef = getMaturityDef(bonsai.maturity);
 
   return (
@@ -1059,21 +1107,42 @@ export function QuickBonsaiRadialMenu({
         onClick={(e) => e.stopPropagation()}
         className="relative w-72 h-72 sm:w-88 sm:h-88 flex items-center justify-center">
         {/* Luminous circular backdrop glow */}
-        <div className="absolute inset-2 sm:inset-4 rounded-full border-2 border-emerald-500/40 bg-slate-950/85 shadow-[0_0_50px_rgba(16,185,129,0.35)] pointer-events-none" />
+        <div
+          className={`absolute inset-2 sm:inset-4 rounded-full border-2 bg-slate-950/85 pointer-events-none transition-all ${
+            isEcoMatch
+              ? 'border-amber-400/80 shadow-[0_0_60px_rgba(250,204,21,0.5)]'
+              : 'border-emerald-500/40 shadow-[0_0_50px_rgba(16,185,129,0.35)]'
+          }`}
+        />
 
-        {/* UP QUADRANT: Quick Sell */}
+        {/* UP QUADRANT: Quick Sell / Donate */}
         <button
           onClick={() => {
             onSell(bonsai.id);
             onClose();
           }}
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-36 sm:w-44 py-2 sm:py-2.5 px-2 rounded-2xl bg-gradient-to-b from-amber-950 via-slate-900 to-slate-950 border-2 border-amber-400 text-amber-200 shadow-xl hover:scale-105 active:scale-95 transition-all flex flex-col items-center gap-0.5 group cursor-pointer">
-          <span className="text-[9px] sm:text-[10px] font-mono font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
-            <span>⬆ [W / ↑ / D-Pad Up]</span>
+          className={`absolute top-0 left-1/2 -translate-x-1/2 w-40 sm:w-48 py-2 sm:py-2.5 px-2 rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all flex flex-col items-center gap-0.5 group cursor-pointer ${
+            isEcoMatch
+              ? 'bg-gradient-to-b from-amber-900 via-emerald-950 to-slate-950 border-2 border-amber-300 ring-2 ring-emerald-400 shadow-[0_0_25px_rgba(250,204,21,0.6)] text-amber-100'
+              : 'bg-gradient-to-b from-amber-950 via-slate-900 to-slate-950 border-2 border-amber-400 text-amber-200'
+          }`}>
+          <span className="text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1">
+            <span className={isEcoMatch ? 'text-amber-300 font-black' : 'text-amber-400'}>
+              ⬆ [W / ↑ / D-Pad Up]
+            </span>
+            {isEcoMatch && (
+              <span className="bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded font-black text-[8px] sm:text-[9px]">
+                🌟 2x Request Match!
+              </span>
+            )}
           </span>
           <span className="text-xs sm:text-sm font-black text-amber-300 flex items-center gap-1">
             <VerdureIcon className="w-3.5 h-3.5" />
-            <span>Sell (+{sellPrice.toFixed(2)} Verdure)</span>
+            <span>
+              {isEcoMatch
+                ? `Donate (🌟 2x Bonus: +${sellPrice.toFixed(2)} Verdure)`
+                : `Sell (+${sellPrice.toFixed(2)} Verdure)`}
+            </span>
           </span>
         </button>
 
@@ -1116,18 +1185,26 @@ export function QuickBonsaiRadialMenu({
           </span>
         </button>
 
-        {/* RIGHT QUADRANT: Give Fertilizer (Locked / Grey) */}
+        {/* RIGHT QUADRANT: Give Fertilizer */}
         <button
-          disabled
           onClick={() => {
-            gameAudio?.playErrorBuzz?.();
+            if (fertilizerCount > 0) {
+              onFertilize(bonsai.id);
+              onClose();
+            } else {
+              gameAudio?.playErrorBuzz?.();
+            }
           }}
-          className="absolute right-0 top-1/2 -translate-y-1/2 w-32 sm:w-40 py-2 sm:py-2.5 px-1.5 rounded-2xl border-2 border-slate-700 bg-slate-950/90 text-slate-500 opacity-50 shadow-xl flex flex-col items-center gap-0.5 cursor-not-allowed">
-          <span className="text-[9px] sm:text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">
+          className={`absolute right-0 top-1/2 -translate-y-1/2 w-32 sm:w-40 py-2 sm:py-2.5 px-1.5 rounded-2xl border-2 shadow-xl flex flex-col items-center gap-0.5 transition-all ${
+            fertilizerCount > 0
+              ? 'bg-gradient-to-l from-emerald-950 via-slate-900 to-slate-950 border-emerald-400 text-emerald-200 cursor-pointer hover:scale-105 active:scale-95'
+              : 'bg-slate-950/90 border-slate-700 text-slate-500 opacity-60 cursor-not-allowed'
+          }`}>
+          <span className="text-[9px] sm:text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider">
             ➡ [D / → / Right]
           </span>
-          <span className="text-xs sm:text-sm font-bold truncate">
-            🧪 Fertilizer (Locked)
+          <span className="text-xs sm:text-sm font-black truncate">
+            🧪 Fertilizer ({fertilizerCount})
           </span>
         </button>
 
@@ -1140,7 +1217,7 @@ export function QuickBonsaiRadialMenu({
             <span>Lv.{bonsai.level}</span>
           </div>
           <div className="text-[11px] font-bold text-slate-100 truncate max-w-[80px] my-0.5">
-            {bonsai.name}
+            {getBonsaiDisplayName(bonsai)}
           </div>
           <span className="text-[8.5px] text-slate-400 font-mono bg-slate-950 px-1 py-0.2 rounded border border-slate-800">
             [Esc / B / Q / Y]
@@ -1495,7 +1572,7 @@ function CodexSeedlingBox({
 
   return (
     <div
-      title={`${def.name} (${def.group})`}
+      title={`${getBonsaiDisplayName(leafType)} (${def.group})`}
       style={{
         borderColor: def.color,
         backgroundColor: `${def.color}20`,
@@ -1652,6 +1729,9 @@ export interface SanctuaryInventory {
   electronic_chips: number;
   organic_waste: number;
   organic_compost: number;
+  biochemicals: number;
+  fertilizer: number;
+  fertilizer_station_inv?: number;
   seedlingList: SeedlingItem[];
   storedBonsais: (Bonsai | StoredPottedBonsai)[];
   has_compost_guide: boolean;
@@ -1672,8 +1752,13 @@ export interface SanctuaryInventory {
   windTurbines?: number;
   decor_pebble_path_inv: number;   // decorative deployables
   decor_rock_formation_inv: number;
+  zen_rock_formation_inv?: number;
   decor_shrubbery_bush_inv: number;
+  growing_bamboo_formation_inv?: number;
+  asparagus_fern_ball_inv?: number;
   decor_woven_wall_inv: number;
+  water_feature_inv?: number;
+  bamboo_fence_inv?: number;
   torii_gate_inv?: number;
   crystal_pedestal_foliage_inv: number;
   crystal_pedestal_branches_inv: number;
@@ -1684,8 +1769,16 @@ export interface SanctuaryInventory {
   decorations: {
     pebblePath: number;
     rockFormation: number;
+    zenRockFormation?: number;
+    zen_rock_formation?: number;
     shrubbery: number;
+    growingBamboo?: number;
+    growing_bamboo_formation?: number;
+    asparagusFernBall?: number;
+    asparagus_fern_ball?: number;
     wovenWall: number;
+    waterFeature?: number;
+    bambooFence?: number;
     toriiGate?: number;
     torii_gate?: number;
     [key: string]: any;
@@ -1732,7 +1825,13 @@ export function getInventoryStructureKey(type: DeployedStructureType): string {
   if (type === 'automaton_t1') return 'automaton_t1_inv';
   if (type === 'automaton_t2') return 'automaton_t2_inv';
   if (type === 'automaton_t3') return 'automaton_t3_inv';
+  if (type === 'fertilizer_station') return 'fertilizer_station_inv';
   if (type === 'empty_crystal_pedestal' || type === 'crystal_pedestal') return 'empty_crystal_pedestal_inv';
+  if (type === 'water_feature' || type === 'decor_woven_wall') return 'water_feature_inv';
+  if (type === 'bamboo_fence') return 'bamboo_fence_inv';
+  if (type === 'zen_rock_formation' || type === 'decor_rock_formation') return 'zen_rock_formation_inv';
+  if (type === 'growing_bamboo_formation' || type === 'decor_shrubbery_bush') return 'growing_bamboo_formation_inv';
+  if (type === 'asparagus_fern_ball') return 'asparagus_fern_ball_inv';
   return `${type}_inv`;
 }
 
@@ -1749,8 +1848,11 @@ export function getStructureInventoryCount(inv: SanctuaryInventory, type: Deploy
   if (type === 'tool_garden_well') {
     return inv.tool_garden_well_inv ?? inv.tools?.gardenWell ?? 0;
   }
+  if (type === 'fertilizer_station') {
+    return inv.fertilizer_station_inv ?? inv.fertilizerStation ?? 0;
+  }
   if (type === 'torii_gate') {
-    return inv.torii_gate_inv ?? inv.decorations?.toriiGate ?? 0;
+    return inv.torii_gate_inv ?? inv.decorations?.toriiGate ?? inv.decorations?.['torii_gate'] ?? 0;
   }
   if (type === 'automaton_t1') {
     return inv.automaton_t1_inv ?? inv.automatons_tier1 ?? 0;
@@ -1772,6 +1874,52 @@ export function getStructureInventoryCount(inv: SanctuaryInventory, type: Deploy
   }
   if (type === 'empty_crystal_pedestal' || type === 'crystal_pedestal') {
     return inv.empty_crystal_pedestal_inv ?? 0;
+  }
+  if (type === 'water_feature' || type === 'decor_woven_wall') {
+    return (
+      inv.water_feature_inv ??
+      inv.decor_woven_wall_inv ??
+      inv.decorations?.['water_feature'] ??
+      inv.decorations?.waterFeature ??
+      inv.decorations?.wovenWall ??
+      0
+    );
+  }
+  if (type === 'bamboo_fence') {
+    return (
+      inv.bamboo_fence_inv ??
+      inv.decorations?.['bamboo_fence'] ??
+      inv.decorations?.bambooFence ??
+      0
+    );
+  }
+  if (type === 'zen_rock_formation' || type === 'decor_rock_formation') {
+    return (
+      inv.zen_rock_formation_inv ??
+      inv.decor_rock_formation_inv ??
+      inv.decorations?.['zen_rock_formation'] ??
+      inv.decorations?.['zenRockFormation'] ??
+      inv.decorations?.rockFormation ??
+      0
+    );
+  }
+  if (type === 'growing_bamboo_formation' || type === 'decor_shrubbery_bush') {
+    return (
+      inv.growing_bamboo_formation_inv ??
+      inv.decor_shrubbery_bush_inv ??
+      inv.decorations?.['growing_bamboo_formation'] ??
+      inv.decorations?.['growingBamboo'] ??
+      inv.decorations?.shrubbery ??
+      0
+    );
+  }
+  if (type === 'asparagus_fern_ball') {
+    return (
+      inv.asparagus_fern_ball_inv ??
+      inv.decorations?.['asparagus_fern_ball'] ??
+      inv.decorations?.['asparagusFernBall'] ??
+      0
+    );
   }
   const key = `${type}_inv`;
   return inv[key] ?? 0;
@@ -2245,7 +2393,7 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
     id: 'forms_raundo',
     category: 'MATURITY',
     title: 'Triad of Raundo (Round)',
-    subtitle: 'Cultivate Circle & Oval across styles',
+    subtitle: 'Cultivate Maru & Daen across styles',
     description: 'Cultivate Raundo group specimens across Chokan, Moyogi, and Shakan.',
     icon: '🟢',
     rewardZen: 2,
@@ -2258,7 +2406,7 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
     id: 'forms_erementaru',
     category: 'MATURITY',
     title: 'Triad of Erementaru (Elemental)',
-    subtitle: 'Cultivate Raindrop & Flame across styles',
+    subtitle: 'Cultivate Otosu & Hi across styles',
     description: 'Complete classical growth silhouettes for Erementaru group specimens.',
     icon: '🔥',
     rewardZen: 2,
@@ -2271,7 +2419,7 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
     id: 'forms_rokumen',
     category: 'MATURITY',
     title: 'Triad of Roku-men (Six-sides)',
-    subtitle: 'Cultivate Hexagon, Star or Snowflake across styles',
+    subtitle: 'Cultivate Rokkakkei, Asutarisuku or Sunōfurēku across styles',
     description: 'Complete sacred geometric growth silhouettes for Roku-men group specimens.',
     icon: '⭐',
     rewardZen: 2,
@@ -2284,7 +2432,7 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
     id: 'forms_seikatsu',
     category: 'MATURITY',
     title: 'Triad of Seikatsu (Nature)',
-    subtitle: 'Cultivate Feather, Snail or Eye across styles',
+    subtitle: 'Cultivate Fezā, Makigai or Me across styles',
     description: 'Nurture living organic forms across Chokan, Moyogi, and Shakan.',
     icon: '🪶',
     rewardZen: 2,
@@ -2297,7 +2445,7 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
     id: 'forms_sanmen',
     category: 'MATURITY',
     title: 'Triad of Sanmen (Points)',
-    subtitle: 'Cultivate Triangle, Arrow, Shield or Diamond across styles',
+    subtitle: 'Cultivate Sankakkei, Yajirushi, Shīrudo or Daiyamondo across styles',
     description: 'Complete pointed directional silhouettes across Chokan, Moyogi, and Shakan.',
     icon: '🔺',
     rewardZen: 2,
@@ -2310,7 +2458,7 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
     id: 'forms_shihen',
     category: 'MATURITY',
     title: 'Triad of Shihen (Orthogonal)',
-    subtitle: 'Cultivate Cube or Rectangle across styles',
+    subtitle: 'Cultivate Shikaku or Kukei across styles',
     description: 'Master orthogonal architecture and isometric cubes across all 3 styles.',
     icon: '🧊',
     rewardZen: 2,
@@ -2323,7 +2471,7 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
     id: 'forms_jinkoteki',
     category: 'MATURITY',
     title: 'Triad of Jinkō-teki (Crafted)',
-    subtitle: 'Cultivate Gear or Bell across styles',
+    subtitle: 'Cultivate Sōbi or Beru across styles',
     description: 'Grow resonant temple bells and mechanical automata gears across styles.',
     icon: '⚙️',
     rewardZen: 2,
@@ -2783,6 +2931,8 @@ export interface BonsaiSynergies {
   bonsaiCount: number;
   wallCount: number;
   rockCount: number;
+  bambooCount: number;
+  fernBallCount: number;
   bushCount: number;
   decorCount: number;
   pebbleCount: number;
@@ -2790,6 +2940,8 @@ export interface BonsaiSynergies {
   hasAdjacentBonsai: boolean;
   hasAdjacentWall: boolean;
   hasAdjacentRock: boolean;
+  hasAdjacentBamboo: boolean;
+  hasAdjacentFernBall: boolean;
   hasAdjacentBush: boolean;
   hasAdjacentDecor: boolean;
   hasAdjacentPebbles: boolean;
@@ -2797,6 +2949,7 @@ export interface BonsaiSynergies {
   growthMultiplier: number;
   expMultiplier: number;
   quickPruneBonus: number;
+  extraWasteChance: number;
   growingTogetherBonus: number;
   privateGrowingBonus: number;
   isStalled: boolean;
@@ -2812,16 +2965,97 @@ export interface BonsaiSynergies {
   };
 }
 
+export const DEFAULT_BONSAI_SYNERGIES: BonsaiSynergies = {
+  bonsaiCount: 0,
+  wallCount: 0,
+  rockCount: 0,
+  bambooCount: 0,
+  fernBallCount: 0,
+  bushCount: 0,
+  decorCount: 0,
+  pebbleCount: 0,
+  energyCount: 0,
+  hasAdjacentBonsai: false,
+  hasAdjacentWall: false,
+  hasAdjacentRock: false,
+  hasAdjacentBamboo: false,
+  hasAdjacentFernBall: false,
+  hasAdjacentBush: false,
+  hasAdjacentDecor: false,
+  hasAdjacentPebbles: false,
+  hasAdjacentEnergy: false,
+  growthMultiplier: 1,
+  expMultiplier: 1,
+  quickPruneBonus: 0,
+  extraWasteChance: 0,
+  growingTogetherBonus: 0,
+  privateGrowingBonus: 0,
+  isStalled: false,
+  maxIdenticalCount: 0,
+};
+
+export function getFenceEdgeGeometry(
+  col: number,
+  row: number,
+  side: 'top' | 'right' | 'bottom' | 'left' = 'top',
+): {
+  edgeKey: string;
+  side: 'top' | 'right' | 'bottom' | 'left';
+  orientation: 'horizontal' | 'vertical';
+  x: number;
+  y: number;
+} {
+  const centerX = SANCTUARY_GRID.startX + col * SANCTUARY_GRID.cellW;
+  const centerY = SANCTUARY_GRID.startY + row * SANCTUARY_GRID.cellH;
+
+  switch (side) {
+    case 'top':
+      return {
+        edgeKey: `H_${col}_${row}`,
+        side: 'top',
+        orientation: 'horizontal',
+        x: centerX,
+        y: centerY - SANCTUARY_GRID.cellH / 2,
+      };
+    case 'bottom':
+      return {
+        edgeKey: `H_${col}_${row + 1}`,
+        side: 'bottom',
+        orientation: 'horizontal',
+        x: centerX,
+        y: centerY + SANCTUARY_GRID.cellH / 2,
+      };
+    case 'left':
+      return {
+        edgeKey: `V_${col}_${row}`,
+        side: 'left',
+        orientation: 'vertical',
+        x: centerX - SANCTUARY_GRID.cellW / 2,
+        y: centerY,
+      };
+    case 'right':
+      return {
+        edgeKey: `V_${col + 1}_${row}`,
+        side: 'right',
+        orientation: 'vertical',
+        x: centerX + SANCTUARY_GRID.cellW / 2,
+        y: centerY,
+      };
+  }
+}
+
 /**
  * Compute Proximity Synergies for a planted bonsai:
  * Halo area depends strictly on Maturity Rating (Rating 1: 4 spots, Rating 2: 6 spots, Rating 3: 8 spots, Rating 4: 10 spots, Rating 5: 12 spots).
  * 🌿 "Growing Together": Each neighboring Bonsai in halo grants +10% Hydration Growth Speed (stackable)
- * 🎋 "Private Growing": Each neighboring Woven Lattice Wall in halo grants +10% Hydration Growth Speed (stackable)
- * 🪨 "Quick Prune": Each neighboring Zen Rock Formation in halo grants +0.25s Pruning Effect to manual care (stackable)
- * 🌿 "XP Boosted": Each neighboring Topiary Shrubbery Bush in halo grants +15% Level Up Experience (stackable)
+ * 🌊 "Water Feature": Each neighboring Water Feature in halo grants +10% Hydration Growth Speed (stackable)
+ * 🪨 "XP Boosted": Each neighboring Zen Rock Formation in halo grants +15% Level Up Experience (stackable)
+ * 🎋 "Quick Prune": Each neighboring Growing Bamboo Formation in halo grants +0.25s Pruning Effect to manual care (stackable)
+ * 🪴 "Efficient Pruning": Each neighboring Asparagus Fern Ball in halo grants +15% Chance for Extra Organic Waste on Level Up (stackable)
  * 🔮 "Cultivating Potential": Pedestals in halo provide +1 Cultivation Potential per level to their corresponding attribute
  * ⚠️ "Disrupted Zen": Each neighboring Solar/Turbine in halo inflicts -10% Growth Speed penalty (stackable)
  * ⛔ "Stalling Surroundings": 5 or more adjacent identical entities triggers Total Growth Stagnation (0% Growth Rate).
+ * 🎋 "Bamboo Fence": Physically separates and blocks halo connections across borders!
  */
 export function getBonsaiSynergies(
   bonsai: PlantedBonsai,
@@ -2835,6 +3069,31 @@ export function getBonsaiSynergies(
 
   const isPlotInHalo = (c: number, r: number) => haloPlots.some((p) => p.col === c && p.row === r);
 
+  const fenceSet = new Set<string>();
+  structures.forEach((s) => {
+    if (s.type === 'bamboo_fence' && s.edgeKey) {
+      fenceSet.add(s.edgeKey);
+    }
+  });
+
+  const isBlocked = (c: number, r: number) => {
+    if (bonsai.width === 2 && bonsai.height === 2) {
+      // 2x2 bonsai: blocked if blocked to all 4 constituent plots
+      let allBlocked = true;
+      for (let dc = 0; dc <= 1; dc++) {
+        for (let dr = 0; dr <= 1; dr++) {
+          if (!isHaloBlockedByFence(bCol + dc, bRow + dr, c, r, fenceSet)) {
+            allBlocked = false;
+            break;
+          }
+        }
+        if (!allBlocked) break;
+      }
+      return allBlocked;
+    }
+    return isHaloBlockedByFence(bCol, bRow, c, r, fenceSet);
+  };
+
   let bonsaiCount = 0;
   plantedBonsais.forEach((other) => {
     if (other.id === bonsai.id) return;
@@ -2845,7 +3104,7 @@ export function getBonsaiSynergies(
     let inHalo = false;
     for (let c = oc; c < oc + oW; c++) {
       for (let r = or; r < or + oH; r++) {
-        if (isPlotInHalo(c, r)) {
+        if (isPlotInHalo(c, r) && !isBlocked(c, r)) {
           inHalo = true;
           break;
         }
@@ -2859,7 +3118,8 @@ export function getBonsaiSynergies(
 
   let wallCount = 0;
   let rockCount = 0;
-  let bushCount = 0;
+  let bambooCount = 0;
+  let fernBallCount = 0;
   let energyCount = 0;
   const crystalPedestals = {
     foliage: 0,
@@ -2873,18 +3133,29 @@ export function getBonsaiSynergies(
   countsByType['bonsai'] = bonsaiCount;
 
   structures.forEach((s) => {
+    if (s.type === 'bamboo_fence') {
+      // Fences are border barriers, not halo entities
+      return;
+    }
+
     const sc = Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
     const sr = Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
 
     let inHalo = false;
     if (s.type === 'torii_gate') {
       if (s.orientation === 'vertical') {
-        inHalo = isPlotInHalo(sc, sr - 1) || isPlotInHalo(sc, sr) || isPlotInHalo(sc, sr + 1);
+        inHalo =
+          (isPlotInHalo(sc, sr - 1) && !isBlocked(sc, sr - 1)) ||
+          (isPlotInHalo(sc, sr) && !isBlocked(sc, sr)) ||
+          (isPlotInHalo(sc, sr + 1) && !isBlocked(sc, sr + 1));
       } else {
-        inHalo = isPlotInHalo(sc - 1, sr) || isPlotInHalo(sc, sr) || isPlotInHalo(sc + 1, sr);
+        inHalo =
+          (isPlotInHalo(sc - 1, sr) && !isBlocked(sc - 1, sr)) ||
+          (isPlotInHalo(sc, sr) && !isBlocked(sc, sr)) ||
+          (isPlotInHalo(sc + 1, sr) && !isBlocked(sc + 1, sr));
       }
     } else {
-      inHalo = isPlotInHalo(sc, sr);
+      inHalo = isPlotInHalo(sc, sr) && !isBlocked(sc, sr);
     }
 
     if (inHalo) {
@@ -2914,14 +3185,22 @@ export function getBonsaiSynergies(
           crystalPedestals.roots += 1;
         }
       } else {
-        countsByType[s.type] = (countsByType[s.type] || 0) + 1;
+        let typeKey = s.type as string;
+        if (s.type === 'water_feature' || s.type === 'decor_woven_wall') typeKey = 'water_feature';
+        else if (s.type === 'zen_rock_formation' || s.type === 'decor_rock_formation') typeKey = 'zen_rock_formation';
+        else if (s.type === 'growing_bamboo_formation' || s.type === 'decor_shrubbery_bush') typeKey = 'growing_bamboo_formation';
+        else if (s.type === 'asparagus_fern_ball') typeKey = 'asparagus_fern_ball';
 
-        if (s.type === 'decor_woven_wall') {
+        countsByType[typeKey] = (countsByType[typeKey] || 0) + 1;
+
+        if (typeKey === 'water_feature') {
           wallCount++;
-        } else if (s.type === 'decor_rock_formation') {
+        } else if (typeKey === 'zen_rock_formation') {
           rockCount++;
-        } else if (s.type === 'decor_shrubbery_bush') {
-          bushCount++;
+        } else if (typeKey === 'growing_bamboo_formation') {
+          bambooCount++;
+        } else if (typeKey === 'asparagus_fern_ball') {
+          fernBallCount++;
         } else if (s.type === 'solar_panel' || s.type === 'wind_turbine') {
           energyCount++;
         }
@@ -2938,19 +3217,21 @@ export function getBonsaiSynergies(
     }
   }
 
-  // 5 or more (four+ / five or more) triggers Stalling Surroundings
+  // 5 or more triggers Stalling Surroundings
   const isStalled = maxIdenticalCount >= 5;
 
   let stalledEntityLabel = '';
   if (isStalled) {
     if (stalledEntityKey === 'bonsai') {
       stalledEntityLabel = 'Adjacent Bonsais';
-    } else if (stalledEntityKey === 'decor_woven_wall') {
-      stalledEntityLabel = 'Woven Walls';
-    } else if (stalledEntityKey === 'decor_rock_formation') {
+    } else if (stalledEntityKey === 'water_feature') {
+      stalledEntityLabel = 'Water Features';
+    } else if (stalledEntityKey === 'zen_rock_formation') {
       stalledEntityLabel = 'Rock Formations';
-    } else if (stalledEntityKey === 'decor_shrubbery_bush') {
-      stalledEntityLabel = 'Topiary Shrubberies';
+    } else if (stalledEntityKey === 'growing_bamboo_formation') {
+      stalledEntityLabel = 'Bamboo Formations';
+    } else if (stalledEntityKey === 'asparagus_fern_ball') {
+      stalledEntityLabel = 'Asparagus Fern Balls';
     } else if (stalledEntityKey === 'crystal_pedestal') {
       stalledEntityLabel = 'Crystal Pedestals';
     } else if (stalledEntityKey === 'tool_compost_heap') {
@@ -2969,13 +3250,15 @@ export function getBonsaiSynergies(
   const hasAdjacentBonsai = bonsaiCount > 0;
   const hasAdjacentWall = wallCount > 0;
   const hasAdjacentRock = rockCount > 0;
-  const hasAdjacentBush = bushCount > 0;
+  const hasAdjacentBamboo = bambooCount > 0;
+  const hasAdjacentFernBall = fernBallCount > 0;
+  const hasAdjacentBush = bambooCount > 0;
   const hasAdjacentEnergy = energyCount > 0;
-  const hasAdjacentDecor = wallCount > 0 || rockCount > 0 || bushCount > 0;
+  const hasAdjacentDecor = wallCount > 0 || rockCount > 0 || bambooCount > 0 || fernBallCount > 0;
 
   // Hydration Growth Speed calculation:
   // Growing Together: +10% per bonsai
-  // Private Growing: +10% per wall
+  // Water Feature: +10% per water feature
   // Disrupted Zen: -10% per solar/wind
   const growingTogetherBonus = bonsaiCount * 0.10;
   const privateGrowingBonus = wallCount * 0.10;
@@ -2983,26 +3266,29 @@ export function getBonsaiSynergies(
     0.2,
     1.0 + growingTogetherBonus + privateGrowingBonus - energyCount * 0.10,
   );
-  // Stalling Surroundings sets growth multiplier to strictly 0 (0% growth)
   const growthMultiplier = isStalled ? 0 : rawGrowthMultiplier;
-
-  // XP Boosted: +15% Level Up EXP per adjacent bush
-  const expMultiplier = 1.0 + bushCount * 0.15;
-
-  // Quick Prune: +0.25s Pruning Effect per adjacent rock
-  const quickPruneBonus = rockCount * 0.25;
+  // Zen Rock Formation: +15% Level Up Experience (XP Boosted)
+  const expMultiplier = 1.0 + rockCount * 0.15;
+  // Growing Bamboo Formation: +0.25s Pruning Effect (Quick Prune)
+  const quickPruneBonus = bambooCount * 0.25;
+  // Asparagus Fern Ball: +15% Chance for Extra Organic Waste on Level Up (Efficient Pruning)
+  const extraWasteChance = fernBallCount * 0.15;
 
   return {
     bonsaiCount,
     wallCount,
     rockCount,
-    bushCount,
-    decorCount: wallCount + rockCount + bushCount,
+    bambooCount,
+    fernBallCount,
+    bushCount: bambooCount,
+    decorCount: wallCount + rockCount + bambooCount + fernBallCount,
     pebbleCount: 0,
     energyCount,
     hasAdjacentBonsai,
     hasAdjacentWall,
     hasAdjacentRock,
+    hasAdjacentBamboo,
+    hasAdjacentFernBall,
     hasAdjacentBush,
     hasAdjacentDecor,
     hasAdjacentPebbles: false,
@@ -3010,6 +3296,7 @@ export function getBonsaiSynergies(
     growthMultiplier,
     expMultiplier,
     quickPruneBonus,
+    extraWasteChance,
     growingTogetherBonus,
     privateGrowingBonus,
     isStalled,
@@ -3438,6 +3725,240 @@ export function renderWindTurbine(
   ctx.font = 'bold 10px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(formattedTurbineKw, sx, sy + 28.5);
+}
+
+/**
+ * Complete standalone vector rendering for Fertilizer Station:
+ * A sophisticated eco-chemical processing apparatus with a glass distilling flask/beaker,
+ * bronze pressure valves, condenser tube, and nutrient catchment hopper.
+ */
+export function renderFertilizerStation(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  struct: DeployedStructure,
+) {
+  const isDistilling = Boolean(struct.isDistilling && (struct.timer || 0) > 0);
+  const ready = struct.readyFertilizer || 0;
+  const timer = struct.timer || 0;
+
+  // Ground shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 15, 24, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Heavy bronze & slate base plate
+  const baseGrad = ctx.createLinearGradient(sx - 20, sy + 7, sx + 20, sy + 14);
+  baseGrad.addColorStop(0, '#78350f');
+  baseGrad.addColorStop(0.5, '#92400e');
+  baseGrad.addColorStop(1, '#451a03');
+  ctx.fillStyle = baseGrad;
+  ctx.beginPath();
+  ctx.roundRect(sx - 20, sy + 6, 40, 8, 2);
+  ctx.fill();
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Golden base rivets
+  ctx.fillStyle = '#fef08a';
+  ctx.beginPath();
+  ctx.arc(sx - 16, sy + 10, 1.2, 0, Math.PI * 2);
+  ctx.arc(sx + 16, sy + 10, 1.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Left side: Distilling Retort / Round Beaker
+  const flaskX = sx - 10;
+  const flaskY = sy - 4;
+  const flaskR = 9;
+
+  // Bronze burner pedestal under left flask
+  ctx.fillStyle = '#451a03';
+  ctx.fillRect(flaskX - 4, sy + 2, 8, 5);
+  ctx.fillStyle = isDistilling ? '#f59e0b' : '#334155';
+  ctx.beginPath();
+  ctx.arc(flaskX, sy + 4, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Glass retort body
+  ctx.fillStyle = isDistilling ? 'rgba(132, 204, 22, 0.65)' : 'rgba(56, 189, 248, 0.25)';
+  ctx.beginPath();
+  ctx.arc(flaskX, flaskY, flaskR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Liquid level inside retort
+  ctx.fillStyle = isDistilling ? '#84cc16' : '#22c55e';
+  ctx.beginPath();
+  ctx.arc(flaskX, flaskY + 2, flaskR * 0.75, 0, Math.PI);
+  ctx.fill();
+
+  // Bubbles inside retort when distilling
+  if (isDistilling) {
+    const bTime = Date.now() * 0.008;
+    ctx.fillStyle = '#fef08a';
+    for (let b = 0; b < 3; b++) {
+      const bx = flaskX - 3 + b * 3;
+      const by = flaskY + 4 - ((bTime * 10 + b * 4) % 8);
+      ctx.beginPath();
+      ctx.arc(bx, by, 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Right side: Nutrient Catchment Hopper / Collection Flask
+  const hopX = sx + 10;
+  const hopY = sy - 2;
+  ctx.fillStyle = ready > 0 ? 'rgba(52, 211, 153, 0.85)' : 'rgba(56, 189, 248, 0.25)';
+  ctx.beginPath();
+  ctx.moveTo(hopX - 7, hopY + 8);
+  ctx.lineTo(hopX + 7, hopY + 8);
+  ctx.lineTo(hopX + 4, hopY - 6);
+  ctx.lineTo(hopX - 4, hopY - 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Finished fertilizer in nutrient chamber
+  if (ready > 0) {
+    ctx.fillStyle = '#10b981';
+    ctx.fillRect(hopX - 5, hopY + 2, 10, 6);
+  }
+
+  // 3-Loop Helical Copper Condensing Coil & Bronze Valves
+  const coilStartX = flaskX + 4;
+  const coilEndX = hopX - 4;
+  const coilWidth = coilEndX - coilStartX;
+  const coilY = sy - 14;
+  const coilLoops = 4;
+
+  // Helical Copper Coil Loops
+  ctx.strokeStyle = '#ea580c';
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  for (let i = 0; i < coilLoops; i++) {
+    const cx = coilStartX + (coilWidth / coilLoops) * (i + 0.5);
+    ctx.ellipse(cx, coilY, 2.4, 5.5, 0, 0, Math.PI * 2);
+  }
+  ctx.stroke();
+
+  // Gleaming copper specular highlights
+  ctx.strokeStyle = '#fed7aa';
+  ctx.lineWidth = 1.0;
+  ctx.beginPath();
+  for (let i = 0; i < coilLoops; i++) {
+    const cx = coilStartX + (coilWidth / coilLoops) * (i + 0.5);
+    ctx.arc(cx, coilY - 4.2, 1.6, Math.PI, 0);
+  }
+  ctx.stroke();
+
+  // Bronze Pressure Valves & Dial Gauge
+  const gaugeX = sx;
+  const gaugeY = sy - 14;
+  ctx.fillStyle = '#b45309';
+  ctx.beginPath();
+  ctx.arc(gaugeX, gaugeY, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#fef08a';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Gauge face
+  ctx.fillStyle = '#fef08a';
+  ctx.beginPath();
+  ctx.arc(gaugeX, gaugeY, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Gauge needle
+  const needleRot = isDistilling ? (Date.now() * 0.005) % (Math.PI * 2) : 0.8;
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(gaugeX, gaugeY);
+  ctx.lineTo(gaugeX + Math.cos(needleRot) * 2.8, gaugeY + Math.sin(needleRot) * 2.8);
+  ctx.stroke();
+
+  // Bronze shutoff valves on intake and outflow
+  const drawBronzeValve = (vx: number, vy: number) => {
+    ctx.fillStyle = '#d97706';
+    ctx.fillRect(vx - 2.5, vy - 2, 5, 4);
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.arc(vx, vy - 3, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+  };
+  drawBronzeValve(flaskX + 5, sy - 8);
+  drawBronzeValve(hopX - 5, sy - 8);
+
+  // Condenser droplet traveling along coil when active
+  if (isDistilling) {
+    const dProg = ((Date.now() * 0.002) % 1);
+    const dropX = coilStartX + coilWidth * dProg;
+    const dropY = coilY + Math.sin(dProg * Math.PI * coilLoops) * 4;
+    ctx.fillStyle = '#34d399';
+    ctx.beginPath();
+    ctx.arc(dropX, dropY, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Status Badge underneath
+  const statusBoxW = 66;
+  const statusBoxH = 15;
+  const statusBoxX = sx - statusBoxW / 2;
+  const statusBoxY = sy + 18;
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.beginPath();
+  ctx.roundRect(statusBoxX, statusBoxY, statusBoxW, statusBoxH, 4);
+  ctx.fill();
+
+  if (isDistilling && timer > 0) {
+    const prog = Math.min(1.0, (60 - timer) / 60);
+    const fillW = Math.max(3, (statusBoxW - 2) * prog);
+    const grad = ctx.createLinearGradient(statusBoxX + 1, statusBoxY + 1, statusBoxX + 1 + fillW, statusBoxY + 1);
+    grad.addColorStop(0, '#047857');
+    grad.addColorStop(1, '#10b981');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect(statusBoxX + 1, statusBoxY + 1, fillW, statusBoxH - 2, 3);
+    ctx.fill();
+  } else if (ready > 0) {
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.4)';
+    ctx.beginPath();
+    ctx.roundRect(statusBoxX + 1, statusBoxY + 1, statusBoxW - 2, statusBoxH - 2, 3);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = ready > 0 ? '#34d399' : isDistilling ? '#10b981' : '#475569';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(statusBoxX, statusBoxY, statusBoxW, statusBoxH, 4);
+  ctx.stroke();
+
+  let statusText = 'Fertilizer Stn';
+  let statusTextColor = '#94a3b8';
+  if (ready > 0) {
+    statusText = `${ready} Fertilizer!`;
+    statusTextColor = '#6ee7b7';
+  } else if (isDistilling) {
+    statusText = `${Math.ceil(timer)}s Distilling`;
+    statusTextColor = '#fef08a';
+  }
+
+  ctx.fillStyle = statusTextColor;
+  ctx.font = 'bold 9px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(statusText, sx, statusBoxY + statusBoxH / 2);
+  ctx.textBaseline = 'alphabetic';
 }
 
 /**
@@ -5161,23 +5682,33 @@ export function renderCrystalPedestal(
   ctx.stroke();
 
   // Socket depression on top
-  ctx.fillStyle = '#0f172a';
+  ctx.fillStyle = '#090e17';
   ctx.beginPath();
-  ctx.ellipse(sx, sy - 12, 8, 2.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(sx, sy - 12, 9, 3, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = isSocketed ? themeColor : '#475569';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // 4 Brass/stone mounting prongs around the socket bowl
+  const prongs = [-7, -2.5, 2.5, 7];
+  ctx.fillStyle = isSocketed ? '#fbbf24' : '#64748b';
+  prongs.forEach((px) => {
+    ctx.fillRect(sx + px - 1, sy - 14, 2, 3);
+  });
 
   // Runic trims
   ctx.save();
   if (isSocketed) {
     ctx.strokeStyle = themeColor;
     ctx.shadowColor = themeColor;
-    ctx.shadowBlur = 4 * pulse;
-    ctx.globalAlpha = 0.5 + 0.4 * pulse;
+    ctx.shadowBlur = 5 * pulse;
+    ctx.globalAlpha = 0.6 + 0.4 * pulse;
   } else {
     ctx.strokeStyle = '#64748b';
-    ctx.globalAlpha = 0.4;
+    ctx.globalAlpha = 0.45;
   }
-  ctx.lineWidth = 1.1;
+  ctx.lineWidth = 1.2;
 
   ctx.beginPath();
   ctx.moveTo(sx, sy - 7);
@@ -5198,11 +5729,16 @@ export function renderCrystalPedestal(
 
   // If empty, do not draw crystal on top
   if (!isSocketed) {
+    // Subtle empty socket indicator on overworld
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.4)';
+    ctx.font = 'bold 7px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('EMPTY', sx, sy - 16);
     return;
   }
 
   // Draw the unified crystal on top of the pedestal
-  renderUnifiedCrystalGraphic(ctx, sx, sy - 21, cType, strength, 1.0);
+  renderUnifiedCrystalGraphic(ctx, sx, sy - 22, cType, strength, 1.05);
 }
 
 /**
@@ -5252,14 +5788,20 @@ export function renderCompleteDecor(
     renderIrrigationT3(ctx, sx, sy, dummyStruct);
   } else if (type === 'decor_pebble_path') {
     renderPebbleCluster(ctx, sx, sy, dummyStruct.variant ?? 0);
-  } else if (type === 'decor_rock_formation') {
+  } else if (type === 'decor_rock_formation' || type === 'zen_rock_formation') {
     renderRockFormation(ctx, sx, sy);
-  } else if (type === 'decor_shrubbery_bush') {
-    renderShrubberyBush(ctx, sx, sy);
-  } else if (type === 'decor_woven_wall') {
-    renderWovenWall(ctx, sx, sy);
+  } else if (type === 'decor_shrubbery_bush' || type === 'growing_bamboo_formation') {
+    renderGrowingBambooFormation(ctx, sx, sy);
+  } else if (type === 'asparagus_fern_ball') {
+    renderAsparagusFernBall(ctx, sx, sy);
+  } else if (type === 'water_feature' || type === 'decor_woven_wall') {
+    renderWaterFeature(ctx, sx, sy);
+  } else if (type === 'bamboo_fence') {
+    renderBambooFence(ctx, sx, sy, orientation);
   } else if (type === 'tool_compost_heap') {
     renderCompostHeap(ctx, sx, sy, dummyStruct);
+  } else if (type === 'fertilizer_station') {
+    renderFertilizerStation(ctx, sx, sy, dummyStruct);
   } else if (type === 'tool_garden_well') {
     renderGardenWell(ctx, sx, sy, dummyStruct);
   } else if (type.startsWith('crystal_pedestal') || type === 'empty_crystal_pedestal') {
@@ -6391,272 +6933,695 @@ export function renderRockFormation(
 }
 
 /**
- * Complete standalone vector rendering for Topiary Shrubbery Bush.
+ * Complete standalone vector rendering for Growing Bamboo Formation:
+ * A cluster/formation of growing bamboo shoots and culms sprouting from the ground
+ * with nodes, joint rings, and vibrant feathered bamboo leaves.
  */
-export function renderShrubberyBush(
+export function renderGrowingBambooFormation(
   ctx: CanvasRenderingContext2D,
   sx: number,
   sy: number,
 ) {
-  const planterW = 32;
-  const planterH = 16;
-  const planterX = sx - planterW / 2;
-  const planterY = sy + 1;
-
-  // Planter Box Cedar Body
-  const cedarGrad = ctx.createLinearGradient(planterX, planterY, planterX, planterY + planterH);
-  cedarGrad.addColorStop(0, '#92400e');
-  cedarGrad.addColorStop(0.5, '#78350f');
-  cedarGrad.addColorStop(1, '#5c2b09');
-  ctx.fillStyle = cedarGrad;
+  // Ground shadow beneath the growing bamboo mound
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
   ctx.beginPath();
-  ctx.roundRect(planterX, planterY, planterW, planterH, 3);
+  ctx.ellipse(sx, sy + 15, 26, 8, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#b45309';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
 
-  // Horizontal Cedar Slats
-  ctx.strokeStyle = 'rgba(254, 240, 138, 0.2)';
+  // Fertile dark soil mound & mossy earth
+  const soilGrad = ctx.createRadialGradient(sx, sy + 12, 3, sx, sy + 12, 22);
+  soilGrad.addColorStop(0, '#3b1802');
+  soilGrad.addColorStop(0.6, '#291408');
+  soilGrad.addColorStop(1, '#180c04');
+  ctx.fillStyle = soilGrad;
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 12, 22, 7.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#451a03';
   ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(planterX + 3, planterY + 6);
-  ctx.lineTo(planterX + planterW - 3, planterY + 6);
-  ctx.moveTo(planterX + 3, planterY + 11);
-  ctx.lineTo(planterX + planterW - 3, planterY + 11);
   ctx.stroke();
 
-  // Polished Brass Corner Brackets & Screws
-  ctx.fillStyle = '#f59e0b';
-  ctx.fillRect(planterX, planterY, 6, 4);
-  ctx.fillRect(planterX, planterY, 4, 6);
-  ctx.fillRect(planterX + planterW - 6, planterY, 6, 4);
-  ctx.fillRect(planterX + planterW - 4, planterY, 4, 6);
-  ctx.fillRect(planterX, planterY + planterH - 4, 6, 4);
-  ctx.fillRect(planterX + planterW - 6, planterY + planterH - 4, 6, 4);
-
-  // Brass rivets
-  ctx.fillStyle = '#fef08a';
+  // Base moss stipples and tiny companion pebbles
+  ctx.fillStyle = '#16a34a';
   ctx.beginPath();
-  ctx.arc(planterX + 2.5, planterY + 2.5, 1.2, 0, Math.PI * 2);
-  ctx.arc(planterX + planterW - 2.5, planterY + 2.5, 1.2, 0, Math.PI * 2);
+  ctx.arc(sx - 14, sy + 13, 3, 0, Math.PI * 2);
+  ctx.arc(sx + 15, sy + 12, 3.5, 0, Math.PI * 2);
+  ctx.arc(sx - 2, sy + 15, 2.5, 0, Math.PI * 2);
   ctx.fill();
 
-  // Dark rich potting soil rim
-  ctx.fillStyle = '#3b1802';
+  ctx.fillStyle = '#64748b';
   ctx.beginPath();
-  ctx.ellipse(sx, planterY, planterW / 2 - 2, 4, 0, 0, Math.PI * 2);
+  ctx.ellipse(sx + 10, sy + 15, 3.2, 1.8, 0.2, 0, Math.PI * 2);
+  ctx.ellipse(sx - 10, sy + 15, 2.5, 1.5, -0.3, 0, Math.PI * 2);
   ctx.fill();
 
-  // Lush, spherical manicured Japanese boxwood shrub
-  ctx.fillStyle = '#064e3b';
+  // Sprouting young bamboo shoot cone (takenoko) emerging at base left
+  ctx.save();
+  ctx.translate(sx - 13, sy + 10);
+  ctx.fillStyle = '#854d0e';
   ctx.beginPath();
-  ctx.arc(sx, sy - 11, 18, 0, Math.PI * 2);
+  ctx.moveTo(0, 2);
+  ctx.lineTo(4, -8);
+  ctx.lineTo(8, 2);
+  ctx.closePath();
   ctx.fill();
-
-  // Rich emerald midtone foliage pads
-  ctx.fillStyle = '#047857';
+  ctx.strokeStyle = '#451a03';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  // Overlapping shoot sheath stripes
+  ctx.strokeStyle = '#fef08a';
+  ctx.lineWidth = 0.6;
   ctx.beginPath();
-  ctx.arc(sx - 5, sy - 14, 13, 0, Math.PI * 2);
-  ctx.arc(sx + 6, sy - 13, 12, 0, Math.PI * 2);
-  ctx.arc(sx, sy - 8, 14, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.moveTo(1, -1); ctx.lineTo(7, -1);
+  ctx.moveTo(2, -4); ctx.lineTo(6, -4);
+  ctx.stroke();
+  ctx.restore();
 
-  // Vibrant sunlit top foliage highlights
-  ctx.fillStyle = '#10b981';
-  ctx.beginPath();
-  ctx.arc(sx - 3, sy - 18, 9, 0, Math.PI * 2);
-  ctx.arc(sx + 4, sy - 17, 8, 0, Math.PI * 2);
-  ctx.arc(sx - 6, sy - 12, 7, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Crisp lime leaf crest tips
-  ctx.fillStyle = '#34d399';
-  ctx.beginPath();
-  ctx.arc(sx - 2, sy - 20, 5, 0, Math.PI * 2);
-  ctx.arc(sx + 3, sy - 19, 4.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Tiny delicate blossom flecks
-  const blossomFlecks = [
-    {x: sx - 8, y: sy - 15, col: '#fbcfe8'},
-    {x: sx + 7, y: sy - 16, col: '#fbcfe8'},
-    {x: sx + 2, y: sy - 10, col: '#ffffff'},
-    {x: sx - 5, y: sy - 8, col: '#fbcfe8'},
-    {x: sx + 8, y: sy - 8, col: '#ffffff'},
+  // Culm definitions: cluster of 4 growing bamboo culms/canes of varying heights and subtle lean
+  const culms = [
+    { x: sx - 8, baseW: 4.8, topW: 3.6, height: 38, lean: -0.04, mainColor: '#16a34a', highlight: '#4ade80' },
+    { x: sx + 1, baseW: 5.6, topW: 4.2, height: 44, lean: 0.02, mainColor: '#15803d', highlight: '#34d399' },
+    { x: sx + 9, baseW: 4.4, topW: 3.4, height: 35, lean: 0.05, mainColor: '#16a34a', highlight: '#4ade80' },
+    { x: sx + 16, baseW: 3.4, topW: 2.6, height: 26, lean: 0.08, mainColor: '#22c55e', highlight: '#86efac' },
   ];
 
-  blossomFlecks.forEach((b) => {
-    ctx.fillStyle = b.col;
+  // Helper to draw a tapered bamboo stalk with nodes and joint rings
+  const drawBambooCulm = (c: typeof culms[0]) => {
+    ctx.save();
+    const nodeCount = 4;
+    const segH = c.height / nodeCount;
+    const startY = sy + 12;
+
+    for (let i = 0; i < nodeCount; i++) {
+      const segBottomY = startY - i * segH;
+      const segTopY = startY - (i + 1) * segH;
+      const tProgress1 = i / nodeCount;
+      const tProgress2 = (i + 1) / nodeCount;
+      const segW1 = c.baseW - (c.baseW - c.topW) * tProgress1;
+      const segW2 = c.baseW - (c.baseW - c.topW) * tProgress2;
+
+      const leanX1 = c.x + c.lean * (i * segH);
+      const leanX2 = c.x + c.lean * ((i + 1) * segH);
+
+      // Segment body with natural bamboo vertical gradient
+      const bGrad = ctx.createLinearGradient(leanX1 - segW1 / 2, 0, leanX1 + segW1 / 2, 0);
+      bGrad.addColorStop(0, '#14532d');
+      bGrad.addColorStop(0.35, c.mainColor);
+      bGrad.addColorStop(0.7, c.highlight);
+      bGrad.addColorStop(1, '#166534');
+      ctx.fillStyle = bGrad;
+
+      ctx.beginPath();
+      ctx.moveTo(leanX1 - segW1 / 2, segBottomY);
+      ctx.lineTo(leanX2 - segW2 / 2, segTopY);
+      ctx.lineTo(leanX2 + segW2 / 2, segTopY);
+      ctx.lineTo(leanX1 + segW1 / 2, segBottomY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#14532d';
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+
+      // Node Joint Ring (slightly raised collar at node)
+      const ringY = segTopY;
+      const ringW = segW2 + 1.6;
+      ctx.fillStyle = '#fef08a';
+      ctx.fillRect(leanX2 - ringW / 2, ringY - 0.7, ringW, 1.4);
+      ctx.strokeStyle = '#713f12';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(leanX2 - ringW / 2, ringY - 0.7, ringW, 1.4);
+    }
+    ctx.restore();
+  };
+
+  // Draw all 4 bamboo culms
+  culms.forEach(drawBambooCulm);
+
+  // Helper to draw a cluster of feathered bamboo leaves branching from a node
+  const drawBambooLeafSpray = (lx: number, ly: number, angle: number, scale = 1.0) => {
+    ctx.save();
+    ctx.translate(lx, ly);
+    ctx.rotate(angle);
+
+    // Slender branching twig
+    ctx.strokeStyle = '#14532d';
+    ctx.lineWidth = 1.0 * scale;
     ctx.beginPath();
-    ctx.arc(b.x, b.y, 1.5, 0, Math.PI * 2);
-    ctx.fill();
-  });
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(4 * scale, -2 * scale, 8 * scale, -4 * scale);
+    ctx.stroke();
+
+    // 3 to 4 graceful lanceolate feathered bamboo leaves fanning out
+    const leaves = [
+      { ang: -0.4, len: 14 * scale, w: 3.6 * scale, col: '#15803d', tipCol: '#4ade80' },
+      { ang: -0.1, len: 18 * scale, w: 4.2 * scale, col: '#16a34a', tipCol: '#86efac' },
+      { ang: 0.25, len: 15 * scale, w: 3.8 * scale, col: '#22c55e', tipCol: '#a7f3d0' },
+      { ang: 0.55, len: 11 * scale, w: 3.0 * scale, col: '#16a34a', tipCol: '#4ade80' },
+    ];
+
+    leaves.forEach((leaf) => {
+      ctx.save();
+      ctx.translate(8 * scale, -4 * scale);
+      ctx.rotate(leaf.ang);
+
+      // Feathered lanceolate leaf silhouette
+      ctx.fillStyle = leaf.col;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(leaf.len * 0.35, -leaf.w / 2, leaf.len * 0.75, -leaf.w / 2, leaf.len, 0);
+      ctx.bezierCurveTo(leaf.len * 0.75, leaf.w / 2, leaf.len * 0.35, leaf.w / 2, 0, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Sunlit tip highlight
+      ctx.fillStyle = leaf.tipCol;
+      ctx.beginPath();
+      ctx.moveTo(leaf.len * 0.5, 0);
+      ctx.bezierCurveTo(leaf.len * 0.7, -leaf.w * 0.3, leaf.len * 0.85, -leaf.w * 0.2, leaf.len, 0);
+      ctx.bezierCurveTo(leaf.len * 0.85, leaf.w * 0.2, leaf.len * 0.7, leaf.w * 0.3, leaf.len * 0.5, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Leaf central vein
+      ctx.strokeStyle = 'rgba(254, 240, 138, 0.4)';
+      ctx.lineWidth = 0.5 * scale;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(leaf.len * 0.85, 0);
+      ctx.stroke();
+
+      ctx.restore();
+    });
+
+    ctx.restore();
+  };
+
+  // Branching foliage leaf sprays radiating gracefully off the upper culm nodes
+  drawBambooLeafSpray(sx - 10, sy - 8, -0.65, 0.95);
+  drawBambooLeafSpray(sx - 7, sy - 22, -0.85, 1.05);
+  drawBambooLeafSpray(sx + 1, sy - 28, -0.25, 1.15);
+  drawBambooLeafSpray(sx + 2, sy - 20, 0.45, 1.0);
+  drawBambooLeafSpray(sx + 9, sy - 18, 0.65, 0.95);
+  drawBambooLeafSpray(sx + 11, sy - 10, 0.55, 0.85);
+  drawBambooLeafSpray(sx + 16, sy - 6, 0.75, 0.8);
+  drawBambooLeafSpray(sx - 2, sy - 34, -0.05, 1.1); // Canopy apex crown
 }
 
 /**
- * Complete standalone vector rendering for Flame-shaped Woven Wooden Lattice Wall.
+ * Backward compatibility alias for Topiary Shrubbery Bush -> Growing Bamboo Formation
  */
-export function renderWovenWall(
+export const renderShrubberyBush = renderGrowingBambooFormation;
+
+/**
+ * Complete standalone vector rendering for Asparagus Fern Ball:
+ * An authentic Kokedama moss ball pot with delicate feathery Asparagus Fern fronds:
+ * - Base: A small dark ceramic/slate coaster dish holding a spherical, textured
+ *   emerald/olive-green moss ball wrapped in fine twine strings (Kokedama style).
+ * - Fronds: Elegant, wispy, feathery plume-like needle fronds of an asparagus fern
+ *   (delicate layered soft green sprays branching gracefully upwards and outwards).
+ */
+export function renderAsparagusFernBall(
   ctx: CanvasRenderingContext2D,
   sx: number,
   sy: number,
 ) {
-  const fenceW = 40;
-  const baseY = sy + 13;
-  const startX = sx - fenceW / 2;
-
-  // Ground base shadow curved along flame footprint
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+  // 1. Soft Ground Shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
   ctx.beginPath();
-  ctx.ellipse(sx, baseY + 2, 20, 5, 0, 0, Math.PI * 2);
+  ctx.ellipse(sx, sy + 15, 20, 6, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 5 Upward-curving tapered Cedar Bamboo flame-crest vertical posts (Outer posts at sx - 18, sx + 18)
-  const flamePosts = [
-    {offX: -18, topY: sy - 11, lean: -1.2, cedarCol: '#78350f'}, // Left outer upright
-    {offX: -9,  topY: sy - 25, lean: -0.9, cedarCol: '#92400e'}, // Primary Tall Flame Crest
-    {offX: 0,   topY: sy - 18, lean: 0.6,  cedarCol: '#b45309'},
-    {offX: 9,   topY: sy - 23, lean: 1.2,  cedarCol: '#92400e'}, // Secondary Flame Crest
-    {offX: 18,  topY: sy - 12, lean: 1.2,  cedarCol: '#78350f'}, // Right outer upright
+  // 2. Base: Dark Slate / Charcoal Ceramic Coaster Dish
+  const dishW = 32;
+  const dishH = 6.5;
+  const dishY = sy + 9;
+
+  // Dark slate coaster body
+  const dishGrad = ctx.createLinearGradient(sx - dishW / 2, dishY, sx + dishW / 2, dishY + dishH);
+  dishGrad.addColorStop(0, '#334155');
+  dishGrad.addColorStop(0.5, '#1e293b');
+  dishGrad.addColorStop(1, '#0f172a');
+  ctx.fillStyle = dishGrad;
+  ctx.beginPath();
+  ctx.roundRect(sx - dishW / 2, dishY, dishW, dishH, [2, 2, 3, 3]);
+  ctx.fill();
+
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Subtle ceramic coaster rim highlight
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(sx - dishW / 2 + 2, dishY + 1);
+  ctx.lineTo(sx + dishW / 2 - 2, dishY + 1);
+  ctx.stroke();
+
+  // 3. Spherical Textured Emerald/Olive-Green Moss Ball (Kokedama Ball)
+  const ballY = sy + 2;
+  const ballR = 12.5;
+
+  // Moss Ball Base Shadow in dish
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+  ctx.beginPath();
+  ctx.ellipse(sx, ballY + ballR - 2, ballR * 0.9, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Rich textured moss gradient
+  const mossGrad = ctx.createRadialGradient(sx - 3, ballY - 3, 2, sx, ballY, ballR + 1);
+  mossGrad.addColorStop(0, '#22c55e');  // vibrant emerald top
+  mossGrad.addColorStop(0.4, '#15803d'); // deep lush moss
+  mossGrad.addColorStop(0.8, '#3f6212'); // rich olive moss
+  mossGrad.addColorStop(1, '#14532d');   // dark forest edge
+  ctx.fillStyle = mossGrad;
+  ctx.beginPath();
+  ctx.arc(sx, ballY, ballR, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#14532d';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Stippled organic moss clumps/tufts around the ball
+  const mossTufts = [
+    { x: sx - 6, y: ballY - 4, r: 2.2, col: '#4ade80' },
+    { x: sx + 5, y: ballY - 3, r: 2.0, col: '#84cc16' },
+    { x: sx - 2, y: ballY + 2, r: 2.4, col: '#65a30d' },
+    { x: sx + 4, y: ballY + 5, r: 1.8, col: '#22c55e' },
+    { x: sx - 7, y: ballY + 4, r: 1.9, col: '#4d7c0f' },
+    { x: sx + 1, y: ballY - 7, r: 2.1, col: '#4ade80' },
+  ];
+  mossTufts.forEach((t) => {
+    ctx.fillStyle = t.col;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Fine Twine Strings (Kokedama Cord Wrap)
+  // Wrapped around the spherical moss ball with delicate twine texture
+  ctx.strokeStyle = '#b45309';
+  ctx.lineWidth = 0.85;
+
+  // Arc 1 (diagonal left-to-right)
+  ctx.beginPath();
+  ctx.ellipse(sx, ballY, ballR * 0.95, ballR * 0.55, 0.45, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Arc 2 (cross diagonal right-to-left)
+  ctx.strokeStyle = '#d97706';
+  ctx.beginPath();
+  ctx.ellipse(sx, ballY, ballR * 0.92, ballR * 0.52, -0.45, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Horizontal tie cord
+  ctx.strokeStyle = '#92400e';
+  ctx.beginPath();
+  ctx.ellipse(sx, ballY + 2, ballR * 0.96, 4, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Tiny twine knot on side
+  ctx.fillStyle = '#f59e0b';
+  ctx.beginPath();
+  ctx.arc(sx + ballR * 0.7, ballY + 2, 1.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 4. Fronds: Elegant, wispy, feathery plume-like needle fronds of an Asparagus Fern
+  // Branching gracefully upwards and outwards from the top of the moss ball
+  const frondStems = [
+    { startX: sx - 2, startY: ballY - ballR + 2, cpX: sx - 14, cpY: sy - 14, endX: sx - 22, endY: sy - 24, scale: 0.95 },
+    { startX: sx - 1, startY: ballY - ballR + 1, cpX: sx - 8, cpY: sy - 20, endX: sx - 12, endY: sy - 34, scale: 1.1 },
+    { startX: sx + 1, startY: ballY - ballR + 1, cpX: sx + 1, cpY: sy - 22, endX: sx + 2, endY: sy - 38, scale: 1.2 },
+    { startX: sx + 2, startY: ballY - ballR + 1, cpX: sx + 10, cpY: sy - 20, endX: sx + 16, endY: sy - 32, scale: 1.1 },
+    { startX: sx + 3, startY: ballY - ballR + 2, cpX: sx + 16, cpY: sy - 14, endX: sx + 24, endY: sy - 22, scale: 0.95 },
   ];
 
-  // Render flame vertical posts
-  flamePosts.forEach((p) => {
-    const postBaseX = sx + p.offX;
-    const postTopX = postBaseX + p.lean;
+  // Helper to draw a feathery asparagus fern plume spray tier
+  const drawAsparagusPlume = (px: number, py: number, width: number, angle: number) => {
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(angle);
 
-    // Dark cedar post core shadow
-    ctx.strokeStyle = '#3b1802';
-    ctx.lineWidth = 3.8;
-    ctx.lineCap = 'round';
+    // Soft layered cloud/needle spray
+    const sprayGrad = ctx.createLinearGradient(-width / 2, 0, width / 2, 0);
+    sprayGrad.addColorStop(0, '#10b981');
+    sprayGrad.addColorStop(0.5, '#34d399');
+    sprayGrad.addColorStop(1, '#6ee7b7');
+    ctx.fillStyle = sprayGrad;
+
+    // Airy horizontal feather spray ellipse
     ctx.beginPath();
-    ctx.moveTo(postBaseX, baseY);
-    ctx.quadraticCurveTo(postBaseX + p.lean * 0.4, (baseY + p.topY) * 0.5, postTopX, p.topY);
-    ctx.stroke();
+    ctx.ellipse(0, 0, width / 2, 3.2, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Post Body with warm Japanese cedar tones
-    ctx.strokeStyle = p.cedarCol;
-    ctx.lineWidth = 2.6;
-    ctx.beginPath();
-    ctx.moveTo(postBaseX, baseY);
-    ctx.quadraticCurveTo(postBaseX + p.lean * 0.4, (baseY + p.topY) * 0.5, postTopX, p.topY);
-    ctx.stroke();
-
-    // Bamboo joints / node rings on posts
-    const nodeCount = 3;
-    for (let n = 1; n <= nodeCount; n++) {
-      const nt = n / (nodeCount + 1);
-      const nx = postBaseX + p.lean * nt;
-      const ny = baseY + (p.topY - baseY) * nt;
-      ctx.fillStyle = '#f59e0b';
+    // Fine delicate needle strokes across the plume spray
+    ctx.strokeStyle = '#86efac';
+    ctx.lineWidth = 0.55;
+    const needleCount = 6;
+    for (let i = -needleCount / 2; i <= needleCount / 2; i++) {
+      const nx = (i / (needleCount / 2)) * (width * 0.42);
       ctx.beginPath();
-      ctx.ellipse(nx, ny, 2.0, 1.1, 0.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#451a03';
-      ctx.lineWidth = 0.5;
+      ctx.moveTo(nx, -2.5);
+      ctx.lineTo(nx + 1.2, 2.5);
       ctx.stroke();
     }
 
-    // Tapered flame-tip post peak with brass cap
-    ctx.fillStyle = '#fef08a';
+    ctx.restore();
+  };
+
+  // Draw each wiry stem and its tiered feathery sprays
+  frondStems.forEach((f) => {
+    // Slender wiry olive-green stem
+    ctx.strokeStyle = '#166534';
+    ctx.lineWidth = 0.9;
     ctx.beginPath();
-    ctx.ellipse(postTopX, p.topY - 1, 1.8, 1.2, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  // Sculptural Sweeping Flame-Crest Top Rails (Upper, Mid, Lower Arches)
-  ctx.strokeStyle = '#451a03';
-  ctx.lineWidth = 2.8;
-  ctx.beginPath();
-  ctx.moveTo(sx - 18, sy - 9);
-  ctx.bezierCurveTo(sx - 12, sy - 26, sx - 5, sy - 23, sx + 2, sy - 16);
-  ctx.bezierCurveTo(sx + 7, sy - 24, sx + 13, sy - 22, sx + 18, sy - 10);
-  ctx.stroke();
-
-  ctx.strokeStyle = '#d97706';
-  ctx.lineWidth = 2.0;
-  ctx.beginPath();
-  ctx.moveTo(sx - 18, sy - 10);
-  ctx.bezierCurveTo(sx - 12, sy - 27, sx - 5, sy - 24, sx + 2, sy - 17);
-  ctx.bezierCurveTo(sx + 7, sy - 25, sx + 13, sy - 23, sx + 18, sy - 11);
-  ctx.stroke();
-
-  // Mid Rail
-  ctx.strokeStyle = '#78350f';
-  ctx.lineWidth = 2.0;
-  ctx.beginPath();
-  ctx.moveTo(sx - 18, sy - 1);
-  ctx.bezierCurveTo(sx - 9, sy - 10, sx + 9, sy - 8, sx + 18, sy - 2);
-  ctx.stroke();
-
-  // Lower Base Rail
-  ctx.strokeStyle = '#92400e';
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  ctx.moveTo(sx - 18, sy + 7);
-  ctx.bezierCurveTo(sx - 7, sy + 3, sx + 7, sy + 3, sx + 18, sy + 7);
-  ctx.stroke();
-
-  // Interwoven Diagonal Bamboo Flame Lattice Weave (STRICTLY CLIPPED WITHIN OUTER POSTS)
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(sx - 18, sy - 28, 36, baseY - (sy - 28) + 1);
-  ctx.clip();
-
-  ctx.strokeStyle = '#f59e0b';
-  ctx.lineWidth = 1.2;
-  for (let i = -1; i <= 6; i++) {
-    const xStart = startX + i * 6.5;
-    ctx.beginPath();
-    ctx.moveTo(xStart, baseY - 2);
-    ctx.lineTo(xStart + 12, sy - 20 + Math.abs(i - 2) * 2.2);
+    ctx.moveTo(f.startX, f.startY);
+    ctx.quadraticCurveTo(f.cpX, f.cpY, f.endX, f.endY);
     ctx.stroke();
-  }
 
-  ctx.strokeStyle = '#d97706';
-  ctx.lineWidth = 1.2;
-  for (let i = 0; i <= 7; i++) {
-    const xStart = startX + i * 6.5;
-    ctx.beginPath();
-    ctx.moveTo(xStart, baseY - 2);
-    ctx.lineTo(xStart - 12, sy - 20 + Math.abs(i - 4) * 2.2);
-    ctx.stroke();
-  }
-  ctx.restore();
+    // 3 tiered planar feathery sprays along each stem
+    const tiers = [0.45, 0.72, 1.0];
+    tiers.forEach((t, tIdx) => {
+      // Interpolate position along quadratic curve
+      const p1X = (1 - t) * f.startX + t * f.cpX;
+      const p1Y = (1 - t) * f.startY + t * f.cpY;
+      const p2X = (1 - t) * f.cpX + t * f.endX;
+      const p2Y = (1 - t) * f.cpY + t * f.endY;
+      const curX = (1 - t) * p1X + t * p2X;
+      const curY = (1 - t) * p1Y + t * p2Y;
 
-  // Traditional dark twine knots & brass fasteners on posts
-  flamePosts.forEach((p) => {
-    const postBaseX = sx + p.offX;
-    const heights = [sy + 7, sy - 4, (sy + p.topY) * 0.5];
+      const plumeW = (12 + (3 - tIdx) * 3) * f.scale;
+      const plumeAngle = (f.endX - f.startX) * 0.025;
 
-    heights.forEach((hY) => {
-      if (hY > p.topY + 3 && hY < baseY) {
-        ctx.strokeStyle = '#1e1b4b';
-        ctx.lineWidth = 1.1;
-        ctx.beginPath();
-        ctx.moveTo(postBaseX - 2.0, hY - 2.0);
-        ctx.lineTo(postBaseX + 2.0, hY + 2.0);
-        ctx.moveTo(postBaseX + 2.0, hY - 2.0);
-        ctx.lineTo(postBaseX - 2.0, hY + 2.0);
-        ctx.stroke();
-
-        ctx.fillStyle = '#fef08a';
-        ctx.beginPath();
-        ctx.arc(postBaseX, hY, 0.9, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      drawAsparagusPlume(curX, curY, plumeW, plumeAngle);
     });
   });
 
-  // Emerald moss cushions at post bases
-  flamePosts.forEach((p, idx) => {
-    const postBaseX = sx + p.offX;
-    ctx.fillStyle = idx % 2 === 0 ? '#10b981' : '#059669';
+  // Top wispy plume highlights
+  ctx.fillStyle = 'rgba(167, 243, 208, 0.4)';
+  ctx.beginPath();
+  ctx.arc(sx + 1, sy - 36, 4, 0, Math.PI * 2);
+  ctx.arc(sx - 10, sy - 30, 3.5, 0, Math.PI * 2);
+  ctx.arc(sx + 14, sy - 28, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
+ * Complete standalone vector rendering for Japanese Garden Water Feature:
+ * An authentic shishi-odoshi (deer scarer) bamboo fountain dripping into a carved stone basin (tsukubai)
+ * with gentle animated water ripples, bamboo pivot arm, moss, and pebbles.
+ */
+export function renderWaterFeature(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+) {
+  // Ground water shadow & damp earth
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 14, 25, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Smooth natural stone basin (Tsukubai water basin) body
+  const stoneGrad = ctx.createRadialGradient(sx, sy + 4, 3, sx, sy + 4, 22);
+  stoneGrad.addColorStop(0, '#475569');
+  stoneGrad.addColorStop(0.6, '#334155');
+  stoneGrad.addColorStop(1, '#1e293b');
+  ctx.fillStyle = stoneGrad;
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 4, 22, 13, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#64748b';
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+
+  // Water pool inside stone basin
+  const waterGrad = ctx.createRadialGradient(sx, sy + 3, 2, sx, sy + 3, 16);
+  waterGrad.addColorStop(0, '#38bdf8');
+  waterGrad.addColorStop(0.5, '#0284c7');
+  waterGrad.addColorStop(1, '#0c4a6e');
+  ctx.fillStyle = waterGrad;
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 3, 16, 8.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Animated concentric water ripple rings in basin
+  const rTime = Date.now() * 0.003;
+  for (let rip = 0; rip < 2; rip++) {
+    const ripRad = ((rTime * 14 + rip * 7) % 12) + 2;
+    const ripAlpha = Math.max(0, 1 - ripRad / 13) * 0.85;
+    ctx.strokeStyle = `rgba(186, 230, 253, ${ripAlpha})`;
+    ctx.lineWidth = 1.0;
     ctx.beginPath();
-    ctx.arc(postBaseX, baseY + 1, 2.0, 0, Math.PI * 2);
+    ctx.ellipse(sx, sy + 3, ripRad, ripRad * 0.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Slender bamboo intake spout (kakehi) arriving from upper left
+  ctx.strokeStyle = '#15803d'; // Green bamboo
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(sx - 24, sy - 22);
+  ctx.lineTo(sx - 4, sy - 14);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#4ade80'; // Bamboo highlight
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(sx - 23, sy - 23);
+  ctx.lineTo(sx - 5, sy - 15);
+  ctx.stroke();
+
+  // Bamboo node joints
+  ctx.fillStyle = '#86efac';
+  ctx.beginPath();
+  ctx.ellipse(sx - 14, sy - 18, 1.8, 3.2, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pivoting bamboo rocker arm (shishi-odoshi) on vertical stand
+  // Vertical pivot stand
+  ctx.fillStyle = '#166534';
+  ctx.fillRect(sx - 10, sy - 16, 4, 18);
+  ctx.strokeStyle = '#14532d';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(sx - 10, sy - 16, 4, 18);
+
+  // Pivot brass pin
+  ctx.fillStyle = '#f59e0b';
+  ctx.beginPath();
+  ctx.arc(sx - 8, sy - 10, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Rocker bamboo pipe (shishi-odoshi arm) angled gently towards basin
+  const rockAngle = Math.sin(rTime * 1.5) * 0.08 - 0.22;
+  ctx.save();
+  ctx.translate(sx - 8, sy - 10);
+  ctx.rotate(rockAngle);
+
+  // Bamboo hollow tube
+  ctx.fillStyle = '#22c55e';
+  ctx.beginPath();
+  ctx.roundRect(-10, -3, 24, 5, 2);
+  ctx.fill();
+  ctx.strokeStyle = '#15803d';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Hollow angled mouth at right tip
+  ctx.fillStyle = '#064e3b';
+  ctx.beginPath();
+  ctx.ellipse(14, -0.5, 1.5, 2.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Gentle animated water droplet falling from bamboo mouth into basin
+  const dropProgress = (rTime * 2.5) % 1;
+  const dropY = sy - 8 + dropProgress * 10;
+  ctx.fillStyle = '#7dd3fc';
+  ctx.beginPath();
+  ctx.ellipse(sx, dropY, 1.2, 2.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Lush emerald moss cushions and smooth pebbles nestled around stone basin base
+  const mossClumps = [
+    { x: sx - 18, y: sy + 12, r: 4.5, c: '#16a34a' },
+    { x: sx - 22, y: sy + 8, r: 3.5, c: '#22c55e' },
+    { x: sx + 18, y: sy + 11, r: 4.8, c: '#16a34a' },
+    { x: sx + 22, y: sy + 7, r: 3.2, c: '#4ade80' },
+    { x: sx - 4, y: sy + 15, r: 3.8, c: '#15803d' },
+    { x: sx + 8, y: sy + 14, r: 4.0, c: '#22c55e' },
+  ];
+  mossClumps.forEach((m) => {
+    ctx.fillStyle = m.c;
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
     ctx.fill();
   });
+
+  // Small companion pebbles
+  ctx.fillStyle = '#64748b';
+  ctx.beginPath();
+  ctx.ellipse(sx - 14, sy + 15, 3.5, 2.2, 0.3, 0, Math.PI * 2);
+  ctx.ellipse(sx + 14, sy + 15, 3.8, 2.4, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
+ * Backward compatibility alias for Water Feature
+ */
+export const renderWovenWall = renderWaterFeature;
+
+/**
+ * Complete standalone vector rendering for Bamboo Fence (Takegaki):
+ * Slender green and tan bamboo stalks closely lashed together with black hemp twine cords.
+ * Renders horizontally (top/bottom edge) or vertically (left/right edge).
+ */
+export function renderBambooFence(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  orientation: 'horizontal' | 'vertical' = 'horizontal',
+  isGhost = false,
+) {
+  ctx.save();
+  if (isGhost) {
+    ctx.globalAlpha = 0.7;
+  }
+
+  if (orientation === 'horizontal') {
+    // Spans full width of tile (cellW = 72px), centered at (sx, sy)
+    const fenceWidth = SANCTUARY_GRID.cellW - 2; // ~70px
+    const fenceHeight = 14;
+    const xLeft = sx - fenceWidth / 2;
+    const yTop = sy - fenceHeight / 2;
+
+    // Ground shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + 6, fenceWidth / 2, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Vertical slender bamboo stalks (Takegaki)
+    const stalkCount = 11;
+    const stalkSpacing = fenceWidth / (stalkCount - 1);
+    for (let i = 0; i < stalkCount; i++) {
+      const bx = xLeft + i * stalkSpacing;
+      const isPost = i === 0 || i === stalkCount - 1 || i === Math.floor(stalkCount / 2);
+      const stalkW = isPost ? 4.2 : 3.2;
+
+      // Bamboo stalk body (alternating natural green & warm tan bamboo tones)
+      const bambooGrad = ctx.createLinearGradient(bx - stalkW / 2, 0, bx + stalkW / 2, 0);
+      if (i % 2 === 0) {
+        bambooGrad.addColorStop(0, '#15803d');
+        bambooGrad.addColorStop(0.5, '#4ade80');
+        bambooGrad.addColorStop(1, '#166534');
+      } else {
+        bambooGrad.addColorStop(0, '#854d0e');
+        bambooGrad.addColorStop(0.5, '#facc15');
+        bambooGrad.addColorStop(1, '#713f12');
+      }
+      ctx.fillStyle = bambooGrad;
+      ctx.beginPath();
+      ctx.roundRect(bx - stalkW / 2, yTop - 1, stalkW, fenceHeight + 2, 1);
+      ctx.fill();
+      ctx.strokeStyle = '#14532d';
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+
+      // Bamboo joint rings
+      ctx.fillStyle = '#fef08a';
+      ctx.fillRect(bx - stalkW / 2, yTop + 3.5, stalkW, 1.2);
+      ctx.fillRect(bx - stalkW / 2, yTop + 9.5, stalkW, 1.2);
+    }
+
+    // Two horizontal bamboo cross rails (top rail and bottom rail)
+    const railH = 2.8;
+    const topRailY = yTop + 3;
+    const botRailY = yTop + 9;
+
+    const railGrad = ctx.createLinearGradient(0, yTop, 0, yTop + fenceHeight);
+    railGrad.addColorStop(0, '#a16207');
+    railGrad.addColorStop(1, '#713f12');
+    ctx.fillStyle = railGrad;
+
+    ctx.fillRect(xLeft, topRailY, fenceWidth, railH);
+    ctx.fillRect(xLeft, botRailY, fenceWidth, railH);
+    ctx.strokeStyle = '#451a03';
+    ctx.lineWidth = 0.7;
+    ctx.strokeRect(xLeft, topRailY, fenceWidth, railH);
+    ctx.strokeRect(xLeft, botRailY, fenceWidth, railH);
+
+    // Black hemp twine cross-lashings (X ties) on posts and rails
+    for (let i = 0; i < stalkCount; i += 2) {
+      const bx = xLeft + i * stalkSpacing;
+      [topRailY + 1.4, botRailY + 1.4].forEach((ry) => {
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(bx - 2, ry - 2); ctx.lineTo(bx + 2, ry + 2);
+        ctx.moveTo(bx - 2, ry + 2); ctx.lineTo(bx + 2, ry - 2);
+        ctx.stroke();
+      });
+    }
+  } else {
+    // Vertical takegaki: spans full height of tile (cellH = 74px), centered at (sx, sy)
+    const fenceWidth = 14;
+    const fenceHeight = SANCTUARY_GRID.cellH - 2; // ~72px
+    const xLeft = sx - fenceWidth / 2;
+    const yTop = sy - fenceHeight / 2;
+
+    // Ground shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + fenceHeight / 2 + 1, 6, 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Vertical main bamboo posts (left, center, right)
+    const posts = [sx - 4.5, sx, sx + 4.5];
+    posts.forEach((px, pIdx) => {
+      const stalkW = 3.6;
+      const bGrad = ctx.createLinearGradient(px - stalkW / 2, 0, px + stalkW / 2, 0);
+      if (pIdx === 1) {
+        bGrad.addColorStop(0, '#854d0e');
+        bGrad.addColorStop(0.5, '#facc15');
+        bGrad.addColorStop(1, '#713f12');
+      } else {
+        bGrad.addColorStop(0, '#15803d');
+        bGrad.addColorStop(0.5, '#4ade80');
+        bGrad.addColorStop(1, '#166534');
+      }
+      ctx.fillStyle = bGrad;
+      ctx.beginPath();
+      ctx.roundRect(px - stalkW / 2, yTop, stalkW, fenceHeight, 1);
+      ctx.fill();
+      ctx.strokeStyle = '#14532d';
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+    });
+
+    // Horizontal bamboo cross bars spaced down the height
+    const barCount = 7;
+    const barSpacing = fenceHeight / (barCount + 1);
+    for (let b = 1; b <= barCount; b++) {
+      const by = yTop + b * barSpacing;
+      ctx.fillStyle = '#713f12';
+      ctx.fillRect(xLeft + 0.5, by - 1.2, fenceWidth - 1, 2.4);
+      ctx.strokeStyle = '#451a03';
+      ctx.lineWidth = 0.6;
+      ctx.strokeRect(xLeft + 0.5, by - 1.2, fenceWidth - 1, 2.4);
+
+      // Black hemp twine cross lashing in center
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(sx - 2, by - 2); ctx.lineTo(sx + 2, by + 2);
+      ctx.moveTo(sx - 2, by + 2); ctx.lineTo(sx + 2, by - 2);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
 }
 
 
@@ -6696,6 +7661,30 @@ export default function App() {
   const [guidebookChapter, setGuidebookChapter] = useState<number>(1);
   const [isUnifiedStorageOpen, setIsUnifiedStorageOpen] = useState(false);
   const [isPlantingModalOpen, setIsPlantingModalOpen] = useState(false);
+  const [isBonsaiSocietyOpen, setIsBonsaiSocietyOpen] = useState(false);
+  const isBonsaiSocietyOpenRef = useRef(false);
+  isBonsaiSocietyOpenRef.current = isBonsaiSocietyOpen;
+
+  const handleCloseBonsaiSociety = useCallback(() => {
+    setIsBonsaiSocietyOpen(false);
+    isBonsaiSocietyOpenRef.current = false;
+    avatarRef.current.vx = 0;
+    avatarRef.current.vy = 0;
+    avatarRef.current.isMoving = false;
+    keysPressed.current = {};
+    if (inputRef.current) {
+      inputRef.current.actions = {
+        left: false,
+        right: false,
+        up: false,
+        down: false,
+        confirm: false,
+        cancel: false,
+        tap: false,
+      };
+    }
+    canvasRef.current?.focus();
+  }, []);
   const [storageTab, setStorageTab] = useState<'PLANTING' | 'MATERIALS' | 'EQUIPMENT' | 'DECOR'>('PLANTING');
   const [stylingModalSapling, setStylingModalSapling] = useState<StoredSapling | SeedlingItem | any | null>(null);
   const [isWorkbenchModalOpen, setIsWorkbenchModalOpen] = useState(false);
@@ -6712,6 +7701,8 @@ export default function App() {
   const [inspectingStructureId, setInspectingStructureId] = useState<string | null>(null);
   const [socketingPedestalId, setSocketingPedestalId] = useState<string | null>(null);
   const [quickRadialBonsai, setQuickRadialBonsai] = useState<PlantedBonsai | null>(null);
+  const quickRadialBonsaiRef = useRef<PlantedBonsai | null>(null);
+  quickRadialBonsaiRef.current = quickRadialBonsai;
   const [focusedMenuIdx, setFocusedMenuIdx] = useState<number>(0);
   const [titleMenuIdx, setTitleMenuIdx] = useState<number>(0);
   const [focusedShopIdx, setFocusedShopIdx] = useState<number>(0);
@@ -6721,6 +7712,20 @@ export default function App() {
   const [isSfxMuted, setIsSfxMuted] = useState(false);
   const [, setHudTick] = useState(0);
   const refreshHud = useCallback(() => setHudTick((t) => t + 1), []);
+
+  // Master Quests System State (Discovery, Competition, Eco Requests)
+  const masterQuestsRef = useRef<MasterQuestsState>({
+    discovery: { tier1Completed: false },
+    competition: { tier1Completed: false },
+    eco: {
+      activeRequestIndex: 0,
+      requestCounts: {},
+      completedRequests: 0,
+      tier1Completed: false,
+    },
+  });
+  const [, setMasterQuestsTick] = useState(0);
+  const refreshMasterQuests = useCallback(() => setMasterQuestsTick((t) => t + 1), []);
 
   // Fullscreen state and lock (with graceful pseudo-fullscreen fallback for sandboxed iframes)
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -6770,9 +7775,79 @@ export default function App() {
   placementPreviewRef.current = placementPreview;
   const lastPreviewPlotKeyRef = useRef<string>('');
 
-  const togglePreviewOrientation = useCallback(() => {
+  const keysPressed = useRef<Record<string, boolean>>({});
+  const radialActionKeyRef = useRef<string | null>(null);
+  const radialSafetyTimeoutRef = useRef<number | null>(null);
+  const gamepadMovementLockedRef = useRef(false);
+  const gamepadSafetyTimeoutRef = useRef<number | null>(null);
+
+  const clearRadialActionKey = useCallback(() => {
+    radialActionKeyRef.current = null;
+    if (radialSafetyTimeoutRef.current !== null) {
+      window.clearTimeout(radialSafetyTimeoutRef.current);
+      radialSafetyTimeoutRef.current = null;
+    }
+  }, []);
+
+  const setRadialActionKey = useCallback((key: string | null) => {
+    clearRadialActionKey();
+    if (key) {
+      radialActionKeyRef.current = key.toLowerCase();
+      radialSafetyTimeoutRef.current = window.setTimeout(() => {
+        radialActionKeyRef.current = null;
+        radialSafetyTimeoutRef.current = null;
+      }, 300);
+    }
+  }, [clearRadialActionKey]);
+
+  const handleCloseRadialMenu = useCallback((triggerKey?: string) => {
+    setQuickRadialBonsai(null);
+    quickRadialBonsaiRef.current = null;
+    if (triggerKey) {
+      setRadialActionKey(triggerKey);
+    } else {
+      clearRadialActionKey();
+    }
+    keysPressed.current = {};
+    gamepadMovementLockedRef.current = true;
+    if (gamepadSafetyTimeoutRef.current !== null) {
+      window.clearTimeout(gamepadSafetyTimeoutRef.current);
+    }
+    gamepadSafetyTimeoutRef.current = window.setTimeout(() => {
+      gamepadMovementLockedRef.current = false;
+      gamepadSafetyTimeoutRef.current = null;
+    }, 300);
+
+    avatarRef.current.vx = 0;
+    avatarRef.current.vy = 0;
+    avatarRef.current.isMoving = false;
+    canvasRef.current?.focus();
+  }, [clearRadialActionKey, setRadialActionKey]);
+
+  const togglePreviewOrientation = useCallback((direction: 'clockwise' | 'counter-clockwise' = 'clockwise') => {
     setPlacementPreview((prev) => {
       if (!prev) return null;
+      if (
+        prev.payload === 'bamboo_fence' ||
+        prev.item === 'bamboo_fence' ||
+        (prev as any).type === 'bamboo_fence' ||
+        (prev.category === 'decoration' && prev.payload === 'bamboo_fence')
+      ) {
+        const sides: ('top' | 'right' | 'bottom' | 'left')[] = ['top', 'right', 'bottom', 'left'];
+        const curSide = prev.fenceEdge || prev.edgeSide || 'top';
+        const curIdx = sides.indexOf(curSide);
+        const nextIdx = direction === 'clockwise'
+          ? (curIdx + 1) % 4
+          : (curIdx - 1 + 4) % 4;
+        const nextSide = sides[nextIdx];
+        const nextOrientation = (nextSide === 'top' || nextSide === 'bottom') ? 'horizontal' : 'vertical';
+        return {
+          ...prev,
+          edgeSide: nextSide,
+          fenceEdge: nextSide,
+          orientation: nextOrientation,
+        };
+      }
       const nextOrientation = prev.orientation === 'horizontal' ? 'vertical' : 'horizontal';
       return {
         ...prev,
@@ -6953,6 +8028,8 @@ export default function App() {
     electronic_chips: 0,
     organic_waste: 0,
     organic_compost: 0,
+    biochemicals: 0,
+    fertilizer: 0,
     seedlingList: [],
     storedBonsais: [],
     scrapMetal: 0,
@@ -6987,18 +8064,31 @@ export default function App() {
     irrigation_t3_inv: 0,
     decor_pebble_path_inv: 0,
     decor_rock_formation_inv: 0,
+    zen_rock_formation_inv: 0,
     decor_shrubbery_bush_inv: 0,
+    growing_bamboo_formation_inv: 0,
+    asparagus_fern_ball_inv: 0,
     decor_woven_wall_inv: 0,
+    water_feature_inv: 0,
     torii_gate_inv: 0,
     crystal_pedestal_foliage_inv: 0,
     crystal_pedestal_branches_inv: 0,
     crystal_pedestal_trunk_inv: 0,
     crystal_pedestal_roots_inv: 0,
+    empty_crystal_pedestal_inv: 0,
+    crystals: [],
     decorations: {
       pebblePath: 0,
       rockFormation: 0,
+      zenRockFormation: 0,
+      zen_rock_formation: 0,
       shrubbery: 0,
+      growingBamboo: 0,
+      growing_bamboo_formation: 0,
+      asparagusFernBall: 0,
+      asparagus_fern_ball: 0,
       wovenWall: 0,
+      waterFeature: 0,
       toriiGate: 0,
     },
     tool_compost_heap_inv: 0,
@@ -7497,6 +8587,12 @@ export default function App() {
       if (notificationTimeoutRef.current) {
         window.clearTimeout(notificationTimeoutRef.current);
       }
+      if (radialSafetyTimeoutRef.current !== null) {
+        window.clearTimeout(radialSafetyTimeoutRef.current);
+      }
+      if (gamepadSafetyTimeoutRef.current !== null) {
+        window.clearTimeout(gamepadSafetyTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -7680,6 +8776,7 @@ export default function App() {
     (c: number, r: number, excludeStructId?: string): boolean => {
       return deployedStructuresRef.current.some((s) => {
         if (excludeStructId && s.id === excludeStructId) return false;
+        if (s.type === 'bamboo_fence') return false; // Fences are boundary edge entities and do not occupy plot interiors
         const sCol = Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
         const sRow = Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
         if (s.type === 'torii_gate') {
@@ -8045,7 +9142,7 @@ export default function App() {
             saplingGroup: chosenLeaf.group,
             saplingMaturity: chosenMaturity,
             saplingSpecies: chosenLeaf.id,
-            saplingName: `[${chosenLeaf.group}] ${chosenLeaf.name} (${matDef.kanji} ${matDef.name})`,
+            saplingName: `${getSpeciesName(chosenLeaf.id)} Bonsai`,
             saplingRarity: chosenLeaf.rarity,
             spawnChance,
             collected: false,
@@ -8232,7 +9329,7 @@ export default function App() {
       const totalSaplings = back.saplings.length;
       const retainedSaplingCount = Math.floor(totalSaplings * retention);
       const saplingBreakdown = back.saplings.map((sap, idx) => ({
-        name: sap.name,
+        name: getBonsaiDisplayName(sap),
         leafType: sap.leafType,
         group: sap.group,
         maturity: sap.maturity || 'sprout',
@@ -8314,13 +9411,14 @@ export default function App() {
           const pickedNature = (sap as any).nature
             ? getBonsaiNature((sap as any).nature)
             : BONSAI_NATURES[Math.floor(Math.random() * BONSAI_NATURES.length)];
+          const bName = getBonsaiDisplayName(lType);
           const seedlingItem: SeedlingItem = {
             id: uniqueId,
             leafType: lType,
             group: sap.group || getLeafTypeDef(lType).group,
             maturity: mat,
             species: lType,
-            name: sap.name,
+            name: bName,
             rarity: sap.rarity,
             nature: pickedNature,
             color: sap.color || getLeafTypeDef(lType).color,
@@ -8342,7 +9440,7 @@ export default function App() {
             group: sap.group,
             maturity: mat,
             species: lType,
-            name: sap.name,
+            name: bName,
             rarity: sap.rarity,
             count: 1,
             color: sap.color,
@@ -8592,7 +9690,7 @@ export default function App() {
         nodeId: node.id,
         tileX: node.tileX,
         tileY: node.tileY,
-        saplingName: node.saplingName || `[${group}] ${leafDef.name} (${matDef.kanji} ${matDef.name})`,
+        saplingName: node.saplingName || getBonsaiDisplayName(leafType),
         leafType,
         group,
         maturity,
@@ -8688,8 +9786,7 @@ export default function App() {
         triggerNotification('🏕️ At Campsite Base! Click [Unload Haul] or press [Enter] to safely return with 100% loot.', '#10b981');
       }
 
-      const key = `${rover.tileX},${rover.tileY}`;
-      const node = excursionNodesRef.current.get(key);
+      const node = findNearbyExcursionNode();
 
       if (node && !node.collected) {
         if (node.type === 'RESOURCE' && node.resourceType) {
@@ -8727,10 +9824,11 @@ export default function App() {
         } else if (node.type === 'SAPLING') {
           const curWeight = getCargoWeight();
           const maxWeight = getMaxRoverCargo();
+          const dName = getBonsaiDisplayName(node.saplingLeafType || node.saplingSpecies);
           if (curWeight + ITEM_WEIGHTS.sapling <= maxWeight) {
-            triggerNotification(`Found ${node.saplingName || 'Wild Seedling'}! Press [E] to Excavate (3.0kg).`, '#34d399');
+            triggerNotification(`Found ${dName}! Press [E] to Excavate (3.0kg).`, '#34d399');
           } else {
-            triggerNotification(`Found ${node.saplingName || 'Wild Seedling'}! [Backpack Full (3.0kg)]`, '#ef4444');
+            triggerNotification(`Found ${dName}! [Backpack Full (3.0kg)]`, '#ef4444');
           }
         } else if (node.type === 'CRYSTAL') {
           const curWeight = getCargoWeight();
@@ -8840,6 +9938,8 @@ export default function App() {
       electronic_chips: 0,
       organic_waste: 0,
       organic_compost: 0,
+      biochemicals: 0,
+      fertilizer: 0,
       seedlingList: [],
       storedBonsais: [],
       scrapMetal: 0,
@@ -8874,18 +9974,31 @@ export default function App() {
       irrigation_t3_inv: 0,
       decor_pebble_path_inv: 0,
       decor_rock_formation_inv: 0,
+      zen_rock_formation_inv: 0,
       decor_shrubbery_bush_inv: 0,
+      growing_bamboo_formation_inv: 0,
+      asparagus_fern_ball_inv: 0,
       decor_woven_wall_inv: 0,
+      water_feature_inv: 0,
       torii_gate_inv: 0,
       crystal_pedestal_foliage_inv: 0,
       crystal_pedestal_branches_inv: 0,
       crystal_pedestal_trunk_inv: 0,
       crystal_pedestal_roots_inv: 0,
+      empty_crystal_pedestal_inv: 0,
+      crystals: [],
       decorations: {
         pebblePath: 0,
         rockFormation: 0,
+        zenRockFormation: 0,
+        zen_rock_formation: 0,
         shrubbery: 0,
+        growingBamboo: 0,
+        growing_bamboo_formation: 0,
+        asparagusFernBall: 0,
+        asparagus_fern_ball: 0,
         wovenWall: 0,
+        waterFeature: 0,
         toriiGate: 0,
       },
       tool_compost_heap_inv: 0,
@@ -9056,6 +10169,17 @@ export default function App() {
     setIsBiomeSelectOpen(false);
     setIsGoalModalOpen(false);
     setIsNearBonsaiSociety(false);
+    setIsBonsaiSocietyOpen(false);
+    masterQuestsRef.current = {
+      discovery: { tier1Completed: false },
+      competition: { tier1Completed: false },
+      eco: {
+        activeRequestIndex: 0,
+        requestCounts: {},
+        completedRequests: 0,
+        tier1Completed: false,
+      },
+    };
     setWorkbenchTab('resources');
 
     setGameState({
@@ -9086,12 +10210,30 @@ export default function App() {
     refreshHud();
   }, [revealAreaSpecies, refreshHud, triggerNotification]);
 
+  // Helper to locate active/anomaly site at current tile or adjacent (for crystals and seedlings)
+  const findNearbyExcursionNode = useCallback(() => {
+    const rover = roverRef.current;
+    const currentKey = `${rover.tileX},${rover.tileY}`;
+    const exactNode = excursionNodesRef.current.get(currentKey);
+    if (exactNode && !exactNode.collected) return exactNode;
+    // Check adjacent tiles if player is right next to an anomaly/site
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        const k = `${rover.tileX + dx},${rover.tileY + dy}`;
+        const n = excursionNodesRef.current.get(k);
+        if (n && !n.collected && (n.type === 'CRYSTAL' || n.type === 'SAPLING' || n.type === 'RESOURCE')) {
+          return n;
+        }
+      }
+    }
+    return null;
+  }, []);
+
   // Voluntary Harvest of Resource Node at Rover Tile
   const collectCurrentRoverResource = useCallback(() => {
     if (locationRef.current !== 'EXCURSION' || digStateRef.current.active || excursionReport || excavationResult) return;
-    const rover = roverRef.current;
-    const key = `${rover.tileX},${rover.tileY}`;
-    const node = excursionNodesRef.current.get(key);
+    const node = findNearbyExcursionNode();
 
     if (node && !node.collected && node.type === 'RESOURCE' && node.resourceType) {
       const rt = node.resourceType;
@@ -9211,7 +10353,13 @@ export default function App() {
       if (bonsaiIdx === -1) return;
 
       const bonsai = plantedBonsaisRef.current[bonsaiIdx];
-      const payout = calculateDonationValue(bonsai);
+      const basePayout = calculateDonationValue(bonsai);
+
+      // Check Eco Quest active Botanical Request matching
+      const eco = masterQuestsRef.current.eco;
+      const match = checkMatchesEcoRequest(bonsai, eco.activeRequestIndex, eco.requestCounts);
+      const isMatch = match.matches;
+      const finalPayout = isMatch ? Number((basePayout * 2).toFixed(2)) : basePayout;
 
       const inv = sanctuaryInventoryRef.current;
       if (bonsai.automatonTier > 0) {
@@ -9224,15 +10372,45 @@ export default function App() {
         inv[oldKey] += 1;
       }
 
-      inv.coins = Number((inv.coins + payout).toFixed(2));
+      inv.coins = Number((inv.coins + finalPayout).toFixed(2));
       plantedBonsaisRef.current.splice(bonsaiIdx, 1);
       invalidateSynergiesCache();
 
-      gameAudio.playCoinPickup();
-      addFloatingText(bonsai.x, bonsai.y - 50, `+${payout.toFixed(2)} Verdure!`, '#34d399');
-      triggerNotification(
-        `🌱 Donated ${bonsai.name} (Lv.${bonsai.level}) to ecological restoration for +${payout.toFixed(2)} Verdure!${bonsai.automatonTier > 0 ? ' (Automaton returned to inventory)' : ''}`,
-        '#10b981',
+      if (isMatch && match.key) {
+        eco.requestCounts[match.key] = (eco.requestCounts[match.key] || 0) + 1;
+        if (isEcoRequestComplete(eco.activeRequestIndex, eco.requestCounts)) {
+          const finishedNum = eco.activeRequestIndex + 1;
+          eco.completedRequests = Math.min(10, eco.completedRequests + 1);
+          eco.activeRequestIndex = Math.min(10, eco.activeRequestIndex + 1);
+          eco.requestCounts = {};
+          gameAudio.playVictoryFanfare();
+          triggerNotification(
+            `🎉 Eco Request #${finishedNum} Completed!${finishedNum < 10 ? ` (Advanced to Request #${finishedNum + 1})` : ' (All 10 Requests Finished - Complete Tier 1 at Bonsai Society!)'}`,
+            '#facc15',
+            4500,
+          );
+        } else {
+          gameAudio.playPowerupChime();
+          triggerNotification(
+            `🌟 Eco Request Progress! (+${finalPayout.toFixed(2)} Verdure - 2x Bonus)`,
+            '#34d399',
+            3500,
+          );
+        }
+        refreshMasterQuests();
+      } else {
+        gameAudio.playCoinPickup();
+        triggerNotification(
+          `🌱 Donated ${getBonsaiDisplayName(bonsai)} (Lv.${bonsai.level}) to ecological restoration for +${finalPayout.toFixed(2)} Verdure!${bonsai.automatonTier > 0 ? ' (Automaton returned to inventory)' : ''}`,
+          '#10b981',
+        );
+      }
+
+      addFloatingText(
+        bonsai.x,
+        bonsai.y - 50,
+        `+${finalPayout.toFixed(2)} Verdure!${isMatch ? ' (🌟 2x Eco Match)' : ''}`,
+        isMatch ? '#facc15' : '#34d399',
       );
 
       if (inspectingBonsaiId === bonsaiId) {
@@ -9240,7 +10418,7 @@ export default function App() {
       }
       refreshHud();
     },
-    [addFloatingText, inspectingBonsaiId, refreshHud, triggerNotification],
+    [addFloatingText, inspectingBonsaiId, refreshHud, refreshMasterQuests, triggerNotification],
   );
   const sellPlantedBonsai = donatePlantedBonsai;
 
@@ -9250,19 +10428,83 @@ export default function App() {
       if (idx === -1) return;
 
       const bonsai = storedPottedBonsaisRef.current[idx];
-      const payout = calculateDonationValue(bonsai);
+      const basePayout = calculateDonationValue(bonsai);
 
-      sanctuaryInventoryRef.current.coins = Number((sanctuaryInventoryRef.current.coins + payout).toFixed(2));
+      // Check Eco Quest active Botanical Request matching
+      const eco = masterQuestsRef.current.eco;
+      const match = checkMatchesEcoRequest(bonsai, eco.activeRequestIndex, eco.requestCounts);
+      const isMatch = match.matches;
+      const finalPayout = isMatch ? Number((basePayout * 2).toFixed(2)) : basePayout;
+
+      sanctuaryInventoryRef.current.coins = Number(
+        (sanctuaryInventoryRef.current.coins + finalPayout).toFixed(2),
+      );
       storedPottedBonsaisRef.current.splice(idx, 1);
       sanctuaryInventoryRef.current.storedBonsais = storedPottedBonsaisRef.current;
 
-      gameAudio.playCoinPickup();
-      triggerNotification(`🌱 Donated stored ${bonsai.name} (Lv.${bonsai.level}) to ecological restoration for +${payout.toFixed(2)} Verdure!`, '#10b981');
+      if (isMatch && match.key) {
+        eco.requestCounts[match.key] = (eco.requestCounts[match.key] || 0) + 1;
+        if (isEcoRequestComplete(eco.activeRequestIndex, eco.requestCounts)) {
+          const finishedNum = eco.activeRequestIndex + 1;
+          eco.completedRequests = Math.min(10, eco.completedRequests + 1);
+          eco.activeRequestIndex = Math.min(10, eco.activeRequestIndex + 1);
+          eco.requestCounts = {};
+          gameAudio.playVictoryFanfare();
+          triggerNotification(
+            `🎉 Eco Request #${finishedNum} Completed!${finishedNum < 10 ? ` (Advanced to Request #${finishedNum + 1})` : ' (All 10 Requests Finished - Complete Tier 1 at Bonsai Society!)'}`,
+            '#facc15',
+            4500,
+          );
+        } else {
+          gameAudio.playPowerupChime();
+          triggerNotification(
+            `🌟 Eco Request Progress! (+${finalPayout.toFixed(2)} Verdure - 2x Bonus)`,
+            '#34d399',
+            3500,
+          );
+        }
+        refreshMasterQuests();
+      } else {
+        gameAudio.playCoinPickup();
+        triggerNotification(
+          `🌱 Donated stored ${getBonsaiDisplayName(bonsai)} (Lv.${bonsai.level}) for +${finalPayout.toFixed(2)} Verdure!`,
+          '#10b981',
+        );
+      }
+
       refreshHud();
     },
-    [refreshHud, triggerNotification],
+    [refreshHud, refreshMasterQuests, triggerNotification],
   );
   const sellStoredPottedBonsai = donateStoredPottedBonsai;
+
+  // --- BONSAI MASTER QUEST: TIER 1 COMPLETION HANDLERS ---
+  const handleCompleteDiscoveryTier1 = useCallback(() => {
+    if (masterQuestsRef.current.discovery.tier1Completed) return;
+    masterQuestsRef.current.discovery.tier1Completed = true;
+    sanctuaryInventoryRef.current.coins = Number((sanctuaryInventoryRef.current.coins + 250).toFixed(2));
+    sanctuaryInventoryRef.current.zen_essence += 5;
+    gameAudio.playVictoryFanfare();
+    triggerNotification('🎉 Discovery Quest Tier 1 Completed! (+250 Verdure, 🌸 +5 Zen Points)', '#10b981', 4500);
+    refreshMasterQuests();
+    refreshHud();
+  }, [refreshMasterQuests, refreshHud, triggerNotification]);
+
+  const handleCompleteCompetitionTier1 = useCallback(() => {
+    gameAudio.playErrorBuzz();
+    triggerNotification('Area 1 League challenges coming soon!', '#f59e0b', 3000);
+  }, [triggerNotification]);
+
+  const handleCompleteEcoTier1 = useCallback(() => {
+    if (masterQuestsRef.current.eco.tier1Completed) return;
+    masterQuestsRef.current.eco.tier1Completed = true;
+    sanctuaryInventoryRef.current.coins = Number((sanctuaryInventoryRef.current.coins + 500).toFixed(2));
+    sanctuaryInventoryRef.current.zen_essence += 5;
+    gameAudio.playVictoryFanfare();
+    triggerNotification('🎉 Eco Quest Tier 1 Completed! (+500 Verdure, 🌸 +5 Zen Points)', '#10b981', 4500);
+    refreshMasterQuests();
+    refreshHud();
+  }, [refreshMasterQuests, refreshHud, triggerNotification]);
 
   // --- PICK UP BONSAI INTO INVENTORY ---
   const pickUpBonsaiToInventory = useCallback(
@@ -9291,7 +10533,7 @@ export default function App() {
         style: bonsai.style || 'MOYOGI',
         maturity: bonsai.maturity || 'sprout',
         maturityRating: bonsai.maturityRating || getBonsaiMaturityRating(bonsai),
-        name: bonsai.name,
+        name: getBonsaiDisplayName(bonsai),
         rarity: bonsai.rarity,
         nature: bonsai.nature,
         level: bonsai.level,
@@ -9312,9 +10554,9 @@ export default function App() {
       invalidateSynergiesCache();
       setInspectingBonsaiId(null);
       gameAudio.playConfirmSelect();
-      addFloatingText(bonsai.x, bonsai.y - 45, `+1 ${bonsai.name} Stored!`, '#38bdf8');
+      addFloatingText(bonsai.x, bonsai.y - 45, `+1 ${getBonsaiDisplayName(bonsai)} Stored!`, '#38bdf8');
       triggerNotification(
-        `🪴 Uprooted ${bonsai.name} (Lv.${bonsai.level}) to Storage! Can be replanted anywhere later with all levels intact.`,
+        `🪴 Uprooted ${getBonsaiDisplayName(bonsai)} (Lv.${bonsai.level}) to Storage! Can be replanted anywhere later with all levels intact.`,
         '#38bdf8',
       );
       refreshHud();
@@ -9477,7 +10719,7 @@ export default function App() {
         bonsai.radius = 60;
         invalidateSynergiesCache();
         addFloatingText(bonsai.x, bonsai.y - 70, '🌟 Expanded to 2x2 Grand Bonsai!', '#f59e0b');
-        triggerNotification(`🌟 ${bonsai.name} achieved Maturity Rating 5 and expanded to a magnificent 2x2 footprint!`, '#f59e0b');
+        triggerNotification(`🌟 ${getBonsaiDisplayName(bonsai)} achieved Maturity Rating 5 and expanded to a magnificent 2x2 footprint!`, '#f59e0b');
       }
 
       // Calculate Proximity Synergies
@@ -9581,10 +10823,16 @@ export default function App() {
       }
 
       const inv = sanctuaryInventoryRef.current;
-      inv.organic_waste += 1;
+      let organicWasteCount = 1;
+      let extraWasteTriggered = false;
+      if (synergies.extraWasteChance > 0 && Math.random() < synergies.extraWasteChance) {
+        organicWasteCount += 1;
+        extraWasteTriggered = true;
+      }
+      inv.organic_waste += organicWasteCount;
       inv.organicWaste = inv.organic_waste;
 
-      // 2. Botanist EXP Reward with XP Boosted (Bush) synergy multiplier
+      // 2. Botanist EXP Reward with XP Boosted (Zen Rock Formation) synergy multiplier
       const baseExpReward = 25 + 2 * bonsai.level;
       const expReward = Math.round(baseExpReward * synergies.expMultiplier);
       gainPlayerExp(expReward);
@@ -9599,8 +10847,10 @@ export default function App() {
       addFloatingText(
         bonsai.x + (Math.random() - 0.5) * 30,
         bonsai.y - 85,
-        `+1 🍂 Organic Waste`,
-        '#a3e635',
+        extraWasteTriggered
+          ? `+${organicWasteCount} 🍂 Organic Waste (🌟 Efficient Pruning!)`
+          : `+1 🍂 Organic Waste`,
+        extraWasteTriggered ? '#facc15' : '#a3e635',
       );
 
       // Organic waste floating leaf particles
@@ -9618,7 +10868,7 @@ export default function App() {
         );
       }
 
-      triggerNotification(`🌱 ${bonsai.name} grew to Level ${bonsai.level}! (+1 🍂 Organic Waste Collected)`, '#84cc16');
+      triggerNotification(`🌱 ${getBonsaiDisplayName(bonsai)} grew to Level ${bonsai.level}! (+1 🍂 Organic Waste Collected)`, '#84cc16');
 
       // Win Condition: Cultivate any Premium (五, Rank V) Bonsai to Level 100!
       if (bonsai.maturity === 'premium' && bonsai.level >= 100) {
@@ -9713,7 +10963,7 @@ export default function App() {
       }
 
       addFloatingText(bonsai.x, bonsai.y - 45, `🌾 -${timeReduction.toFixed(0)}s Boost! (+${expReward} EXP)`, '#84cc16');
-      triggerNotification(`🌾 Applied Organic Compost to ${bonsai.name}! Shaved -${timeReduction.toFixed(0)}s (+${expReward} EXP)`, '#84cc16');
+      triggerNotification(`🌾 Applied Organic Compost to ${getBonsaiDisplayName(bonsai)}! Shaved -${timeReduction.toFixed(0)}s (+${expReward} EXP)`, '#84cc16');
 
       // Advance progress with overflow carryover
       advanceBonsaiProgress(bonsai, timeReduction);
@@ -9721,6 +10971,70 @@ export default function App() {
       refreshHud();
     },
     [addFloatingText, advanceBonsaiProgress, gainPlayerExp, refreshHud, triggerNotification],
+  );
+
+  // --- APPLY FERTILIZER (+300 SECONDS / 5 MINUTES GROWTH BOOST) ---
+  const applyFertilizer = useCallback(
+    (bonsaiId: string) => {
+      const bonsai = plantedBonsaisRef.current.find((b) => b.id === bonsaiId);
+      if (!bonsai) return;
+
+      const inv = sanctuaryInventoryRef.current;
+      if ((inv.fertilizer || 0) <= 0) {
+        gameAudio.playErrorBuzz();
+        triggerNotification('No Fertilizer in stock! Craft at Fertilizer Station or buy at Market.', '#ef4444');
+        return;
+      }
+
+      if (bonsai.level >= 100) {
+        triggerNotification('Bonsai is already at Maximum Level 100 Mastery!', '#10b981');
+        return;
+      }
+
+      const synergies = getCachedBonsaiSynergies(bonsai);
+
+      if (synergies.isStalled) {
+        gameAudio.playErrorBuzz();
+        addFloatingText(bonsai.x, bonsai.y - 45, '⛔ Growth Stalled!', '#f43f5e');
+        triggerNotification(
+          `⛔ Cannot advance growth: Stalled by repetitive surroundings! (>4 ${synergies.stalledEntityLabel || 'identical neighbors'})`,
+          '#ef4444',
+        );
+        return;
+      }
+
+      inv.fertilizer = Math.max(0, (inv.fertilizer ?? 0) - 1);
+      if (inv.resources) inv.resources.fertilizer = inv.fertilizer;
+      gameAudio.playPowerupChime();
+
+      // Green & amber fertilizing particle effect
+      for (let i = 0; i < 8; i++) {
+        const pAngle = Math.random() * Math.PI * 2;
+        const pSpeed = 40 + Math.random() * 50;
+        emitParticle(
+          bonsai.x,
+          bonsai.y - 10,
+          Math.cos(pAngle) * pSpeed,
+          Math.sin(pAngle) * pSpeed - 20,
+          3.5 + Math.random() * 2.5,
+          i % 2 === 0 ? '#34d399' : '#f59e0b',
+          0.8,
+        );
+      }
+
+      // Boosts growth progress by 300 seconds (5 minutes)!
+      const timeReduction = 300;
+      addFloatingText(bonsai.x, bonsai.y - 45, `🧪 -300s Fertilizer Boost!`, '#34d399');
+      triggerNotification(
+        `🧪 Applied Fertilizer to ${getBonsaiDisplayName(bonsai)}! Boosted growth progress by 300s (5 minutes)!`,
+        '#10b981',
+      );
+
+      // Advance progress with overflow carryover
+      advanceBonsaiProgress(bonsai, timeReduction);
+      refreshHud();
+    },
+    [addFloatingText, advanceBonsaiProgress, emitParticle, getCachedBonsaiSynergies, refreshHud, triggerNotification],
   );
 
   // --- ECONOMY: BUY GUIDEBOOKS & BLUEPRINTS ---
@@ -9864,8 +11178,13 @@ export default function App() {
       decorType:
         | 'decor_pebble_path'
         | 'decor_rock_formation'
+        | 'zen_rock_formation'
         | 'decor_shrubbery_bush'
+        | 'growing_bamboo_formation'
+        | 'asparagus_fern_ball'
         | 'decor_woven_wall'
+        | 'water_feature'
+        | 'bamboo_fence'
         | 'torii_gate'
         | 'empty_crystal_pedestal'
         | 'crystal_pedestal_foliage'
@@ -9880,14 +11199,48 @@ export default function App() {
         inv.coins = Number((inv.coins - cost).toFixed(2));
         if (decorType === 'empty_crystal_pedestal') {
           inv.empty_crystal_pedestal_inv = (inv.empty_crystal_pedestal_inv || 0) + 1;
+        } else if (decorType === 'bamboo_fence') {
+          const next = getStructureInventoryCount(inv, 'bamboo_fence') + 1;
+          inv.bamboo_fence_inv = next;
+          if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0 };
+          inv.decorations.bambooFence = next;
+          inv.decorations['bamboo_fence'] = next;
+        } else if (decorType === 'water_feature' || decorType === 'decor_woven_wall') {
+          const next = getStructureInventoryCount(inv, 'water_feature') + 1;
+          inv.water_feature_inv = next;
+          inv.decor_woven_wall_inv = next;
+          if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0 };
+          inv.decorations.wovenWall = next;
+          inv.decorations.waterFeature = next;
+          inv.decorations['water_feature'] = next;
+          inv.decorations['waterFeature'] = next;
+        } else if (decorType === 'zen_rock_formation' || decorType === 'decor_rock_formation') {
+          const next = getStructureInventoryCount(inv, 'zen_rock_formation') + 1;
+          inv.zen_rock_formation_inv = next;
+          inv.decor_rock_formation_inv = next;
+          if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0 };
+          inv.decorations.rockFormation = next;
+          inv.decorations.zenRockFormation = next;
+          inv.decorations['zen_rock_formation'] = next;
+        } else if (decorType === 'growing_bamboo_formation' || decorType === 'decor_shrubbery_bush') {
+          const next = getStructureInventoryCount(inv, 'growing_bamboo_formation') + 1;
+          inv.growing_bamboo_formation_inv = next;
+          inv.decor_shrubbery_bush_inv = next;
+          if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0 };
+          inv.decorations.shrubbery = next;
+          inv.decorations.growingBamboo = next;
+          inv.decorations['growing_bamboo_formation'] = next;
+        } else if (decorType === 'asparagus_fern_ball') {
+          const next = getStructureInventoryCount(inv, 'asparagus_fern_ball') + 1;
+          inv.asparagus_fern_ball_inv = next;
+          if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0 };
+          inv.decorations.asparagusFernBall = next;
+          inv.decorations['asparagus_fern_ball'] = next;
         } else {
           const key = `${decorType}_inv`;
           inv[key] = (inv[key] || 0) + 1;
         }
         if (decorType === 'decor_pebble_path') inv.decorations.pebblePath = (inv.decorations.pebblePath || 0) + 1;
-        else if (decorType === 'decor_rock_formation') inv.decorations.rockFormation = (inv.decorations.rockFormation || 0) + 1;
-        else if (decorType === 'decor_shrubbery_bush') inv.decorations.shrubbery = (inv.decorations.shrubbery || 0) + 1;
-        else if (decorType === 'decor_woven_wall') inv.decorations.wovenWall = (inv.decorations.wovenWall || 0) + 1;
         else if (decorType === 'torii_gate') inv.decorations.toriiGate = (inv.decorations.toriiGate || 0) + 1;
 
         gameAudio.playCoinPickup();
@@ -9920,22 +11273,31 @@ export default function App() {
     [refreshHud, triggerNotification],
   );
 
-  // --- ECONOMY: PURCHASE NURSERY TOOLS (COMPOST HEAP & STONE WELL) ---
+  // --- ECONOMY: PURCHASE NURSERY TOOLS (COMPOST HEAP, FERTILIZER STATION & STONE WELL) ---
   const buyTool = useCallback(
-    (toolType: 'tool_compost_heap' | 'tool_garden_well', cost: number, name: string) => {
+    (
+      toolType: 'tool_compost_heap' | 'tool_garden_well' | 'fertilizer_station',
+      cost: number,
+      name: string,
+    ) => {
       const inv = sanctuaryInventoryRef.current;
       if (inv.coins >= cost) {
-        inv.coins -= cost;
+        inv.coins = Number((inv.coins - cost).toFixed(2));
         const key = `${toolType}_inv`;
         inv[key] = (inv[key] || 0) + 1;
-        if (!inv.tools) inv.tools = { compostHeap: 0, gardenWell: 0 };
+        if (toolType === 'fertilizer_station') {
+          inv.fertilizer_station_inv = inv[key];
+          inv.fertilizerStation = (inv.fertilizerStation || 0) + 1;
+        } else if (!inv.tools) {
+          inv.tools = { compostHeap: 0, gardenWell: 0 };
+        }
         if (toolType === 'tool_compost_heap') {
           inv.tools.compostHeap = (inv.tools.compostHeap || 0) + 1;
-        } else {
+        } else if (toolType === 'tool_garden_well') {
           inv.tools.gardenWell = (inv.tools.gardenWell || 0) + 1;
         }
         gameAudio.playCoinPickup();
-        triggerNotification(`🔧 Purchased ${name}! (+1 added to Tools inventory)`, '#10b981');
+        triggerNotification(`🔧 Purchased ${name}! (+1 added to Inventory)`, '#10b981');
         refreshHud();
       } else {
         gameAudio.playErrorBuzz();
@@ -9944,6 +11306,25 @@ export default function App() {
     },
     [refreshHud, triggerNotification],
   );
+
+  const buyBiochemicalsItem = useCallback(
+    (cost: number) => {
+      const inv = sanctuaryInventoryRef.current;
+      if (inv.coins >= cost) {
+        inv.coins = Number((inv.coins - cost).toFixed(2));
+        inv.biochemicals = (inv.biochemicals || 0) + 1;
+        if (inv.resources) inv.resources.biochemicals = inv.biochemicals;
+        gameAudio.playCoinPickup();
+        triggerNotification(`🧪 Purchased 1 Biochemical (+1 in Stock)!`, '#10b981');
+        refreshHud();
+      } else {
+        gameAudio.playErrorBuzz();
+        triggerNotification(`Need ${cost} Verdure to purchase Biochemicals! Donate mature bonsais.`, '#ef4444');
+      }
+    },
+    [refreshHud, triggerNotification],
+  );
+  const buyFertilizerItem = buyBiochemicalsItem;
 
   // --- PLACEABLE SOLAR PANELS, TURBINES, TOOLS & GARDEN DECORATIONS (PHYSICAL DEPLOYMENT & DISMANTLE) ---
   const deployStructureOnGrid = useCallback(
@@ -9958,11 +11339,19 @@ export default function App() {
         wind_turbine: 'Wind Turbines',
         decor_pebble_path: 'Zen Pebble Stepping Paths',
         decor_rock_formation: 'Zen Rock Formations',
-        decor_shrubbery_bush: 'Topiary Shrubbery Bushes',
-        decor_woven_wall: 'Woven Wooden Lattice Walls',
+        zen_rock_formation: 'Zen Rock Formations',
+        decor_shrubbery_bush: 'Growing Bamboo Formations',
+        growing_bamboo_formation: 'Growing Bamboo Formations',
+        asparagus_fern_ball: 'Asparagus Fern Balls',
+        decor_woven_wall: 'Water Features',
+        water_feature: 'Water Features',
+        bamboo_fence: 'Bamboo Fences',
         torii_gate: 'Torii Gates',
         tool_compost_heap: 'Compost Heaps',
+        fertilizer_station: 'Fertilizer Stations',
         tool_garden_well: 'Stone Wells',
+        empty_crystal_pedestal: 'Empty Pedestals',
+        crystal_pedestal: 'Empty Pedestals',
         crystal_pedestal_foliage: 'Emerald Leaf Crystal Pedestals',
         crystal_pedestal_branches: 'Amber Branch Crystal Pedestals',
         crystal_pedestal_trunk: 'Coral Trunk Crystal Pedestals',
@@ -10048,6 +11437,8 @@ export default function App() {
       } else if (type === 'tool_compost_heap') {
         inv.tool_compost_heap_inv = inv[key];
         if (inv.tools) inv.tools.compostHeap = inv[key];
+      } else if (type === 'fertilizer_station') {
+        inv.fertilizer_station_inv = inv[key];
       } else if (type === 'tool_garden_well') {
         inv.tool_garden_well_inv = inv[key];
         if (inv.tools) inv.tools.gardenWell = inv[key];
@@ -10066,11 +11457,52 @@ export default function App() {
         inv.irrigation_t2_inv = inv[key];
       } else if (type === 'irrigation_t3') {
         inv.irrigation_t3_inv = inv[key];
-      } else if (type === 'decor_pebble_path') inv.decorations.pebblePath = Math.max(0, (inv.decorations.pebblePath || 0) - 1);
-      else if (type === 'decor_rock_formation') inv.decorations.rockFormation = Math.max(0, (inv.decorations.rockFormation || 0) - 1);
-      else if (type === 'decor_shrubbery_bush') inv.decorations.shrubbery = Math.max(0, (inv.decorations.shrubbery || 0) - 1);
-      else if (type === 'decor_woven_wall') inv.decorations.wovenWall = Math.max(0, (inv.decorations.wovenWall || 0) - 1);
-      else if (type === 'torii_gate') {
+      }      else if (type === 'decor_pebble_path') inv.decorations.pebblePath = Math.max(0, (inv.decorations.pebblePath || 0) - 1);
+      else if (type === 'decor_rock_formation' || type === 'zen_rock_formation') {
+        const remaining = Math.max(0, stock - 1);
+        inv.zen_rock_formation_inv = remaining;
+        inv.decor_rock_formation_inv = remaining;
+        if (inv.decorations) {
+          inv.decorations.rockFormation = remaining;
+          inv.decorations.zenRockFormation = remaining;
+          inv.decorations['zen_rock_formation'] = remaining;
+        }
+      }
+      else if (type === 'decor_shrubbery_bush' || type === 'growing_bamboo_formation') {
+        const remaining = Math.max(0, stock - 1);
+        inv.growing_bamboo_formation_inv = remaining;
+        inv.decor_shrubbery_bush_inv = remaining;
+        if (inv.decorations) {
+          inv.decorations.shrubbery = remaining;
+          inv.decorations.growingBamboo = remaining;
+          inv.decorations['growing_bamboo_formation'] = remaining;
+        }
+      }
+      else if (type === 'asparagus_fern_ball') {
+        const remaining = Math.max(0, stock - 1);
+        inv.asparagus_fern_ball_inv = remaining;
+        if (inv.decorations) {
+          inv.decorations.asparagusFernBall = remaining;
+          inv.decorations['asparagus_fern_ball'] = remaining;
+        }
+      }
+      else if (type === 'decor_woven_wall' || type === 'water_feature') {
+        const remaining = Math.max(0, stock - 1);
+        inv.water_feature_inv = remaining;
+        inv.decor_woven_wall_inv = remaining;
+        if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0 };
+        inv.decorations.wovenWall = remaining;
+        inv.decorations.waterFeature = remaining;
+        inv.decorations['water_feature'] = remaining;
+        inv.decorations['waterFeature'] = remaining;
+      } else if (type === 'bamboo_fence') {
+        const remaining = Math.max(0, stock - 1);
+        inv.bamboo_fence_inv = remaining;
+        if (inv.decorations) {
+          inv.decorations.bambooFence = remaining;
+          inv.decorations['bamboo_fence'] = remaining;
+        }
+      } else if (type === 'torii_gate') {
         if (inv.decorations) inv.decorations.toriiGate = Math.max(0, (inv.decorations.toriiGate || 1) - 1);
       }
 
@@ -10093,10 +11525,13 @@ export default function App() {
         gridX: snapX,
         gridY: snapY,
         variant: type === 'decor_pebble_path' ? Math.floor(Math.random() * 5) : 0,
-        depositedWaste: type === 'tool_compost_heap' ? 0 : undefined,
-        maxCapacity: type === 'tool_compost_heap' ? 20 : undefined,
-        timer: type === 'tool_compost_heap' ? 0 : undefined,
+        depositedWaste: type === 'tool_compost_heap' || type === 'fertilizer_station' ? 0 : undefined,
+        depositedBiochemicals: type === 'fertilizer_station' ? 0 : undefined,
+        maxCapacity: type === 'tool_compost_heap' ? 20 : type === 'fertilizer_station' ? 30 : undefined,
+        timer: type === 'tool_compost_heap' || type === 'fertilizer_station' ? 0 : undefined,
         readyCompost: type === 'tool_compost_heap' ? 0 : undefined,
+        readyFertilizer: type === 'fertilizer_station' ? 0 : undefined,
+        isDistilling: type === 'fertilizer_station' ? false : undefined,
         waterDuration: isManualIrrigation ? initDuration : undefined,
         maxWaterDuration: isManualIrrigation ? initDuration : undefined,
         activeWateringRemaining: type === 'tool_garden_well' ? 0 : undefined,
@@ -10117,13 +11552,17 @@ export default function App() {
           ? '#f59e0b'
           : type === 'tool_compost_heap'
           ? '#84cc16'
+          : type === 'fertilizer_station'
+          ? '#34d399'
           : type === 'tool_garden_well'
           ? '#0ea5e9'
-          : type === 'decor_shrubbery_bush'
+          : type === 'decor_shrubbery_bush' || type === 'growing_bamboo_formation'
+          ? '#16a34a'
+          : type === 'asparagus_fern_ball'
           ? '#10b981'
           : type === 'decor_pebble_path'
           ? '#94a3b8'
-          : type === 'decor_rock_formation'
+          : type === 'decor_rock_formation' || type === 'zen_rock_formation'
           ? '#f59e0b'
           : type === 'crystal_pedestal_foliage'
           ? '#22c55e'
@@ -10153,12 +11592,20 @@ export default function App() {
         solar_panel: '☀️ Solar Panel Array (3 kW)',
         wind_turbine: '💨 Wind Turbine Generator (6 kW)',
         tool_compost_heap: '🍂 Compost Heap (20 Capacity)',
+        fertilizer_station: '🧪 Fertilizer Station (Eco-Chemical Processor)',
         tool_garden_well: '💧 Stone Well (3×3 Irrigation)',
         decor_pebble_path: '🪨 Zen Pebble Stepping Path',
-        decor_rock_formation: '🪨 Zen Rock Formation',
-        decor_shrubbery_bush: '🌿 Topiary Shrubbery Bush',
-        decor_woven_wall: '🎋 Woven Wooden Lattice Wall',
+        decor_rock_formation: '🪨 Zen Rock Formation (+15% EXP)',
+        zen_rock_formation: '🪨 Zen Rock Formation (+15% EXP)',
+        decor_shrubbery_bush: '🎋 Growing Bamboo Formation (+0.25s Prune)',
+        growing_bamboo_formation: '🎋 Growing Bamboo Formation (+0.25s Prune)',
+        asparagus_fern_ball: '🪴 Asparagus Fern Ball (+15% Extra Waste)',
+        decor_woven_wall: '🌊 Water Feature (Shishi-Odoshi)',
+        water_feature: '🌊 Water Feature (Shishi-Odoshi)',
+        bamboo_fence: '🎋 Bamboo Fence (Takegaki)',
         torii_gate: '⛩️ Torii Gate (3x1)',
+        empty_crystal_pedestal: '💎 Empty Pedestal (Can Host Crystal Artifacts)',
+        crystal_pedestal: '💎 Empty Pedestal',
         crystal_pedestal_foliage: '💎 Emerald Leaf Crystal Pedestal',
         crystal_pedestal_branches: '💎 Amber Branch Crystal Pedestal',
         crystal_pedestal_trunk: '💎 Coral Trunk Crystal Pedestal',
@@ -10253,6 +11700,18 @@ export default function App() {
           inv.organic_compost = (inv.organic_compost || 0) + struct.readyCompost;
           inv.enrichedCompost = inv.organic_compost;
         }
+      } else if (struct.type === 'fertilizer_station') {
+        inv.fertilizer_station_inv = (inv.fertilizer_station_inv || 0) + 1;
+        if (struct.depositedWaste && struct.depositedWaste > 0) {
+          inv.organic_waste = (inv.organic_waste || 0) + struct.depositedWaste;
+          inv.organicWaste = inv.organic_waste;
+        }
+        if (struct.depositedBiochemicals && struct.depositedBiochemicals > 0) {
+          inv.biochemicals = (inv.biochemicals || 0) + struct.depositedBiochemicals;
+        }
+        if (struct.readyFertilizer && struct.readyFertilizer > 0) {
+          inv.fertilizer = (inv.fertilizer || 0) + struct.readyFertilizer;
+        }
       } else if (struct.type === 'tool_garden_well') {
         inv.tool_garden_well_inv = (inv.tool_garden_well_inv || 0) + 1;
         if (inv.tools) inv.tools.gardenWell = inv.tool_garden_well_inv;
@@ -10260,18 +11719,43 @@ export default function App() {
         inv.decor_pebble_path_inv = (inv.decor_pebble_path_inv || 0) + 1;
         if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
         inv.decorations.pebblePath = (inv.decorations.pebblePath || 0) + 1;
-      } else if (struct.type === 'decor_rock_formation') {
-        inv.decor_rock_formation_inv = (inv.decor_rock_formation_inv || 0) + 1;
+      } else if (struct.type === 'decor_rock_formation' || struct.type === 'zen_rock_formation') {
+        const next = getStructureInventoryCount(inv, 'zen_rock_formation') + 1;
+        inv.zen_rock_formation_inv = next;
+        inv.decor_rock_formation_inv = next;
         if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
-        inv.decorations.rockFormation = (inv.decorations.rockFormation || 0) + 1;
-      } else if (struct.type === 'decor_shrubbery_bush') {
-        inv.decor_shrubbery_bush_inv = (inv.decor_shrubbery_bush_inv || 0) + 1;
+        inv.decorations.rockFormation = next;
+        inv.decorations.zenRockFormation = next;
+        inv.decorations['zen_rock_formation'] = next;
+      } else if (struct.type === 'decor_shrubbery_bush' || struct.type === 'growing_bamboo_formation') {
+        const next = getStructureInventoryCount(inv, 'growing_bamboo_formation') + 1;
+        inv.growing_bamboo_formation_inv = next;
+        inv.decor_shrubbery_bush_inv = next;
         if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
-        inv.decorations.shrubbery = (inv.decorations.shrubbery || 0) + 1;
-      } else if (struct.type === 'decor_woven_wall') {
-        inv.decor_woven_wall_inv = (inv.decor_woven_wall_inv || 0) + 1;
+        inv.decorations.shrubbery = next;
+        inv.decorations.growingBamboo = next;
+        inv.decorations['growing_bamboo_formation'] = next;
+      } else if (struct.type === 'asparagus_fern_ball') {
+        const next = getStructureInventoryCount(inv, 'asparagus_fern_ball') + 1;
+        inv.asparagus_fern_ball_inv = next;
         if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
-        inv.decorations.wovenWall = (inv.decorations.wovenWall || 0) + 1;
+        inv.decorations.asparagusFernBall = next;
+        inv.decorations['asparagus_fern_ball'] = next;
+      } else if (struct.type === 'decor_woven_wall' || struct.type === 'water_feature') {
+        const nextStock = getStructureInventoryCount(inv, 'water_feature') + 1;
+        inv.water_feature_inv = nextStock;
+        inv.decor_woven_wall_inv = nextStock;
+        if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
+        inv.decorations.wovenWall = nextStock;
+        inv.decorations.waterFeature = nextStock;
+        inv.decorations['water_feature'] = nextStock;
+        inv.decorations['waterFeature'] = nextStock;
+      } else if (struct.type === 'bamboo_fence') {
+        const nextStock = getStructureInventoryCount(inv, 'bamboo_fence') + 1;
+        inv.bamboo_fence_inv = nextStock;
+        if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
+        inv.decorations.bambooFence = nextStock;
+        inv.decorations['bamboo_fence'] = nextStock;
       } else if (struct.type === 'torii_gate') {
         inv.torii_gate_inv = (inv.torii_gate_inv || 0) + 1;
         if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
@@ -10310,11 +11794,17 @@ export default function App() {
         solar_panel: 'Solar Panel Array',
         wind_turbine: 'Wind Turbine Generator',
         tool_compost_heap: 'Compost Heap',
+        fertilizer_station: 'Fertilizer Station',
         tool_garden_well: 'Stone Well',
         decor_pebble_path: 'Zen Pebble Stepping Path',
         decor_rock_formation: 'Zen Rock Formation',
-        decor_shrubbery_bush: 'Topiary Shrubbery Bush',
-        decor_woven_wall: 'Woven Wooden Lattice Wall',
+        zen_rock_formation: 'Zen Rock Formation',
+        decor_shrubbery_bush: 'Growing Bamboo Formation',
+        growing_bamboo_formation: 'Growing Bamboo Formation',
+        asparagus_fern_ball: 'Asparagus Fern Ball',
+        decor_woven_wall: 'Water Feature',
+        water_feature: 'Water Feature',
+        bamboo_fence: 'Bamboo Fence',
         torii_gate: '⛩️ Torii Gate',
         crystal_pedestal_foliage: 'Emerald Leaf Crystal Pedestal',
         crystal_pedestal_branches: 'Amber Branch Crystal Pedestal',
@@ -10328,8 +11818,16 @@ export default function App() {
         irrigation_t3: 'T3 Manual Irrigation System',
       };
       const name = nameMap[struct.type] || 'Item';
-      addFloatingText(struct.x, struct.y - 40, `+1 ${name} Stored!`, '#38bdf8');
-      triggerNotification(`📦 Dismantled ${name}! Returned to Inventory.`, '#38bdf8');
+      if (struct.type === 'bamboo_fence') {
+        addFloatingText(struct.x, struct.y - 20, '+1 🎋 Bamboo Fence', '#10b981');
+        triggerNotification('🎋 Picked up Bamboo Fence (+1 added to Inventory)', '#10b981');
+      } else if (struct.type === 'water_feature' || struct.type === 'decor_woven_wall') {
+        addFloatingText(struct.x, struct.y - 30, '+1 🌊 Water Feature Stored!', '#38bdf8');
+        triggerNotification('🌊 Stored Water Feature (+1 added to Inventory)', '#10b981');
+      } else {
+        addFloatingText(struct.x, struct.y - 40, `+1 ${name} Stored!`, '#38bdf8');
+        triggerNotification(`📦 Dismantled ${name}! Returned to Inventory.`, '#38bdf8');
+      }
       refreshHud();
     },
     [addFloatingText, refreshHud, triggerNotification],
@@ -10380,6 +11878,82 @@ export default function App() {
       gameAudio.playConfirmSelect();
       addFloatingText(struct.x, struct.y - 45, `+${toDeposit} Organic Waste Deposited`, '#84cc16');
       triggerNotification(`🍂 Deposited +${toDeposit} Organic Waste into Compost Heap (${struct.depositedWaste}/${maxCap})`, '#84cc16');
+      refreshHud();
+    },
+    [addFloatingText, refreshHud, triggerNotification],
+  );
+
+  // --- FERTILIZER STATION INTERACTION (DIRECT [E] INTERACTION) ---
+  const interactFertilizerStationDirect = useCallback(
+    (structId: string) => {
+      const struct = deployedStructuresRef.current.find((s) => s.id === structId);
+      if (!struct || struct.type !== 'fertilizer_station') return;
+      const inv = sanctuaryInventoryRef.current;
+
+      // 1. Collect finished fertilizer
+      const ready = struct.readyFertilizer || 0;
+      if (ready > 0) {
+        inv.fertilizer = (inv.fertilizer || 0) + ready;
+        if (inv.resources) inv.resources.fertilizer = inv.fertilizer;
+        struct.readyFertilizer = 0;
+        gameAudio.playPowerupChime();
+        addFloatingText(struct.x, struct.y - 45, `+${ready} 🧪 Fertilizer!`, '#34d399');
+        triggerNotification(`🧪 Collected +${ready} Fertilizer into Inventory!`, '#10b981');
+        refreshHud();
+        return;
+      }
+
+      // 2. Deposit materials: Recipe: 3 Organic Waste + 1 Biochemical = 1 Fertilizer
+      // Up to 30 Organic Waste and 10 Biochemicals can be deposited at once (yielding up to 10 Fertilizer)
+      const curWaste = struct.depositedWaste || 0;
+      const curBio = struct.depositedBiochemicals || 0;
+      const maxBatches = 10;
+      const curBatches = Math.min(Math.floor(curWaste / 3), curBio);
+      const availableBatchSlots = maxBatches - curBatches;
+
+      if (availableBatchSlots <= 0) {
+        gameAudio.playErrorBuzz();
+        triggerNotification(`Fertilizer Station is currently at full capacity (${curBatches}/10 batches)!`, '#f59e0b');
+        return;
+      }
+
+      const playerWaste = inv.organic_waste || 0;
+      const playerBio = inv.biochemicals || 0;
+
+      const possibleFromWaste = Math.floor(playerWaste / 3);
+      const possibleBatches = Math.min(possibleFromWaste, playerBio, availableBatchSlots);
+
+      if (possibleBatches <= 0) {
+        gameAudio.playErrorBuzz();
+        triggerNotification(
+          `Requires 3 Organic Waste + 1 Biochemical! (You have: ${playerWaste} Waste, ${playerBio} Bio)`,
+          '#ef4444',
+        );
+        return;
+      }
+
+      const wasteToDeposit = possibleBatches * 3;
+      const bioToDeposit = possibleBatches;
+
+      inv.organic_waste -= wasteToDeposit;
+      inv.organicWaste = inv.organic_waste;
+      inv.biochemicals = Math.max(0, (inv.biochemicals ?? 0) - bioToDeposit);
+      if (inv.resources) {
+        inv.resources.organic_waste = inv.organic_waste;
+        inv.resources.biochemicals = inv.biochemicals;
+      }
+
+      struct.depositedWaste = curWaste + wasteToDeposit;
+      struct.depositedBiochemicals = curBio + bioToDeposit;
+      struct.timer = 60; // 60 seconds processing time
+      struct.isDistilling = true;
+
+      gameAudio.playConfirmSelect();
+      addFloatingText(struct.x, struct.y - 45, `+${possibleBatches} Batches Distilling!`, '#38bdf8');
+      triggerNotification(
+        `🧪 Deposited ${wasteToDeposit} Organic Waste & ${bioToDeposit} Biochemicals! Distilling ${possibleBatches} Fertilizer (60s)...`,
+        '#10b981',
+      );
       refreshHud();
     },
     [addFloatingText, refreshHud, triggerNotification],
@@ -10864,7 +12438,7 @@ export default function App() {
         style: stored.style || 'MOYOGI',
         maturity: stored.maturity || 'sprout',
         maturityRating: rating,
-        name: stored.name,
+        name: getBonsaiDisplayName(stored),
         rarity: stored.rarity,
         nature: stored.nature || BONSAI_NATURES[Math.floor(Math.random() * BONSAI_NATURES.length)],
         level: stored.level,
@@ -10898,8 +12472,8 @@ export default function App() {
       gameAudio.playPowerupChime();
 
       const mDef = getMaturityDef(newBonsai.maturity);
-      addFloatingText(snapX, snapY - 40, `Placed ${isRating5 ? '2x2 ' : ''}${mDef.kanji} | Lv.${stored.level} ${stored.name}!`, mDef.color);
-      triggerNotification(`Replanted ${stored.name} (${mDef.kanji} ${mDef.name}${isRating5 ? ' • 2x2 Footprint' : ''}) on grid!`, mDef.color);
+      addFloatingText(snapX, snapY - 40, `Placed ${isRating5 ? '2x2 ' : ''}${mDef.kanji} | Lv.${stored.level} ${getBonsaiDisplayName(stored)}!`, mDef.color);
+      triggerNotification(`Replanted ${getBonsaiDisplayName(stored)} (${mDef.kanji} ${mDef.name}${isRating5 ? ' • 2x2 Footprint' : ''}) on grid!`, mDef.color);
     },
     [addFloatingText, isGridPlotUnlocked, isPlotOccupiedByPlantedBonsai, isPlotOccupiedByStructure, recordBondexEntry, refreshHud, triggerNotification],
   );
@@ -10997,7 +12571,7 @@ export default function App() {
         style: chosenStyle,
         maturity: chosenMaturity,
         maturityRating: rating,
-        name: seedling.name || `[${seedling.group || leafDef.group}] ${leafDef.name}`,
+        name: getBonsaiDisplayName(seedling),
         rarity: (seedling.rarity as BonsaiRarity) || leafDef.rarity,
         nature: pickedNature,
         level: 0,
@@ -11046,8 +12620,8 @@ export default function App() {
         );
       }
 
-      addFloatingText(snapX, snapY - 40, `Planted ${isRating5 ? '2x2 ' : ''}${matDef.kanji} | Lv.0 ${newBonsai.name}!`, matDef.color);
-      triggerNotification(`Planted [${matDef.kanji} ${matDef.name}${isRating5 ? ' • 2x2' : ''}] ${newBonsai.name} (Lv.0) styled as ${styleDef.japanese}!`, matDef.color);
+      addFloatingText(snapX, snapY - 40, `Planted ${isRating5 ? '2x2 ' : ''}${matDef.kanji} | Lv.0 ${getBonsaiDisplayName(newBonsai)}!`, matDef.color);
+      triggerNotification(`Planted [${matDef.kanji} ${matDef.name}${isRating5 ? ' • 2x2' : ''}] ${getBonsaiDisplayName(newBonsai)} (Lv.0) styled as ${styleDef.japanese}!`, matDef.color);
     },
     [addFloatingText, emitParticle, invalidateSynergiesCache, isGridPlotUnlocked, isPlotOccupiedByPlantedBonsai, isPlotOccupiedByStructure, recordBondexEntry, refreshHud, triggerNotification],
   );
@@ -11163,7 +12737,7 @@ export default function App() {
         style: chosenStyle,
         maturity: chosenMaturity,
         maturityRating: rating,
-        name: stored.name,
+        name: getBonsaiDisplayName(stored),
         rarity: stored.rarity,
         nature: pickedNature,
         level: 0,
@@ -11212,8 +12786,8 @@ export default function App() {
         );
       }
 
-      addFloatingText(snapX, snapY - 40, `Planted ${matDef.kanji} | Lv.0 ${stored.name}!`, matDef.color);
-      triggerNotification(`Planted [${matDef.kanji} ${matDef.name}] ${stored.name} (Lv.0) styled as ${styleDef.japanese} (${styleDef.name})!`, matDef.color);
+      addFloatingText(snapX, snapY - 40, `Planted ${matDef.kanji} | Lv.0 ${getBonsaiDisplayName(newBonsai)}!`, matDef.color);
+      triggerNotification(`Planted [${matDef.kanji} ${matDef.name}] ${getBonsaiDisplayName(newBonsai)} (Lv.0) styled as ${styleDef.japanese} (${styleDef.name})!`, matDef.color);
     },
     [addFloatingText, isGridPlotUnlocked, plantIndividualSeedling, refreshHud, sanctuaryBonsaiSociety, sanctuaryRoverGarage, sanctuaryShopStand, sanctuaryWorkbench, sanctuaryZenLibrary, snapToSanctuaryGrid, triggerNotification],
   );
@@ -11267,6 +12841,21 @@ export default function App() {
         // Validate all 4 plots [c .. c+1] x [r .. r+1]
         if (c + 1 >= SANCTUARY_GRID.cols || r + 1 >= SANCTUARY_GRID.rows) return false;
 
+        const fenceSet = new Set(
+          deployedStructuresRef.current
+            .filter((s) => s.type === 'bamboo_fence' && s.edgeKey)
+            .map((s) => s.edgeKey!),
+        );
+        // Internal fences running between the 4 composite plots of the 2x2 area
+        if (
+          fenceSet.has(`V_${c + 1}_${r}`) ||
+          fenceSet.has(`V_${c + 1}_${r + 1}`) ||
+          fenceSet.has(`H_${c}_${r + 1}`) ||
+          fenceSet.has(`H_${c + 1}_${r + 1}`)
+        ) {
+          return false;
+        }
+
         for (let dc = 0; dc <= 1; dc++) {
           for (let dr = 0; dr <= 1; dr++) {
             const plotC = c + dc;
@@ -11283,13 +12872,30 @@ export default function App() {
 
       if (isNearStationCoords(snapX, snapY)) return false;
 
+      if (preview.payload === 'bamboo_fence') {
+        if (!plot.isUnlocked) return false;
+        const side = preview.fenceEdge || preview.edgeSide || 'top';
+        const edgeGeom = getFenceEdgeGeometry(plot.col, plot.row, side);
+        const alreadyHasFence = deployedStructuresRef.current.some(
+          (s) => s.type === 'bamboo_fence' && s.edgeKey === edgeGeom.edgeKey,
+        );
+        return !alreadyHasFence;
+      }
+
       if (preview.payload === 'torii_gate') {
         const isVert = preview.orientation === 'vertical';
+        const fenceSet = new Set(
+          deployedStructuresRef.current
+            .filter((s) => s.type === 'bamboo_fence' && s.edgeKey)
+            .map((s) => s.edgeKey!),
+        );
         if (isVert) {
           if (plot.row - 1 < 0 || plot.row + 1 >= SANCTUARY_GRID.rows) return false;
           const topUnlocked = isGridPlotUnlocked(snapX, snapY - SANCTUARY_GRID.cellH);
           const botUnlocked = isGridPlotUnlocked(snapX, snapY + SANCTUARY_GRID.cellH);
           if (!topUnlocked || !botUnlocked) return false;
+          // Internal fence collision: cannot place if an internal fence runs between composite plots
+          if (fenceSet.has(`H_${plot.col}_${plot.row}`) || fenceSet.has(`H_${plot.col}_${plot.row + 1}`)) return false;
           if (checkOccupied(plot.col, plot.row)) return false;
           if (checkOccupied(plot.col, plot.row - 1)) return false;
           if (checkOccupied(plot.col, plot.row + 1)) return false;
@@ -11299,6 +12905,8 @@ export default function App() {
           const leftUnlocked = isGridPlotUnlocked(snapX - SANCTUARY_GRID.cellW, snapY);
           const rightUnlocked = isGridPlotUnlocked(snapX + SANCTUARY_GRID.cellW, snapY);
           if (!leftUnlocked || !rightUnlocked) return false;
+          // Internal fence collision: cannot place if an internal fence runs between composite plots
+          if (fenceSet.has(`V_${plot.col}_${plot.row}`) || fenceSet.has(`V_${plot.col + 1}_${plot.row}`)) return false;
           if (checkOccupied(plot.col, plot.row)) return false;
           if (checkOccupied(plot.col - 1, plot.row)) return false;
           if (checkOccupied(plot.col + 1, plot.row)) return false;
@@ -11340,10 +12948,73 @@ export default function App() {
         (preview.style as BonsaiStyle) || 'CHOKAN',
         preview.nature,
       );
+      setPlacementPreview(null);
     } else if (preview.category === 'bonsai') {
       plantStoredPottedBonsai(preview.payload.id);
+      setPlacementPreview(null);
     } else if (preview.category === 'infrastructure' || preview.category === 'decoration') {
-      if (preview.payload === 'torii_gate') {
+      if (preview.payload === 'bamboo_fence') {
+        const stock = getStructureInventoryCount(inv, 'bamboo_fence');
+        if (stock <= 0) {
+          gameAudio.playErrorBuzz();
+          triggerNotification('No Bamboo Fences in stock!', '#ef4444');
+          setPlacementPreview(null);
+          return;
+        }
+        const side = preview.fenceEdge || preview.edgeSide || 'top';
+        const edgeGeom = getFenceEdgeGeometry(currentPlot.col, currentPlot.row, side);
+        const remaining = Math.max(0, stock - 1);
+        inv.bamboo_fence_inv = remaining;
+        if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0 };
+        inv.decorations.bambooFence = remaining;
+        inv.decorations['bamboo_fence'] = remaining;
+
+        const newFence: DeployedStructure = {
+          id: `fence_${edgeGeom.edgeKey}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          type: 'bamboo_fence',
+          edgeKey: edgeGeom.edgeKey,
+          side: edgeGeom.side,
+          orientation: edgeGeom.orientation,
+          x: edgeGeom.x,
+          y: edgeGeom.y,
+          gridX: edgeGeom.x,
+          gridY: edgeGeom.y,
+        };
+        deployedStructuresRef.current.push(newFence);
+        invalidateSynergiesCache();
+        gameAudio.playPowerupChime();
+        addFloatingText(edgeGeom.x, edgeGeom.y - 15, 'Placed 🎋 Bamboo Fence!', '#10b981');
+        triggerNotification(
+          remaining > 0
+            ? `Placed Bamboo Fence (${remaining} remaining in stock)! Walk to place next fence, or [Esc / B] to exit.`
+            : 'Placed Bamboo Fence on boundary edge! Physically blocks halos across borders.',
+          '#10b981',
+        );
+        refreshHud();
+
+        // Multi-placement: keep preview active if stock remains
+        if (remaining <= 0) {
+          setPlacementPreview(null);
+        }
+      } else if (preview.payload === 'water_feature' || preview.payload === 'decor_woven_wall') {
+        const stock = getStructureInventoryCount(inv, 'water_feature');
+        if (stock <= 0) {
+          gameAudio.playErrorBuzz();
+          triggerNotification('No Water Features in stock!', '#ef4444');
+          setPlacementPreview(null);
+          return;
+        }
+        deployStructureOnGrid('water_feature');
+        const remaining = getStructureInventoryCount(inv, 'water_feature');
+        if (remaining <= 0) {
+          setPlacementPreview(null);
+        } else {
+          triggerNotification(
+            `Placed Water Feature (${remaining} remaining in inventory)! Walk to next plot to place another, or [Esc / B] to exit.`,
+            '#10b981',
+          );
+        }
+      } else if (preview.payload === 'torii_gate') {
         const type: DeployedStructureType = 'torii_gate';
         const stock = getStructureInventoryCount(inv, type);
         if (stock <= 0) {
@@ -11372,14 +13043,31 @@ export default function App() {
         invalidateSynergiesCache();
         gameAudio.playPowerupChime();
         addFloatingText(snapX, snapY - 40, 'Placed ⛩️ Torii Gate!', '#ef4444');
-        triggerNotification('Placed ⛩️ Torii Gate on Sanctuary plot! [Q] to Dismantle anytime.', '#10b981');
+        const remainingTorii = getStructureInventoryCount(inv, type);
+        triggerNotification(
+          remainingTorii > 0
+            ? `Placed ⛩️ Torii Gate (${remainingTorii} remaining)! Walk to place next item or [Esc / B] to exit.`
+            : 'Placed ⛩️ Torii Gate on Sanctuary plot! [Q] to Dismantle anytime.',
+          '#10b981',
+        );
         refreshHud();
+        if (remainingTorii <= 0) {
+          setPlacementPreview(null);
+        }
       } else {
-        deployStructureOnGrid(preview.payload as DeployedStructureType);
+        const structType = preview.payload as DeployedStructureType;
+        deployStructureOnGrid(structType);
+        const remainingStock = getStructureInventoryCount(inv, structType);
+        if (remainingStock <= 0) {
+          setPlacementPreview(null);
+        } else {
+          triggerNotification(
+            `Placed item (${remainingStock} remaining in inventory)! Walk to next plot to place another, or [Esc / B] to exit.`,
+            '#10b981',
+          );
+        }
       }
     }
-
-    setPlacementPreview(null);
   }, [
     checkPlotPlacementValid,
     deployStructureOnGrid,
@@ -11421,7 +13109,7 @@ export default function App() {
       gameAudio.playPowerupChime();
 
       const conf = getAutomatonConfig(tier);
-      triggerNotification(`Attached ${conf?.name || 'Automaton'} to ${bonsai.name}! (${conf?.speedMultiplier || 1}x Speed, ${conf?.kwDrain || 2} kW)`, '#38bdf8');
+      triggerNotification(`Attached ${conf?.name || 'Automaton'} to ${getBonsaiDisplayName(bonsai)}! (${conf?.speedMultiplier || 1}x Speed, ${conf?.kwDrain || 2} kW)`, '#38bdf8');
       refreshHud();
     },
     [refreshHud, triggerNotification],
@@ -11639,7 +13327,7 @@ export default function App() {
       }
 
       const finalMatDef = getMaturityDef(earnedMaturity);
-      const finalName = `[${dig.group}] ${lDef.name} (${finalMatDef.kanji} ${finalMatDef.name})`;
+      const finalName = getBonsaiDisplayName(dig.leafType);
 
       if (wasUpgraded) {
         triggerNotification(
@@ -11745,13 +13433,14 @@ export default function App() {
     revealAreaSpecies(activeBiomeIdRef.current, res.leafType, res.maturity);
 
     const seedlingId = res.seedlingId || res.id || `seedling_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const dName = getBonsaiDisplayName(res.leafType);
     backpackInventoryRef.current.saplings.push({
       id: seedlingId,
       leafType: res.leafType,
       group: res.group,
       maturity: res.maturity,
       species: res.leafType,
-      name: res.name,
+      name: dName,
       rarity: res.rarity as BonsaiRarity,
       nature: res.nature || BONSAI_NATURES[Math.floor(Math.random() * BONSAI_NATURES.length)],
       color: getLeafTypeDef(res.leafType).color,
@@ -11764,10 +13453,10 @@ export default function App() {
     } as any);
 
     const digExp = SEEDLING_DIG_EXP[res.leafType] || getLeafTypeDef(res.leafType).digExp || 40;
-    gainPlayerExp(digExp, res.name);
+    gainPlayerExp(digExp, dName);
 
     triggerNotification(
-      `🌿 Collected ${res.name} (Avg Precision: ${res.averagePrecision}%)! (+${digExp} EXP)`,
+      `🌿 Collected ${dName} (Avg Precision: ${res.averagePrecision}%)! (+${digExp} EXP)`,
       '#38bdf8',
     );
 
@@ -11816,9 +13505,9 @@ export default function App() {
     const tabLengths = {
       MAPS: 2,
       EXPANSIONS: 4,
-      DECOR: 9,
+      DECOR: 8,
       GUIDES: 18,
-      EQUIPMENT: 4,
+      EQUIPMENT: 6,
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -11853,14 +13542,13 @@ export default function App() {
         } else if (shopTab === 'DECOR') {
           const decorList = [
             { type: 'decor_pebble_path' as const, cost: 5, name: 'Zen Pebble Stepping Path' },
-            { type: 'decor_rock_formation' as const, cost: 15, name: 'Zen Rock Formation' },
-            { type: 'decor_shrubbery_bush' as const, cost: 25, name: 'Topiary Shrubbery Bush' },
-            { type: 'decor_woven_wall' as const, cost: 40, name: 'Woven Wooden Lattice Wall' },
+            { type: 'zen_rock_formation' as const, cost: 20, name: 'Zen Rock Formation' },
+            { type: 'water_feature' as const, cost: 30, name: 'Water Feature (Shishi-Odoshi)' },
+            { type: 'growing_bamboo_formation' as const, cost: 10, name: 'Growing Bamboo Formation' },
+            { type: 'asparagus_fern_ball' as const, cost: 15, name: 'Asparagus Fern Ball' },
+            { type: 'bamboo_fence' as const, cost: 3, name: 'Bamboo Fence (Takegaki)' },
             { type: 'torii_gate' as const, cost: 0, name: 'Torii Gate (3x1)' },
-            { type: 'crystal_pedestal_foliage' as const, cost: 100, name: 'Emerald Leaf Crystal Pedestal' },
-            { type: 'crystal_pedestal_branches' as const, cost: 100, name: 'Amber Branch Crystal Pedestal' },
-            { type: 'crystal_pedestal_trunk' as const, cost: 100, name: 'Coral Trunk Crystal Pedestal' },
-            { type: 'crystal_pedestal_roots' as const, cost: 100, name: 'Azure Root Crystal Pedestal' },
+            { type: 'empty_crystal_pedestal' as const, cost: 50, name: 'Empty Pedestal' },
           ];
           const it = decorList[focusedShopIdx];
           if (it) buyDecoration(it.type, it.cost, it.name);
@@ -11888,10 +13576,12 @@ export default function App() {
           const it = guideList[focusedShopIdx];
           if (it) buyGuidebook(it.key, it.cost, it.title);
         } else if (shopTab === 'EQUIPMENT') {
-          if (focusedShopIdx === 0) buyTool('tool_compost_heap', 50, 'Compost Heap');
-          else if (focusedShopIdx === 1) buyManualIrrigation('irrigation_t1', 10, 'T1 Manual Irrigation System');
-          else if (focusedShopIdx === 2) buyManualIrrigation('irrigation_t2', 25, 'T2 Manual Irrigation System');
-          else if (focusedShopIdx === 3) buyManualIrrigation('irrigation_t3', 75, 'T3 Manual Irrigation System');
+          if (focusedShopIdx === 0) buyTool('tool_compost_heap', 20, 'Compost Heap');
+          else if (focusedShopIdx === 1) buyTool('fertilizer_station', 50, 'Fertilizer Station');
+          else if (focusedShopIdx === 2) buyBiochemicalsItem(5);
+          else if (focusedShopIdx === 3) buyManualIrrigation('irrigation_t1', 10, 'T1 Manual Irrigation System');
+          else if (focusedShopIdx === 4) buyManualIrrigation('irrigation_t2', 25, 'T2 Manual Irrigation System');
+          else if (focusedShopIdx === 5) buyManualIrrigation('irrigation_t3', 75, 'T3 Manual Irrigation System');
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
@@ -11900,7 +13590,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isShopModalOpen, shopTab, focusedShopIdx, buyExpeditionMap, buySanctuaryExpansion, buyDecoration, buyGuidebook, buyTool]);
+  }, [isShopModalOpen, shopTab, focusedShopIdx, buyExpeditionMap, buySanctuaryExpansion, buyDecoration, buyGuidebook, buyTool, buyFertilizerItem]);
 
   // Keyboard navigation for Workbench Modal
   useEffect(() => {
@@ -12107,31 +13797,38 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (gameStateRef.current.status !== 'PLAYING') return;
 
+      keysPressed.current[e.key] = true;
+
       if (e.repeat) return;
+
+      if (radialActionKeyRef.current) {
+        const lowerKey = e.key.toLowerCase();
+        // If the user presses ANY other movement key, immediately clear the radial suppression key
+        if (
+          lowerKey !== radialActionKeyRef.current &&
+          ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(lowerKey)
+        ) {
+          clearRadialActionKey();
+        }
+      }
 
       // PRIORITY: If in placement preview mode, handle Arrow keys / R to rotate, Enter/E to place, Esc to abort
       if (placementPreviewRef.current) {
         if (
-          e.key === 'ArrowLeft' ||
           e.key === 'ArrowRight' ||
-          e.key === 'ArrowUp' ||
           e.key === 'ArrowDown' ||
           e.key === 'r' ||
           e.key === 'R'
         ) {
           e.preventDefault();
           e.stopPropagation();
-          setPlacementPreview((prev) => {
-            if (!prev) return null;
-            const newOrientation = prev.orientation === 'horizontal' ? 'vertical' : 'horizontal';
-            return {
-              ...prev,
-              orientation: newOrientation,
-              width: newOrientation === 'horizontal' ? 3 : 1,
-              height: newOrientation === 'horizontal' ? 1 : 3,
-            };
-          });
-          gameAudio.playCrispClick();
+          togglePreviewOrientation('clockwise');
+          return;
+        }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          e.stopPropagation();
+          togglePreviewOrientation('counter-clockwise');
           return;
         }
         if (e.key === 'Escape') {
@@ -12150,6 +13847,11 @@ export default function App() {
       }
 
       if (e.key === 'Escape') {
+        if (isBonsaiSocietyOpenRef.current || isBonsaiSocietyOpen) {
+          e.preventDefault();
+          handleCloseBonsaiSociety();
+          return;
+        }
         if (placementPreviewRef.current) {
           e.preventDefault();
           setPlacementPreview(null);
@@ -12170,7 +13872,10 @@ export default function App() {
           return;
         }
         if (excursionReport) return;
-        if (inspectingBonsaiId) {
+        if (socketingPedestalId) {
+          setSocketingPedestalId(null);
+          gameAudio.playCrispClick();
+        } else if (inspectingBonsaiId) {
           setInspectingBonsaiId(null);
         } else if (inspectingStructureId) {
           setInspectingStructureId(null);
@@ -12205,20 +13910,20 @@ export default function App() {
         if (e.key === 'w' || e.key === 'W') {
           e.preventDefault();
           donatePlantedBonsai(quickRadialBonsai.id);
-          setQuickRadialBonsai(null);
+          handleCloseRadialMenu('w');
           return;
         }
         if (e.key === 's' || e.key === 'S') {
           e.preventDefault();
           pickUpBonsaiToInventory(quickRadialBonsai.id);
-          setQuickRadialBonsai(null);
+          handleCloseRadialMenu('s');
           return;
         }
         if (e.key === 'a' || e.key === 'A') {
           e.preventDefault();
           if (sanctuaryInventoryRef.current.organic_compost > 0) {
             applyOrganicCompost(quickRadialBonsai.id);
-            setQuickRadialBonsai(null);
+            handleCloseRadialMenu('a');
           } else {
             gameAudio.playErrorBuzz();
             triggerNotification('No Enriched Organic Compost in stock! Craft at Workbench.', '#ef4444');
@@ -12227,13 +13932,18 @@ export default function App() {
         }
         if (e.key === 'd' || e.key === 'D') {
           e.preventDefault();
-          gameAudio.playErrorBuzz();
-          triggerNotification('🧪 Chemical Fertilizer research locked! Coming in future updates.', '#94a3b8');
+          if ((sanctuaryInventoryRef.current.fertilizer || 0) > 0) {
+            applyFertilizer(quickRadialBonsai.id);
+            handleCloseRadialMenu('d');
+          } else {
+            gameAudio.playErrorBuzz();
+            triggerNotification('No Fertilizer in stock! Craft at Fertilizer Station or buy at Market.', '#ef4444');
+          }
           return;
         }
-        if (e.key === 'q' || e.key === 'Q') {
+        if (e.key === 'q' || e.key === 'Q' || e.key === 'Escape') {
           e.preventDefault();
-          setQuickRadialBonsai(null);
+          handleCloseRadialMenu();
           gameAudio.playCrispClick();
           return;
         }
@@ -12296,8 +14006,8 @@ export default function App() {
             setIsBiomeSelectOpen(true);
             gameAudio.playCrispClick();
           } else if (isNearBonsaiSociety) {
+            setIsBonsaiSocietyOpen(true);
             gameAudio.playCrispClick();
-            triggerNotification('🏛️ Bonsai Society (Grand Hall - Membership Opening Soon)', '#fbbf24');
           } else if (isNearWorkbench) {
             setWorkbenchTab('resources');
             setIsWorkbenchModalOpen(true);
@@ -12308,6 +14018,8 @@ export default function App() {
           } else if (nearbyStructure) {
             if (nearbyStructure.type === 'tool_compost_heap') {
               interactCompostHeapDirect(nearbyStructure.id);
+            } else if (nearbyStructure.type === 'fertilizer_station') {
+              interactFertilizerStationDirect(nearbyStructure.id);
             } else if (nearbyStructure.type === 'tool_garden_well') {
               drawWaterFromWell(nearbyStructure.id);
             } else if (
@@ -12316,11 +14028,22 @@ export default function App() {
               nearbyStructure.type === 'irrigation_t3'
             ) {
               refillManualIrrigation(nearbyStructure.id);
-            } else if (nearbyStructure.type === 'solar_panel' || nearbyStructure.type === 'wind_turbine') {
+            } else if (
+              nearbyStructure.type === 'solar_panel' ||
+              nearbyStructure.type === 'wind_turbine' ||
+              nearbyStructure.type === 'water_feature' ||
+              nearbyStructure.type === 'decor_woven_wall'
+            ) {
               setInspectingStructureId(nearbyStructure.id);
               gameAudio.playCrispClick();
             } else if (
-              nearbyStructure.type.startsWith('crystal_pedestal') ||
+              nearbyStructure.type === 'empty_crystal_pedestal' ||
+              nearbyStructure.type === 'crystal_pedestal' ||
+              nearbyStructure.type.startsWith('crystal_pedestal')
+            ) {
+              setSocketingPedestalId(nearbyStructure.id);
+              gameAudio.playCrispClick();
+            } else if (
               nearbyStructure.type.startsWith('automaton_')
             ) {
               dismantleDeployedStructure(nearbyStructure.id);
@@ -12350,10 +14073,10 @@ export default function App() {
             e.preventDefault();
             finishExcursion(false);
           } else {
-            const key = `${roverRef.current.tileX},${roverRef.current.tileY}`;
-            const node = excursionNodesRef.current.get(key);
+            const node = findNearbyExcursionNode();
             if (node && !node.collected) {
-              if (node.type === 'SAPLING') {
+              e.preventDefault();
+              if (node.type === 'SAPLING' || node.type === 'CRYSTAL') {
                 triggerRadialDig(node);
               } else if (node.type === 'RESOURCE') {
                 collectCurrentRoverResource();
@@ -12386,7 +14109,28 @@ export default function App() {
             return;
           }
 
+          // Check if player is near any fence along edges
           const av = avatarRef.current;
+          const halfTileW = (SANCTUARY_GRID.cellW - 8) / 2;
+          const halfTileH = (SANCTUARY_GRID.cellH - 8) / 2;
+          let nearestFence: DeployedStructure | null = null;
+          let minFenceDist = Infinity;
+          for (const s of deployedStructuresRef.current) {
+            if (s.type !== 'bamboo_fence') continue;
+            const dist = Math.hypot(av.x - s.x, av.y - s.y);
+            const isNear = s.orientation === 'horizontal'
+              ? Math.abs(av.x - s.x) <= halfTileW + 6 && Math.abs(av.y - s.y) <= 30
+              : Math.abs(av.x - s.x) <= 30 && Math.abs(av.y - s.y) <= halfTileH + 6;
+            if (isNear && dist < minFenceDist) {
+              minFenceDist = dist;
+              nearestFence = s;
+            }
+          }
+          if (nearestFence) {
+            dismantleDeployedStructure((nearestFence as DeployedStructure).id);
+            return;
+          }
+
           const currentPlot = getPlotAtCoords(av.x, av.y, sanctuaryInventoryRef.current.sanctuary_expansion_tier || 0);
           if (currentPlot) {
             const structOnTile = deployedStructuresRef.current.find((s) => Math.hypot(s.x - currentPlot.centerX, s.y - currentPlot.centerY) < 30);
@@ -12481,6 +14225,16 @@ export default function App() {
         } else if (locationRef.current === 'EXCURSION' && Math.hypot(roverRef.current.tileX, roverRef.current.tileY) <= 1.0) {
           e.preventDefault();
           finishExcursion(false);
+        } else if (locationRef.current === 'EXCURSION') {
+          const node = findNearbyExcursionNode();
+          if (node && !node.collected) {
+            e.preventDefault();
+            if (node.type === 'SAPLING' || node.type === 'CRYSTAL') {
+              triggerRadialDig(node);
+            } else if (node.type === 'RESOURCE') {
+              collectCurrentRoverResource();
+            }
+          }
         } else if (
           locationRef.current === 'SANCTUARY' &&
           nearbyBonsai &&
@@ -12499,8 +14253,35 @@ export default function App() {
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      delete keysPressed.current[e.key];
+      const lowerKey = e.key.toLowerCase();
+      if (
+        radialActionKeyRef.current &&
+        (lowerKey === radialActionKeyRef.current ||
+         (radialActionKeyRef.current === 'w' && e.key === 'ArrowUp') ||
+         (radialActionKeyRef.current === 's' && e.key === 'ArrowDown') ||
+         (radialActionKeyRef.current === 'a' && e.key === 'ArrowLeft') ||
+         (radialActionKeyRef.current === 'd' && e.key === 'ArrowRight'))
+      ) {
+        clearRadialActionKey();
+      }
+    };
+
+    const handleBlur = () => {
+      clearRadialActionKey();
+      gamepadMovementLockedRef.current = false;
+      keysPressed.current = {};
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
   }, [
     applyOrganicCompost,
     attemptRoverStep,
@@ -12526,6 +14307,8 @@ export default function App() {
     isNearWorkbench,
     isNearZenLibrary,
     isNearBonsaiSociety,
+    isBonsaiSocietyOpen,
+    handleCloseBonsaiSociety,
     isPlantingModalOpen,
     isShopModalOpen,
     isUnifiedStorageOpen,
@@ -12538,6 +14321,8 @@ export default function App() {
     triggerNotification,
     triggerRadialDig,
     handleConfirmPlacement,
+    clearRadialActionKey,
+    handleCloseRadialMenu,
   ]);
 
   // Pointer click on canvas in Sanctuary
@@ -12628,8 +14413,8 @@ export default function App() {
           worldY >= society.y - 10 &&
           worldY <= society.y + society.height + 10
         ) {
+          setIsBonsaiSocietyOpen(true);
           gameAudio.playCrispClick();
-          triggerNotification('🏛️ Bonsai Society (Grand Hall - Membership Opening Soon)', '#fbbf24');
           return;
         }
 
@@ -12665,6 +14450,9 @@ export default function App() {
           if (Math.abs(dx) <= halfTileW + 4 && Math.abs(dy) <= halfTileH + 4) {
             if (s.type === 'tool_compost_heap') {
               interactCompostHeapDirect(s.id);
+              return;
+            } else if (s.type === 'fertilizer_station') {
+              interactFertilizerStationDirect(s.id);
               return;
             } else if (s.type === 'tool_garden_well') {
               drawWaterFromWell(s.id);
@@ -12748,6 +14536,25 @@ export default function App() {
         if (buttons[12]?.pressed) gpMoveY = -1;
         if (buttons[13]?.pressed) gpMoveY = 1;
 
+        if (gamepadMovementLockedRef.current) {
+          const stickNeutral = Math.hypot(rawAxisX, rawAxisY) < 0.2;
+          const dpadReleased =
+            !buttons[12]?.pressed &&
+            !buttons[13]?.pressed &&
+            !buttons[14]?.pressed &&
+            !buttons[15]?.pressed;
+          if (stickNeutral && dpadReleased) {
+            gamepadMovementLockedRef.current = false;
+            if (gamepadSafetyTimeoutRef.current !== null) {
+              window.clearTimeout(gamepadSafetyTimeoutRef.current);
+              gamepadSafetyTimeoutRef.current = null;
+            }
+          } else {
+            gpMoveX = 0;
+            gpMoveY = 0;
+          }
+        }
+
         // Right Stick (axes 2 and 3) dedicated to scrolling scrollable menus/submenus/lists
         const rightStickX = axes[2] ?? 0;
         const rightStickY = axes[3] ?? 0;
@@ -12804,8 +14611,13 @@ export default function App() {
             lastGamepadButtonsRef.current = buttons.map((b) => b.pressed);
             return;
           }
-          if (justPressed(4) || justPressed(5) || justPressed(14) || justPressed(15)) {
-            togglePreviewOrientation();
+          if (justPressed(4) || justPressed(14) || justPressed(12)) {
+            togglePreviewOrientation('counter-clockwise');
+            lastGamepadButtonsRef.current = buttons.map((b) => b.pressed);
+            return;
+          }
+          if (justPressed(5) || justPressed(15) || justPressed(13)) {
+            togglePreviewOrientation('clockwise');
             lastGamepadButtonsRef.current = buttons.map((b) => b.pressed);
             return;
           }
@@ -12814,7 +14626,7 @@ export default function App() {
         // Button 0 (A / Cross): Start game on START screen, continue on VICTORY, primary interact
         if (justPressed(0)) {
           if (quickRadialBonsai) {
-            setQuickRadialBonsai(null);
+            handleCloseRadialMenu();
             gameAudio.playCrispClick();
           } else if (gameStateRef.current.status === 'START') {
             if (titleMenuIdx === 0) {
@@ -12851,8 +14663,8 @@ export default function App() {
               setIsBiomeSelectOpen(true);
               gameAudio.playCrispClick();
             } else if (isNearBonsaiSocietyRef.current) {
+              setIsBonsaiSocietyOpen(true);
               gameAudio.playCrispClick();
-              triggerNotification('🏛️ Bonsai Society (Grand Hall - Membership Opening Soon)', '#fbbf24');
             } else if (isNearWorkbenchRef.current) {
               setWorkbenchTab('resources');
               setIsWorkbenchModalOpen(true);
@@ -12865,6 +14677,8 @@ export default function App() {
               if (str) {
                 if (str.type === 'tool_compost_heap') {
                   interactCompostHeapDirect(str.id);
+                } else if (str.type === 'fertilizer_station') {
+                  interactFertilizerStationDirect(str.id);
                 } else if (str.type === 'tool_garden_well') {
                   drawWaterFromWell(str.id);
                 } else if (
@@ -12877,7 +14691,13 @@ export default function App() {
                   setInspectingStructureId(str.id);
                   gameAudio.playCrispClick();
                 } else if (
-                  str.type.startsWith('crystal_pedestal') ||
+                  str.type === 'empty_crystal_pedestal' ||
+                  str.type === 'crystal_pedestal' ||
+                  str.type.startsWith('crystal_pedestal')
+                ) {
+                  setSocketingPedestalId(str.id);
+                  gameAudio.playCrispClick();
+                } else if (
                   str.type.startsWith('automaton_')
                 ) {
                   dismantleDeployedStructure(str.id);
@@ -12894,11 +14714,13 @@ export default function App() {
             if (Math.hypot(roverRef.current.tileX, roverRef.current.tileY) <= 1.0) {
               finishExcursion(false);
             } else {
-              const key = `${roverRef.current.tileX},${roverRef.current.tileY}`;
-              const node = excursionNodesRef.current.get(key);
+              const node = findNearbyExcursionNode();
               if (node && !node.collected) {
-                if (node.type === 'SAPLING') triggerRadialDig(node);
-                else if (node.type === 'RESOURCE') collectCurrentRoverResource();
+                if (node.type === 'SAPLING' || node.type === 'CRYSTAL') {
+                  triggerRadialDig(node);
+                } else if (node.type === 'RESOURCE') {
+                  collectCurrentRoverResource();
+                }
               }
             }
           }
@@ -12912,12 +14734,15 @@ export default function App() {
             return;
           }
           if (quickRadialBonsai) {
-            setQuickRadialBonsai(null);
+            handleCloseRadialMenu();
             gameAudio.playCrispClick();
           } else if (excavationResult) {
             handleDeclineExcavatedSeedling();
           } else if (digStateRef.current.active) {
             cancelDiggingMinigame();
+          } else if (socketingPedestalId) {
+            setSocketingPedestalId(null);
+            gameAudio.playCrispClick();
           } else if (inspectingBonsaiId) {
             setInspectingBonsaiId(null);
           } else if (inspectingStructureId) {
@@ -12937,6 +14762,8 @@ export default function App() {
             setIsWorkbenchModalOpen(false);
           } else if (isZenSkillsModalOpen) {
             setIsZenSkillsModalOpen(false);
+          } else if (isBonsaiSocietyOpenRef.current || isBonsaiSocietyOpen) {
+            handleCloseBonsaiSociety();
           } else if (isGoalModalOpen) {
             setIsGoalModalOpen(false);
           } else if (isHowToPlayOpen) {
@@ -12969,19 +14796,32 @@ export default function App() {
         if (justPressed(3)) {
           if (locationRef.current === 'SANCTUARY') {
             if (quickRadialBonsai) {
-              setQuickRadialBonsai(null);
+              handleCloseRadialMenu();
               gameAudio.playCrispClick();
             } else if (nearbyStructureIdRef.current) {
               dismantleDeployedStructure(nearbyStructureIdRef.current);
-            } else if (nearbyBonsaiIdRef.current) {
-              const b = plantedBonsaisRef.current.find((tree) => tree.id === nearbyBonsaiIdRef.current);
-              if (b) {
-                setQuickRadialBonsai(b);
+            } else {
+              const av = avatarRef.current;
+              const halfTileW = (SANCTUARY_GRID.cellW - 8) / 2;
+              const halfTileH = (SANCTUARY_GRID.cellH - 8) / 2;
+              const nearestFence = deployedStructuresRef.current.find((s) => {
+                if (s.type !== 'bamboo_fence') return false;
+                return s.orientation === 'horizontal'
+                  ? Math.abs(av.x - s.x) <= halfTileW + 6 && Math.abs(av.y - s.y) <= 30
+                  : Math.abs(av.x - s.x) <= 30 && Math.abs(av.y - s.y) <= halfTileH + 6;
+              });
+              if (nearestFence) {
+                dismantleDeployedStructure(nearestFence.id);
+              } else if (nearbyBonsaiIdRef.current) {
+                const b = plantedBonsaisRef.current.find((tree) => tree.id === nearbyBonsaiIdRef.current);
+                if (b) {
+                  setQuickRadialBonsai(b);
+                  gameAudio.playCrispClick();
+                }
+              } else {
+                setIsUnifiedStorageOpen((prev) => !prev);
                 gameAudio.playCrispClick();
               }
-            } else {
-              setIsUnifiedStorageOpen((prev) => !prev);
-              gameAudio.playCrispClick();
             }
           }
         }
@@ -13065,24 +14905,29 @@ export default function App() {
           if (justPressed(12) || (rawAxisY < -0.5 && lastBtns[12] === false)) {
             // Up: Quick Sell
             donatePlantedBonsai(quickRadialBonsai.id);
-            setQuickRadialBonsai(null);
+            handleCloseRadialMenu();
           } else if (justPressed(13) || (rawAxisY > 0.5 && lastBtns[13] === false)) {
             // Down: Store Bonsai
             pickUpBonsaiToInventory(quickRadialBonsai.id);
-            setQuickRadialBonsai(null);
+            handleCloseRadialMenu();
           } else if (justPressed(14) || (rawAxisX < -0.5 && lastBtns[14] === false)) {
             // Left: Give Compost
             if (sanctuaryInventoryRef.current.organic_compost > 0) {
               applyOrganicCompost(quickRadialBonsai.id);
-              setQuickRadialBonsai(null);
+              handleCloseRadialMenu();
             } else {
               gameAudio.playErrorBuzz();
               triggerNotification('No Enriched Organic Compost in stock! Craft at Workbench.', '#ef4444');
             }
           } else if (justPressed(15) || (rawAxisX > 0.5 && lastBtns[15] === false)) {
-            // Right: Give Fertilizer (locked)
-            gameAudio.playErrorBuzz();
-            triggerNotification('🧪 Chemical Fertilizer research locked! Coming in future updates.', '#94a3b8');
+            // Right: Give Fertilizer
+            if ((sanctuaryInventoryRef.current.fertilizer || 0) > 0) {
+              applyFertilizer(quickRadialBonsai.id);
+              handleCloseRadialMenu();
+            } else {
+              gameAudio.playErrorBuzz();
+              triggerNotification('No Fertilizer in stock! Craft at Fertilizer Station or buy at Market.', '#ef4444');
+            }
           }
         }
 
@@ -13108,15 +14953,26 @@ export default function App() {
         digStateRef.current.active ||
         inspectingBonsaiId !== null ||
         inspectingStructureId !== null ||
+        socketingPedestalId !== null ||
+        quickRadialBonsai !== null ||
+        quickRadialBonsaiRef.current !== null ||
         isUnifiedStorageOpen ||
         isPlantingModalOpen ||
         isWorkbenchModalOpen ||
         isZenSkillsModalOpen ||
         isShopModalOpen ||
         isBiomeSelectOpen ||
+        isBonsaiSocietyOpen ||
+        isBonsaiSocietyOpenRef.current ||
         isGoalModalOpen;
 
-      if (locationRef.current === 'SANCTUARY' && !isAnyModalBlockingInput) {
+      if (isAnyModalBlockingInput || quickRadialBonsai || quickRadialBonsaiRef.current || isBonsaiSocietyOpenRef.current) {
+        av.vx = 0;
+        av.vy = 0;
+        av.isMoving = false;
+      }
+
+      if (locationRef.current === 'SANCTUARY' && !isAnyModalBlockingInput && !quickRadialBonsai && !quickRadialBonsaiRef.current && !isBonsaiSocietyOpenRef.current) {
         const baseSpeed = (getConfig('playerWalkSpeed') as number) || 220;
 
         // Check if player is standing on a Zen Pebble Stepping Path or Station Promenade Walkway
@@ -13138,10 +14994,16 @@ export default function App() {
         let moveX = 0;
         let moveY = 0;
 
-        if (input.actions.left) moveX -= 1;
-        if (input.actions.right) moveX += 1;
-        if (input.actions.up) moveY -= 1;
-        if (input.actions.down) moveY += 1;
+        const suppressed = radialActionKeyRef.current;
+        const isUpSuppressed = suppressed === 'w' || suppressed === 'arrowup';
+        const isDownSuppressed = suppressed === 's' || suppressed === 'arrowdown';
+        const isLeftSuppressed = suppressed === 'a' || suppressed === 'arrowleft';
+        const isRightSuppressed = suppressed === 'd' || suppressed === 'arrowright';
+
+        if (input.actions.left && !isLeftSuppressed) moveX -= 1;
+        if (input.actions.right && !isRightSuppressed) moveX += 1;
+        if (input.actions.up && !isUpSuppressed) moveY -= 1;
+        if (input.actions.down && !isDownSuppressed) moveY += 1;
 
         if (moveX !== 0 && moveY !== 0) {
           moveX *= 0.7071;
@@ -13338,6 +15200,40 @@ export default function App() {
           } else {
             s.timer = 0;
           }
+        } else if (s.type === 'fertilizer_station') {
+          s.depositedWaste = s.depositedWaste ?? 0;
+          s.depositedBiochemicals = s.depositedBiochemicals ?? 0;
+          s.readyFertilizer = s.readyFertilizer ?? 0;
+          s.timer = s.timer ?? 0;
+
+          if (s.isDistilling && s.timer > 0) {
+            s.timer = Math.max(0, s.timer - dt);
+
+            // Ambient distillation bubbles / steam
+            if (locationRef.current === 'SANCTUARY' && Math.random() < 0.15) {
+              emitParticle(
+                s.x + (Math.random() - 0.5) * 20,
+                s.y - 15,
+                (Math.random() - 0.5) * 10,
+                -15,
+                2,
+                '#84cc16',
+                0.5,
+              );
+            }
+
+            if (s.timer <= 0) {
+              s.isDistilling = false;
+              const batches = Math.min(Math.floor(s.depositedWaste / 3), s.depositedBiochemicals);
+              if (batches > 0) {
+                s.depositedWaste -= batches * 3;
+                s.depositedBiochemicals -= batches;
+                s.readyFertilizer = (s.readyFertilizer || 0) + batches;
+                addFloatingText(s.x, s.y - 35, `+${batches} 🧪 Fertilizer Ready!`, '#34d399');
+                gameAudio.playLevelUpStinger();
+              }
+            }
+          }
         } else if (s.type === 'tool_garden_well') {
           s.activeWateringRemaining = s.activeWateringRemaining ?? 0;
           if (s.activeWateringRemaining > 0) {
@@ -13390,6 +15286,9 @@ export default function App() {
             } else if (recipeId === 'craft_enriched_compost') {
               inv.organic_compost = (inv.organic_compost || 0) + 1;
               inv.enrichedCompost = inv.organic_compost;
+            } else if (recipeId === 'craft_biochemicals') {
+              inv.biochemicals = (inv.biochemicals || 0) + 1;
+              if (inv.resources) inv.resources.biochemicals = inv.biochemicals;
             } else if (recipeId === 'craft_copper_wire') {
               inv.copper_wire = (inv.copper_wire || 0) + 1;
               inv.copperWire = inv.copper_wire;
@@ -13537,6 +15436,9 @@ export default function App() {
               } else if (rid === 'craft_enriched_compost') {
                 inv.organic_compost = (inv.organic_compost || 0) + 1;
                 inv.enrichedCompost = inv.organic_compost;
+              } else if (rid === 'craft_biochemicals') {
+                inv.biochemicals = (inv.biochemicals || 0) + 1;
+                if (inv.resources) inv.resources.biochemicals = inv.biochemicals;
               } else if (rid === 'craft_copper_wire') {
                 inv.copper_wire = (inv.copper_wire || 0) + 1;
                 inv.copperWire = inv.copper_wire;
@@ -13684,6 +15586,16 @@ export default function App() {
               const dy = Math.abs(av.y - s.y);
               isWithinTile = dx <= SANCTUARY_GRID.cellW + halfTileW + 4 && dy <= halfTileH + 4;
             }
+          } else if (s.type === 'bamboo_fence') {
+            if (s.orientation === 'horizontal') {
+              const dx = Math.abs(av.x - s.x);
+              const dy = Math.abs(av.y - s.y);
+              isWithinTile = dx <= halfTileW + 6 && dy <= 28;
+            } else {
+              const dx = Math.abs(av.x - s.x);
+              const dy = Math.abs(av.y - s.y);
+              isWithinTile = dx <= 28 && dy <= halfTileH + 6;
+            }
           } else {
             const dx = Math.abs(av.x - s.x);
             const dy = Math.abs(av.y - s.y);
@@ -13705,7 +15617,7 @@ export default function App() {
 
         if (placementPreviewRef.current) {
           const prevPlot = getPreviewPlot(av.x, av.y, inv.sanctuary_expansion_tier || 0);
-          const pKey = `${prevPlot.col},${prevPlot.row},${placementPreviewRef.current.orientation}`;
+          const pKey = `${prevPlot.col},${prevPlot.row},${placementPreviewRef.current.orientation},${placementPreviewRef.current.edgeSide || placementPreviewRef.current.fenceEdge}`;
           if (lastPreviewPlotKeyRef.current !== pKey) {
             lastPreviewPlotKeyRef.current = pKey;
             refreshHud();
@@ -13713,11 +15625,17 @@ export default function App() {
         }
 
         const isAnyStationNear = isZenNear || isWbNear || isSocietyNear || isGarageNear || isShopNear;
+        const structInPlotCenter = deployedStructuresRef.current.find(
+          (s) =>
+            s.type !== 'bamboo_fence' &&
+            Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW) === currentPlot?.col &&
+            Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH) === currentPlot?.row,
+        );
         const isPlotEmpty =
           currentPlot !== null &&
           currentPlot.isUnlocked &&
           !closestBonsai &&
-          !closestStruct &&
+          !structInPlotCenter &&
           !isAnyStationNear &&
           !isPlotOccupiedByPlantedBonsai(currentPlot.col, currentPlot.row) &&
           !isPlotOccupiedByStructure(currentPlot.col, currentPlot.row);
@@ -15041,7 +16959,7 @@ export default function App() {
         if (isNearBonsaiSociety) {
           ctx.fillStyle = '#fef08a';
           ctx.font = 'bold 10px system-ui';
-          ctx.fillText('🏛️ Grand Hall (Membership Opening Soon)', society.x + society.width / 2, society.y + society.height + 16);
+          ctx.fillText('[E / A] Enter Bonsai Society', society.x + society.width / 2, society.y + society.height + 16);
         }
         ctx.restore();
 
@@ -15397,6 +17315,14 @@ export default function App() {
 
         const activeHaloBonsai = inspectingBonsai || nearbyBonsai;
 
+        // Build Fence Set for visual halo occlusion
+        const fenceSet = new Set<string>();
+        deployedStructuresRef.current.forEach((s) => {
+          if (s.type === 'bamboo_fence' && s.edgeKey) {
+            fenceSet.add(s.edgeKey);
+          }
+        });
+
         // A. 3x3 CLEAN ENERGY RESONANCE HALO (Floor Tiles & Beams)
         if (activeHaloGenerator) {
           const isSolar = activeHaloGenerator.type === 'solar_panel';
@@ -15417,6 +17343,9 @@ export default function App() {
               const gc = centerCol + dc;
               const gr = centerRow + dr;
               if (gc >= 0 && gc < SANCTUARY_GRID.cols && gr >= 0 && gr < SANCTUARY_GRID.rows) {
+                const isBlocked = isHaloBlockedByFence(centerCol, centerRow, gc, gr, fenceSet);
+                if (isBlocked) continue; // Physically cut off by bamboo fence
+
                 const tx = SANCTUARY_GRID.startX + gc * SANCTUARY_GRID.cellW;
                 const ty = SANCTUARY_GRID.startY + gr * SANCTUARY_GRID.cellH;
                 const tW = SANCTUARY_GRID.cellW - 8;
@@ -15528,12 +17457,29 @@ export default function App() {
           }
 
           haloPlots.forEach(({ col: gc, row: gr }) => {
+            const isBlockedByFence = isHaloBlockedByFence(bCol, bRow, gc, gr, fenceSet);
+
             const tx = SANCTUARY_GRID.startX + gc * SANCTUARY_GRID.cellW;
             const ty = SANCTUARY_GRID.startY + gr * SANCTUARY_GRID.cellH;
             const tW = SANCTUARY_GRID.cellW - 8;
             const tH = SANCTUARY_GRID.cellH - 8;
 
             ctx.save();
+            if (isBlockedByFence) {
+              // Dimmed / severed halo boundary indicating fence occlusion
+              ctx.fillStyle = 'rgba(15, 23, 42, 0.4)';
+              ctx.beginPath();
+              ctx.roundRect(tx - tW / 2, ty - tH / 2, tW, tH, 6);
+              ctx.fill();
+              ctx.strokeStyle = 'rgba(100, 116, 139, 0.35)';
+              ctx.lineWidth = 1.0;
+              ctx.setLineDash([2, 4]);
+              ctx.stroke();
+              ctx.setLineDash([]);
+              ctx.restore();
+              return; // Completely severed by fence! Do not draw active halo aura or beams
+            }
+
             // Glowing resonance tile backdrop
             ctx.fillStyle = haloFill;
             ctx.beginPath();
@@ -15583,25 +17529,31 @@ export default function App() {
             });
 
             const matchingWall = deployedStructuresRef.current.find((s) => {
-              if (s.type !== 'decor_woven_wall') return false;
+              if (s.type !== 'decor_woven_wall' && s.type !== 'water_feature') return false;
               const sc = Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
               const sr = Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
               return sc === gc && sr === gr;
             });
             const matchingRock = deployedStructuresRef.current.find((s) => {
-              if (s.type !== 'decor_rock_formation') return false;
+              if (s.type !== 'decor_rock_formation' && s.type !== 'zen_rock_formation') return false;
               const sc = Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
               const sr = Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
               return sc === gc && sr === gr;
             });
-            const matchingBush = deployedStructuresRef.current.find((s) => {
-              if (s.type !== 'decor_shrubbery_bush') return false;
+            const matchingBamboo = deployedStructuresRef.current.find((s) => {
+              if (s.type !== 'decor_shrubbery_bush' && s.type !== 'growing_bamboo_formation') return false;
+              const sc = Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
+              const sr = Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+              return sc === gc && sr === gr;
+            });
+            const matchingFernBall = deployedStructuresRef.current.find((s) => {
+              if (s.type !== 'asparagus_fern_ball') return false;
               const sc = Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
               const sr = Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
               return sc === gc && sr === gr;
             });
             const matchingTool = deployedStructuresRef.current.find((s) => {
-              const isTool = s.type === 'tool_compost_heap' || s.type === 'tool_garden_well';
+              const isTool = s.type === 'tool_compost_heap' || s.type === 'tool_garden_well' || s.type === 'fertilizer_station';
               if (!isTool) return false;
               const sc = Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
               const sr = Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
@@ -15626,11 +17578,13 @@ export default function App() {
               : matchingCrystal
               ? 'crystal_pedestal'
               : matchingWall
-              ? 'decor_woven_wall'
+              ? 'water_feature'
               : matchingRock
-              ? 'decor_rock_formation'
-              : matchingBush
-              ? 'decor_shrubbery_bush'
+              ? 'zen_rock_formation'
+              : matchingBamboo
+              ? 'growing_bamboo_formation'
+              : matchingFernBall
+              ? 'asparagus_fern_ball'
               : matchingTool
               ? matchingTool.type
               : matchingEnergy
@@ -15683,6 +17637,19 @@ export default function App() {
               ctx.arc((activeHaloBonsai.x + tx) / 2, (activeHaloBonsai.y + ty) / 2, 3.5, 0, Math.PI * 2);
               ctx.fill();
             } else if (!isStalled && matchingWall) {
+              ctx.strokeStyle = '#06b6d4';
+              ctx.lineWidth = 2.0;
+              ctx.beginPath();
+              ctx.moveTo(activeHaloBonsai.x, activeHaloBonsai.y);
+              ctx.lineTo(tx, ty);
+              ctx.stroke();
+              const sparkPulse = 0.6 + Math.sin(haloTime * 2 + gc + gr) * 0.4;
+              ctx.fillStyle = `rgba(6, 182, 212, ${sparkPulse})`;
+              ctx.beginPath();
+              ctx.arc((activeHaloBonsai.x + tx) / 2, (activeHaloBonsai.y + ty) / 2, 3.2, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (!isStalled && matchingRock) {
+              // Zen Rock Formation: amber/gold XP Boosted beam
               ctx.strokeStyle = '#f59e0b';
               ctx.lineWidth = 2.0;
               ctx.beginPath();
@@ -15694,19 +17661,8 @@ export default function App() {
               ctx.beginPath();
               ctx.arc((activeHaloBonsai.x + tx) / 2, (activeHaloBonsai.y + ty) / 2, 3.2, 0, Math.PI * 2);
               ctx.fill();
-            } else if (!isStalled && matchingRock) {
-              ctx.strokeStyle = '#94a3b8';
-              ctx.lineWidth = 2.0;
-              ctx.beginPath();
-              ctx.moveTo(activeHaloBonsai.x, activeHaloBonsai.y);
-              ctx.lineTo(tx, ty);
-              ctx.stroke();
-              const sparkPulse = 0.6 + Math.sin(haloTime * 2 + gc + gr) * 0.4;
-              ctx.fillStyle = `rgba(148, 163, 184, ${sparkPulse})`;
-              ctx.beginPath();
-              ctx.arc((activeHaloBonsai.x + tx) / 2, (activeHaloBonsai.y + ty) / 2, 3.2, 0, Math.PI * 2);
-              ctx.fill();
-            } else if (!isStalled && matchingBush) {
+            } else if (!isStalled && matchingBamboo) {
+              // Growing Bamboo Formation: emerald Quick Prune beam
               ctx.strokeStyle = '#10b981';
               ctx.lineWidth = 2.0;
               ctx.beginPath();
@@ -15715,6 +17671,19 @@ export default function App() {
               ctx.stroke();
               const sparkPulse = 0.6 + Math.sin(haloTime * 2 + gc + gr) * 0.4;
               ctx.fillStyle = `rgba(16, 185, 129, ${sparkPulse})`;
+              ctx.beginPath();
+              ctx.arc((activeHaloBonsai.x + tx) / 2, (activeHaloBonsai.y + ty) / 2, 3.2, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (!isStalled && matchingFernBall) {
+              // Asparagus Fern Ball: lime Efficient Pruning beam
+              ctx.strokeStyle = '#84cc16';
+              ctx.lineWidth = 2.0;
+              ctx.beginPath();
+              ctx.moveTo(activeHaloBonsai.x, activeHaloBonsai.y);
+              ctx.lineTo(tx, ty);
+              ctx.stroke();
+              const sparkPulse = 0.6 + Math.sin(haloTime * 2 + gc + gr) * 0.4;
+              ctx.fillStyle = `rgba(132, 204, 22, ${sparkPulse})`;
               ctx.beginPath();
               ctx.arc((activeHaloBonsai.x + tx) / 2, (activeHaloBonsai.y + ty) / 2, 3.2, 0, Math.PI * 2);
               ctx.fill();
@@ -15895,8 +17864,21 @@ export default function App() {
 
             ctx.save();
 
-            // Bounding Box (Handles 1x1, 2x2, and 3x1 torii gate)
-            if (prev.payload === 'torii_gate') {
+            // Bounding Box (Handles 1x1, 2x2, 3x1 torii gate, and edge bamboo fences)
+            if (prev.payload === 'bamboo_fence') {
+              const side = prev.edgeSide || 'top';
+              const edgeGeom = getFenceEdgeGeometry(currentPlot.col, currentPlot.row, side);
+              ctx.strokeStyle = isValid ? '#34d399' : '#f43f5e';
+              ctx.lineWidth = 3;
+              ctx.setLineDash([4, 4]);
+              if (edgeGeom.orientation === 'horizontal') {
+                ctx.strokeRect(edgeGeom.x - (SANCTUARY_GRID.cellW - 2) / 2, edgeGeom.y - 7, SANCTUARY_GRID.cellW - 2, 14);
+              } else {
+                ctx.strokeRect(edgeGeom.x - 7, edgeGeom.y - (SANCTUARY_GRID.cellH - 2) / 2, 14, SANCTUARY_GRID.cellH - 2);
+              }
+              ctx.setLineDash([]);
+              renderBambooFence(ctx, edgeGeom.x, edgeGeom.y, edgeGeom.orientation, true);
+            } else if (prev.payload === 'torii_gate') {
               ctx.strokeStyle = isValid ? '#34d399' : '#f43f5e';
               ctx.lineWidth = 3;
               ctx.setLineDash([5, 5]);
@@ -15988,17 +17970,19 @@ export default function App() {
               );
             } else {
               // Infrastructure or Decoration
-              const decorType = (typeof prev.payload === 'string' ? prev.payload : prev.item || 'decor_rock_formation') as DeployedStructureType;
-              renderCompleteDecor(
-                ctx,
-                decorType,
-                px,
-                py,
-                prev.orientation || 'horizontal',
-                undefined,
-                deployedStructuresRef.current,
-                turbineAngleRef.current,
-              );
+              if (prev.payload !== 'bamboo_fence') {
+                const decorType = (typeof prev.payload === 'string' ? prev.payload : prev.item || 'decor_rock_formation') as DeployedStructureType;
+                renderCompleteDecor(
+                  ctx,
+                  decorType,
+                  px,
+                  py,
+                  prev.orientation || 'horizontal',
+                  undefined,
+                  deployedStructuresRef.current,
+                  turbineAngleRef.current,
+                );
+              }
             }
 
             ctx.filter = 'none';
@@ -17603,7 +19587,7 @@ export default function App() {
             ctx.fillStyle = '#6ee7b7';
             ctx.font = 'bold 8px system-ui';
             ctx.textAlign = 'center';
-            ctx.fillText('🌱 Wild Seedling (3.0kg)', 0, 27);
+            ctx.fillText(`🌱 ${getBonsaiDisplayName(node.saplingLeafType || node.saplingSpecies)} (3.0kg)`, 0, 27);
           }
           ctx.restore();
         });
@@ -18575,7 +20559,7 @@ export default function App() {
 
           ctx.fillStyle = '#f8fafc';
           ctx.font = 'bold 22px system-ui';
-          ctx.fillText(`Radial Root Dig: ${dig.saplingName}`, cx, cy - dialRadius - 46);
+          ctx.fillText(`Radial Root Dig: ${getBonsaiDisplayName(dig.leafType || dig.species)}`, cx, cy - dialRadius - 46);
 
           // 100% HIT REQUIREMENT BADGE
           ctx.font = 'bold 13px system-ui';
@@ -18964,7 +20948,10 @@ export default function App() {
             {placementPreview ? (() => {
               const currentPlot = activePlotRef.current || getPreviewPlot(avatarRef.current.x, avatarRef.current.y, inv.sanctuary_expansion_tier || 0);
               const isValid = checkPlotPlacementValid(currentPlot, placementPreview);
-              const isRotatable = placementPreview.payload === 'torii_gate';
+              const isFence = placementPreview.payload === 'bamboo_fence' || placementPreview.item === 'bamboo_fence';
+              const isTorii = placementPreview.payload === 'torii_gate';
+              const isRotatable = isTorii || isFence;
+              const currentEdge = (placementPreview.fenceEdge || placementPreview.edgeSide || 'top').toUpperCase();
               const isPlantable = placementPreview.category === 'seedling' || placementPreview.category === 'bonsai';
               const previewRating = isPlantable ? getBonsaiMaturityRating(placementPreview.payload) : 1;
               const is2x2Preview = isPlantable && previewRating === 5;
@@ -18990,7 +20977,7 @@ export default function App() {
                   style: (placementPreview.style as BonsaiStyle) || 'CHOKAN',
                   maturity: placementPreview.category === 'seedling' ? placementPreview.payload.maturity : placementPreview.payload.maturity,
                   maturityRating: previewRating,
-                  name: placementPreview.payload.name || 'Preview',
+                  name: getBonsaiDisplayName(placementPreview.payload),
                   level: placementPreview.category === 'bonsai' ? placementPreview.payload.level : 1,
                   progressSeconds: 0,
                   gridX: is2x2Preview ? SANCTUARY_GRID.startX + (currentPlot.col + 0.5) * SANCTUARY_GRID.cellW : currentPlot.centerX,
@@ -19020,13 +21007,16 @@ export default function App() {
                     haloParts.push(`Growing Together x${simSynergies.bonsaiCount} (+${simSynergies.bonsaiCount * 10}% Hydration)`);
                   }
                   if (simSynergies.wallCount > 0) {
-                    haloParts.push(`Private Growing x${simSynergies.wallCount} (+${simSynergies.wallCount * 10}% Hydration)`);
+                    haloParts.push(`Gentle Waters x${simSynergies.wallCount} (+${simSynergies.wallCount * 10}% Hydration)`);
                   }
                   if (simSynergies.rockCount > 0) {
-                    haloParts.push(`Quick Prune x${simSynergies.rockCount} (+${(simSynergies.rockCount * 0.25).toFixed(2)}s Prune)`);
+                    haloParts.push(`XP Boosted x${simSynergies.rockCount} (+${simSynergies.rockCount * 15}% EXP)`);
                   }
-                  if (simSynergies.bushCount > 0) {
-                    haloParts.push(`XP Boosted x${simSynergies.bushCount} (+${simSynergies.bushCount * 15}% EXP)`);
+                  if (simSynergies.bambooCount > 0) {
+                    haloParts.push(`Quick Prune x${simSynergies.bambooCount} (+${(simSynergies.bambooCount * 0.25).toFixed(2)}s Prune)`);
+                  }
+                  if (simSynergies.fernBallCount > 0) {
+                    haloParts.push(`Efficient Pruning x${simSynergies.fernBallCount} (+${simSynergies.fernBallCount * 15}% Extra Waste Chance)`);
                   }
                   if (simSynergies.crystalPedestals && simSynergies.crystalPedestals.total > 0) {
                     haloParts.push(`Cultivating Potential (${formatCrystalPedestalBonus(simSynergies.crystalPedestals)})`);
@@ -19042,14 +21032,27 @@ export default function App() {
                 <div className="w-full flex items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className="text-xl shrink-0">
-                      {placementPreview.payload === 'torii_gate' ? '⛩️' : is2x2Preview ? '👑' : isPlantable ? '🌱' : '📦'}
+                      {isFence ? '🎋' : placementPreview.payload === 'torii_gate' ? '⛩️' : is2x2Preview ? '👑' : isPlantable ? '🌱' : '📦'}
                     </span>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`font-bold ${isValid ? 'text-emerald-300' : 'text-rose-400'}`}>
-                          {isValid ? (is2x2Preview ? '2x2 Grand Bonsai Preview' : 'Placement Preview Active') : 'Invalid Placement Location (Occupied or Off-Grid)'}
+                          {isValid
+                            ? isFence
+                              ? `Bamboo Fence Placement (${currentEdge} Edge)`
+                              : is2x2Preview
+                              ? '2x2 Grand Bonsai Preview'
+                              : 'Placement Preview Active'
+                            : isFence
+                            ? 'Fence Already Exists on Edge'
+                            : 'Invalid Placement Location (Occupied or Off-Grid)'}
                         </span>
-                        {isRotatable && (
+                        {isFence && (
+                          <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/50 px-2 py-0.5 rounded text-[10px] font-mono font-bold">
+                            Edge: {currentEdge}
+                          </span>
+                        )}
+                        {isTorii && (
                           <span className="bg-sky-950 text-sky-300 border border-sky-500/50 px-2 py-0.5 rounded text-[10px] font-mono font-bold">
                             Orientation: {placementPreview.orientation}
                           </span>
@@ -19061,14 +21064,18 @@ export default function App() {
                         )}
                       </div>
                       <div className="text-[11px] text-slate-300 truncate">
-                        {isPlantable ? (
+                        {isFence ? (
+                          <span className="text-emerald-300 font-medium">
+                            [← / → or LB / RB] Rotate Fence ({currentEdge}) • [E / A] Place Fence • [Esc / B] Cancel
+                          </span>
+                        ) : isPlantable ? (
                           <span>
                             <strong>Halo Effects:</strong>{' '}
                             <span className={haloText.startsWith('⛔') ? 'text-rose-400 font-bold' : 'text-emerald-400'}>
                               {haloText}
                             </span>
                           </span>
-                        ) : isRotatable ? (
+                        ) : isTorii ? (
                           <span className="text-slate-400">
                             Spans 3 plots with open center pebble path (+35% Speed) • [← / → or LB / RB] Rotate ({placementPreview.orientation})
                           </span>
@@ -19084,10 +21091,10 @@ export default function App() {
                   <div className="flex items-center gap-2 shrink-0">
                     {isRotatable && (
                       <button
-                        onClick={togglePreviewOrientation}
+                        onClick={() => togglePreviewOrientation('clockwise')}
                         className="bg-sky-700 hover:bg-sky-600 text-white font-bold text-xs px-2.5 py-1.5 rounded-xl shadow transition-transform active:scale-95 flex items-center gap-1 cursor-pointer">
                         <span>🔄</span>
-                        <span>[← / →] Rotate</span>
+                        <span>{isFence ? `[← / →] Rotate (${currentEdge})` : '[← / →] Rotate'}</span>
                       </button>
                     )}
                     <button
@@ -19107,7 +21114,7 @@ export default function App() {
                           : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
                       }`}>
                       <Check className="w-3.5 h-3.5" />
-                      <span>{isPlantable ? (is2x2Preview ? '[E / A] Place 2x2 Bonsai' : '[E / A] Place Bonsai') : '[E / A] Place Item'}</span>
+                      <span>{isFence ? '[E / A] Place Fence' : isPlantable ? (is2x2Preview ? '[E / A] Place 2x2 Bonsai' : '[E / A] Place Bonsai') : '[E / A] Place Item'}</span>
                     </button>
                   </div>
                 </div>
@@ -19178,18 +21185,25 @@ export default function App() {
                 </button>
               </>
             ) : isNearBonsaiSociety ? (
-              <div className="w-full flex items-center justify-between">
+              <>
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">🏛️</span>
                   <div>
-                    <div className="text-xs font-bold text-amber-300">🏛️ Bonsai Society (Grand Hall - Membership Opening Soon)</div>
-                    <div className="text-[11px] text-slate-400">Civic Assembly &amp; Master Arborist Guild Hall</div>
+                    <div className="text-xs font-bold text-amber-300">Bonsai Society Grand Hall</div>
+                    <div className="text-[11px] text-slate-400">Bonsai Master Quest: Discovery, Competition &amp; Eco Lines</div>
                   </div>
                 </div>
-                <div className="bg-slate-800/80 text-amber-300 border border-amber-500/40 text-[11px] font-bold px-3 py-1.5 rounded-xl shadow">
-                  Opening Soon
-                </div>
-              </div>
+
+                <button
+                  onClick={() => {
+                    setIsBonsaiSocietyOpen(true);
+                    gameAudio.playCrispClick();
+                  }}
+                  className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition-transform active:scale-95 min-h-[38px] border border-amber-400/50 cursor-pointer">
+                  <Trophy className="w-4 h-4 text-amber-200" />
+                  <span>[E / A] Enter Bonsai Society</span>
+                </button>
+              </>
             ) : isNearGarage ? (
               <>
                 <div className="flex items-center gap-2">
@@ -19214,7 +21228,10 @@ export default function App() {
               const isSolar = nearbyStructure.type === 'solar_panel';
               const isTurbine = nearbyStructure.type === 'wind_turbine';
               const isCompost = nearbyStructure.type === 'tool_compost_heap';
+              const isFertilizer = nearbyStructure.type === 'fertilizer_station';
               const isWell = nearbyStructure.type === 'tool_garden_well';
+              const isWaterFeature = nearbyStructure.type === 'water_feature' || nearbyStructure.type === 'decor_woven_wall';
+              const isBambooFence = nearbyStructure.type === 'bamboo_fence';
               const isSprinkler =
                 nearbyStructure.type === 'automaton_t1' ||
                 nearbyStructure.type === 'automaton_t2' ||
@@ -19223,6 +21240,10 @@ export default function App() {
                 nearbyStructure.type === 'irrigation_t1' ||
                 nearbyStructure.type === 'irrigation_t2' ||
                 nearbyStructure.type === 'irrigation_t3';
+              const isPedestal =
+                nearbyStructure.type === 'empty_crystal_pedestal' ||
+                nearbyStructure.type === 'crystal_pedestal' ||
+                nearbyStructure.type.startsWith('crystal_pedestal');
               const isEnergy = isSolar || isTurbine;
 
               const solarInfo = isSolar ? getSolarPanelOutput(nearbyStructure, deployedStructuresRef.current) : null;
@@ -19257,18 +21278,28 @@ export default function App() {
                       <Wind className="w-5 h-5 text-amber-400" />
                     ) : isCompost ? (
                       <span className="text-xl">🍂</span>
+                    ) : isFertilizer ? (
+                      <span className="text-xl">🧪</span>
                     ) : isWell ? (
                       <Droplets className="w-5 h-5 text-sky-400" />
                     ) : isSprinkler ? (
                       <span className="text-xl">💧</span>
                     ) : isManualIrrigation ? (
                       <span className="text-xl">💧</span>
+                    ) : isWaterFeature ? (
+                      <span className="text-xl">🌊</span>
+                    ) : isBambooFence ? (
+                      <span className="text-xl">🎋</span>
+                    ) : isPedestal ? (
+                      <span className="text-xl">🔮</span>
                     ) : nearbyStructure.type === 'torii_gate' ? (
                       <span className="text-xl">⛩️</span>
-                    ) : nearbyStructure.type === 'decor_shrubbery_bush' ? (
-                      <Trees className="w-5 h-5 text-emerald-400" />
+                    ) : nearbyStructure.type === 'decor_shrubbery_bush' || nearbyStructure.type === 'growing_bamboo_formation' ? (
+                      <span className="text-xl">🎋</span>
+                    ) : nearbyStructure.type === 'asparagus_fern_ball' ? (
+                      <span className="text-xl">🪴</span>
                     ) : nearbyStructure.type === 'decor_woven_wall' ? (
-                      <Shield className="w-5 h-5 text-amber-400" />
+                      <span className="text-xl">🌊</span>
                     ) : nearbyStructure.type.startsWith('crystal_pedestal') ? (
                       <Sparkles className="w-5 h-5 text-purple-400" />
                     ) : (
@@ -19296,6 +21327,23 @@ export default function App() {
                                   : 'Empty'}
                               </span>
                             </div>
+                          </div>
+                        ) : isFertilizer ? (
+                          <div className="flex items-center gap-1.5">
+                            <span>Fertilizer Station</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-lg font-bold border ${
+                              (nearbyStructure.readyFertilizer || 0) > 0
+                                ? 'bg-emerald-950 text-emerald-300 border-emerald-500/80 shadow-[0_0_8px_rgba(52,211,153,0.3)] animate-pulse'
+                                : (nearbyStructure.isDistilling && (nearbyStructure.timer || 0) > 0)
+                                ? 'bg-amber-950 text-amber-300 border-amber-500/50'
+                                : 'bg-slate-950 text-slate-400 border-slate-700'
+                            }`}>
+                              {(nearbyStructure.readyFertilizer || 0) > 0
+                                ? `${nearbyStructure.readyFertilizer} Ready!`
+                                : (nearbyStructure.isDistilling && (nearbyStructure.timer || 0) > 0)
+                                ? `${Math.ceil(nearbyStructure.timer || 0)}s Distilling`
+                                : 'Idle (3 Waste + 1 Bio)'}
+                            </span>
                           </div>
                         ) : isManualIrrigation ? (
                           <div className="flex items-center gap-1.5">
@@ -19361,16 +21409,22 @@ export default function App() {
                               ? `☀️ Solar Panel Array (+${totalStructKw.toFixed(1)} kW)`
                               : isTurbine
                               ? `💨 Wind Turbine Generator (+${totalStructKw.toFixed(1)} kW)`
+                              : isWaterFeature
+                              ? 'Water Feature'
+                              : isBambooFence
+                              ? 'Bamboo Fence'
+                              : isPedestal
+                              ? (nearbyStructure.socketedCrystal ? `Pedestal (${nearbyStructure.socketedCrystal.name})` : 'Empty Pedestal')
                               : nearbyStructure.type === 'torii_gate'
                               ? `⛩️ Torii Gate (${nearbyStructure.orientation === 'vertical' ? '1x3' : '3x1'})`
                               : nearbyStructure.type === 'decor_pebble_path'
                               ? '🪨 Zen Pebble Stepping Path'
-                              : nearbyStructure.type === 'decor_rock_formation'
+                              : nearbyStructure.type === 'decor_rock_formation' || nearbyStructure.type === 'zen_rock_formation'
                               ? '🪨 Zen Rock Formation'
-                              : nearbyStructure.type === 'decor_shrubbery_bush'
-                              ? '🌿 Topiary Shrubbery Bush'
-                              : nearbyStructure.type === 'decor_woven_wall'
-                              ? '🎋 Woven Wooden Lattice Wall'
+                              : nearbyStructure.type === 'decor_shrubbery_bush' || nearbyStructure.type === 'growing_bamboo_formation'
+                              ? '🎋 Growing Bamboo Formation'
+                              : nearbyStructure.type === 'asparagus_fern_ball'
+                              ? '🪴 Asparagus Fern Ball'
                               : nearbyStructure.type === 'crystal_pedestal_foliage'
                               ? '💎 Emerald Leaf Crystal Pedestal'
                               : nearbyStructure.type === 'crystal_pedestal_branches'
@@ -19395,8 +21449,22 @@ export default function App() {
                           ? '[E / A] Refill Water • [Q / Y] Store to Bag'
                           : isSprinkler
                           ? '[Q / Y] Store to Bag'
+                          : isFertilizer
+                          ? '[E / A] Deposit / Collect • 60s Distillation • [Q / Y] Store to Bag'
+                          : isWaterFeature
+                          ? '[E / A] Inspect • [Q / Y] Store to Bag • Halo: +10% Hydration Growth Speed to adjacent plots'
+                          : isBambooFence
+                          ? '[Q / Y] Pick Up Fence • Physical Barrier (Blocks Halo Synergies)'
+                          : isPedestal
+                          ? '[E / A] Inspect / Socket Crystal • [Q / Y] Store to Bag'
                           : nearbyStructure.type === 'torii_gate'
                           ? `Torii Gate (${nearbyStructure.orientation === 'vertical' ? '1x3' : '3x1'}) • [E / A] Inspect • [Q / Y] Store`
+                          : nearbyStructure.type === 'zen_rock_formation' || nearbyStructure.type === 'decor_rock_formation'
+                          ? '[E / A] Inspect • [Q / Y] Store to Bag • Halo: +15% Level Up Experience (XP Boosted)'
+                          : nearbyStructure.type === 'growing_bamboo_formation' || nearbyStructure.type === 'decor_shrubbery_bush'
+                          ? '[E / A] Inspect • [Q / Y] Store to Bag • Halo: +0.25s Pruning Effect (Quick Prune)'
+                          : nearbyStructure.type === 'asparagus_fern_ball'
+                          ? '[E / A] Inspect • [Q / Y] Store to Bag • Halo: +15% Chance for Extra Organic Waste on Level Up (Efficient Pruning)'
                           : isCompost
                           ? compostReady > 0
                             ? '[E / A] Collect Compost | [Q / Y] Store to Bag'
@@ -19443,6 +21511,27 @@ export default function App() {
                       </button>
                     )}
 
+                    {isFertilizer && (
+                      <button
+                        onClick={() => interactFertilizerStationDirect(nearbyStructure.id)}
+                        className={`font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1 shadow transition-transform active:scale-95 min-h-[38px] cursor-pointer ${
+                          (nearbyStructure.readyFertilizer || 0) > 0
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white animate-pulse'
+                            : (nearbyStructure.isDistilling && (nearbyStructure.timer || 0) > 0)
+                            ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                            : 'bg-cyan-700 hover:bg-cyan-600 text-white'
+                        }`}>
+                        <span>🧪</span>
+                        <span>
+                          {(nearbyStructure.readyFertilizer || 0) > 0
+                            ? `[E / A] Collect (${nearbyStructure.readyFertilizer})`
+                            : (nearbyStructure.isDistilling && (nearbyStructure.timer || 0) > 0)
+                            ? `Distilling (${Math.ceil(nearbyStructure.timer || 0)}s)`
+                            : `[E / A] Deposit (3 Waste + 1 Bio)`}
+                        </span>
+                      </button>
+                    )}
+
                     {isWell && !isWatering && (
                       <button
                         onClick={() => drawWaterFromWell(nearbyStructure.id)}
@@ -19452,7 +21541,7 @@ export default function App() {
                       </button>
                     )}
 
-                    {isEnergy && (
+                    {(isEnergy || isWaterFeature) && (
                       <button
                         onClick={() => {
                           setInspectingStructureId(nearbyStructure.id);
@@ -19464,17 +21553,48 @@ export default function App() {
                       </button>
                     )}
 
+                    {isPedestal && (
+                      <button
+                        onClick={() => {
+                          setSocketingPedestalId(nearbyStructure.id);
+                          gameAudio.playCrispClick();
+                        }}
+                        className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition-transform active:scale-95 min-h-[38px] cursor-pointer">
+                        <Sparkles className="w-4 h-4" />
+                        <span>[E / A] Inspect / Socket Crystal</span>
+                      </button>
+                    )}
+
+                    {isBambooFence && Boolean(standingPlot) && (
+                      <button
+                        onClick={() => {
+                          setIsPlantingModalOpen(true);
+                          gameAudio.playCrispClick();
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1 shadow transition-transform active:scale-95 min-h-[38px] cursor-pointer">
+                        <Sprout className="w-4 h-4" />
+                        <span>[E / A] Deploy on Plot</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={() => dismantleDeployedStructure(nearbyStructure.id)}
                       className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1 shadow transition-transform active:scale-95 min-h-[38px] cursor-pointer">
                       <Package className="w-4 h-4" />
-                      <span>{nearbyStructure.type.startsWith('crystal_pedestal') ? '[E / A] Store to Bag' : '[Q / Y] Store to Bag'}</span>
+                      <span>{isBambooFence ? '[Q / Y] Pick Up Fence' : '[Q / Y] Store to Bag'}</span>
                     </button>
                   </div>
                 </>
               );
-            })() : nearbyBonsai ? (() => {
+            })(            ) : nearbyBonsai ? (() => {
               const bSyn = getCachedBonsaiSynergies(nearbyBonsai);
+              const ecoMatch = checkMatchesEcoRequest(
+                nearbyBonsai,
+                masterQuestsRef.current.eco.activeRequestIndex,
+                masterQuestsRef.current.eco.requestCounts,
+              ).matches;
+              const basePayout = calculateDonationValue(nearbyBonsai);
+              const displayPayout = ecoMatch ? Number((basePayout * 2).toFixed(2)) : basePayout;
 
               return (
                 <>
@@ -19503,12 +21623,12 @@ export default function App() {
                           );
                         })()}
                         <span>
-                          {nearbyBonsai.name} (Lv.{nearbyBonsai.level} • {calculateBaseAesthetic(nearbyBonsai).total.toFixed(2)} BA)
+                          {getBonsaiDisplayName(nearbyBonsai)} (Lv.{nearbyBonsai.level} • {calculateBaseAesthetic(nearbyBonsai).total.toFixed(2)} BA)
                         </span>
                         <span className="text-emerald-400 font-medium">[{getBonsaiStyleDef(nearbyBonsai.style).japanese}]</span>
-                        <span className="text-emerald-300 font-bold flex items-center gap-0.5">
+                        <span className={`font-bold flex items-center gap-0.5 ${ecoMatch ? 'text-amber-300 bg-amber-950/80 border border-amber-500/70 px-2 py-0.5 rounded-full shadow-sm' : 'text-emerald-300'}`}>
                           <VerdureIcon className="w-3.5 h-3.5" />
-                          <span>+{calculateDonationValue(nearbyBonsai).toFixed(2)} Verdure</span>
+                          <span>+{displayPayout.toFixed(2)} Verdure{ecoMatch ? ' (🌟 2x Eco Match!)' : ''}</span>
                         </span>
                         {nearbyBonsai.nature && (() => {
                           const nat = getBonsaiNature(nearbyBonsai.nature);
@@ -19533,18 +21653,23 @@ export default function App() {
                               </span>
                             )}
                             {bSyn.hasAdjacentWall && (
-                              <span className="bg-amber-950 text-amber-300 border border-amber-500/50 text-[10px] px-1.5 py-0.2 rounded font-bold">
-                                🎋 Private Growing x{bSyn.wallCount} (+{bSyn.wallCount * 10}% Hydration Growth Speed)
+                              <span className="bg-cyan-950 text-cyan-300 border border-cyan-500/50 text-[10px] px-1.5 py-0.2 rounded font-bold">
+                                🌊 Gentle Waters x{bSyn.wallCount} (+{bSyn.wallCount * 10}% Hydration Growth Speed)
                               </span>
                             )}
                             {bSyn.hasAdjacentRock && (
-                              <span className="bg-slate-800 text-slate-200 border border-slate-600 text-[10px] px-1.5 py-0.2 rounded font-bold">
-                                🪨 Quick Prune x{bSyn.rockCount} (+{(bSyn.rockCount * 0.25).toFixed(2)}s Pruning Effect)
+                              <span className="bg-amber-950 text-amber-300 border border-amber-500/50 text-[10px] px-1.5 py-0.2 rounded font-bold">
+                                🪨 XP Boosted x{bSyn.rockCount} (+{bSyn.rockCount * 15}% Level Up EXP)
                               </span>
                             )}
-                            {bSyn.hasAdjacentBush && (
+                            {bSyn.hasAdjacentBamboo && (
                               <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/50 text-[10px] px-1.5 py-0.2 rounded font-bold">
-                                🌿 XP Boosted x{bSyn.bushCount} (+{bSyn.bushCount * 15}% Level Up EXP)
+                                🎋 Quick Prune x{bSyn.bambooCount} (+{(bSyn.bambooCount * 0.25).toFixed(2)}s Pruning Effect)
+                              </span>
+                            )}
+                            {bSyn.hasAdjacentFernBall && (
+                              <span className="bg-lime-950 text-lime-300 border border-lime-500/50 text-[10px] px-1.5 py-0.2 rounded font-bold">
+                                🪴 Efficient Pruning x{bSyn.fernBallCount} (+{bSyn.fernBallCount * 15}% Extra Waste Chance)
                               </span>
                             )}
                             {bSyn.crystalPedestals && bSyn.crystalPedestals.total > 0 && (
@@ -19667,10 +21792,9 @@ export default function App() {
               </div>
             </div>
 
-            {/* Check for node at rover position (strictly exact tile, no adjacent search) */}
+            {/* Check for node at rover position or adjacent anomaly site */}
             {(() => {
-              const currentKey = `${rover.tileX},${rover.tileY}`;
-              const targetNode = excursionNodesRef.current.get(currentKey);
+              const targetNode = findNearbyExcursionNode();
 
               if (targetNode && !targetNode.collected) {
                 if (targetNode.type === 'SAPLING') {
@@ -19813,10 +21937,30 @@ export default function App() {
         <QuickBonsaiRadialMenu
           bonsai={quickRadialBonsai}
           inventory={sanctuaryInventoryRef.current}
-          onSell={(id) => donatePlantedBonsai(id)}
-          onStore={(id) => pickUpBonsaiToInventory(id)}
-          onCompost={(id) => applyOrganicCompost(id)}
-          onClose={() => setQuickRadialBonsai(null)}
+          isEcoMatch={
+            checkMatchesEcoRequest(
+              quickRadialBonsai,
+              masterQuestsRef.current.eco.activeRequestIndex,
+              masterQuestsRef.current.eco.requestCounts,
+            ).matches
+          }
+          onSell={(id) => {
+            donatePlantedBonsai(id);
+            handleCloseRadialMenu();
+          }}
+          onStore={(id) => {
+            pickUpBonsaiToInventory(id);
+            handleCloseRadialMenu();
+          }}
+          onCompost={(id) => {
+            applyOrganicCompost(id);
+            handleCloseRadialMenu();
+          }}
+          onFertilize={(id) => {
+            applyFertilizer(id);
+            handleCloseRadialMenu();
+          }}
+          onClose={handleCloseRadialMenu}
         />
       )}
 
@@ -19854,8 +21998,9 @@ export default function App() {
 
         const isSolar = struct.type === 'solar_panel';
         const isTurbine = struct.type === 'wind_turbine';
+        const isWaterFeature = struct.type === 'water_feature' || struct.type === 'decor_woven_wall';
         const isEnergy = isSolar || isTurbine;
-        if (!isEnergy) return null; // Decorations do not have an inspection modal
+        if (!isEnergy && !isWaterFeature) return null;
 
         const solarInfo = isSolar ? getSolarPanelOutput(struct, deployedStructuresRef.current) : null;
         const turbineInfo = isTurbine ? getWindTurbineOutput(struct, deployedStructuresRef.current) : null;
@@ -19877,9 +22022,19 @@ export default function App() {
             icon: '💨',
             desc: 'Brass aero-helix micro-turbine harnessing ventilation airflow. Base Output: 6 kW. Stackable Resonance: +1.0 kW per adjacent Wind Turbine in the surrounding 3x3 zone.',
           },
+          water_feature: {
+            name: 'Water Feature (Shishi-Odoshi)',
+            icon: '🌊',
+            desc: 'An authentic Japanese garden water feature with a dripping bamboo fountain and carved stone basin. Proximity Halo: Grants +10% Hydration Growth Speed to adjacent bonsais in its halo zone.',
+          },
+          decor_woven_wall: {
+            name: 'Water Feature (Shishi-Odoshi)',
+            icon: '🌊',
+            desc: 'An authentic Japanese garden water feature with a dripping bamboo fountain and carved stone basin. Proximity Halo: Grants +10% Hydration Growth Speed to adjacent bonsais in its halo zone.',
+          },
         };
 
-        const info = nameMap[struct.type] || {name: 'Clean Generator', icon: '⚡', desc: 'Placed power generator.'};
+        const info = nameMap[struct.type] || {name: 'Water Feature', icon: '🌊', desc: 'Japanese garden water feature.'};
 
         return (
           <div className="fixed top-12 left-0 right-0 bottom-0 z-40 bg-slate-950/95 backdrop-blur-md p-3 sm:p-5 flex flex-col overflow-hidden border-t border-slate-800 text-left">
@@ -19888,7 +22043,11 @@ export default function App() {
                 <span className="text-2xl">{info.icon}</span>
                 <div>
                   <h3 className="text-lg font-bold text-slate-100">{info.name}</h3>
-                  <span className="text-xs text-emerald-400 font-bold">Status: Active on Sanctuary Grid</span>
+                  <span className="text-xs text-emerald-400 font-bold">
+                    {isWaterFeature
+                      ? 'Status: Active on Sanctuary Grid • Proximity Halo Active'
+                      : 'Status: Active on Sanctuary Grid'}
+                  </span>
                 </div>
               </div>
               <button
@@ -19902,38 +22061,57 @@ export default function App() {
               <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-3">
                 <p className="text-xs text-slate-300 leading-relaxed">{info.desc}</p>
 
-                {/* Generator Output Metrics Breakdown */}
-                <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Base Generator Power:</span>
-                    <strong className="text-slate-200 font-mono">{baseKw} kW</strong>
+                {isWaterFeature ? (
+                  <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Proximity Halo Effect:</span>
+                      <strong className="text-cyan-300 font-bold">+10% Hydration Growth Speed</strong>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Halo Range:</span>
+                      <strong className="text-slate-200">Adjacent surrounding plots</strong>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Synergy Category:</span>
+                      <strong className="text-emerald-400">Gentle Waters (Stackable)</strong>
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    {/* Generator Output Metrics Breakdown */}
+                    <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Base Generator Power:</span>
+                        <strong className="text-slate-200 font-mono">{baseKw} kW</strong>
+                      </div>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">3x3 Proximity Resonance Bonus:</span>
-                    <strong className={`font-mono ${neighborCount > 0 ? 'text-amber-300 font-bold' : 'text-slate-400'}`}>
-                      {neighborCount > 0 ? `+${resonanceKw.toFixed(1)} kW ${resName} Resonance (${neighborCount} neighbors) 🌟` : `0 kW ${resName} Resonance (Place adjacent to another ${isSolar ? 'Solar Panel' : 'Wind Turbine'})`}
-                    </strong>
-                  </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">3x3 Proximity Resonance Bonus:</span>
+                        <strong className={`font-mono ${neighborCount > 0 ? 'text-amber-300 font-bold' : 'text-slate-400'}`}>
+                          {neighborCount > 0 ? `+${resonanceKw.toFixed(1)} kW ${resName} Resonance (${neighborCount} neighbors) 🌟` : `0 kW ${resName} Resonance (Place adjacent to another ${isSolar ? 'Solar Panel' : 'Wind Turbine'})`}
+                        </strong>
+                      </div>
 
-                  <div className="flex items-center justify-between pt-1.5 border-t border-slate-800 font-bold">
-                    <span className="text-emerald-400">Total Generator Output:</span>
-                    <strong className="text-emerald-300 font-mono text-sm">+{totalOutput.toFixed(1)} kW Clean Electricity</strong>
-                  </div>
-                </div>
+                      <div className="flex items-center justify-between pt-1.5 border-t border-slate-800 font-bold">
+                        <span className="text-emerald-400">Total Generator Output:</span>
+                        <strong className="text-emerald-300 font-mono text-sm">+{totalOutput.toFixed(1)} kW Clean Electricity</strong>
+                      </div>
+                    </div>
 
-                {/* Overall Grid Telemetry */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 block text-[11px]">Total Grid Supply:</span>
-                    <strong className="text-sky-300 text-sm font-mono">{power.totalGenerated} kW</strong>
-                  </div>
+                    {/* Overall Grid Telemetry */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                        <span className="text-slate-400 block text-[11px]">Total Grid Supply:</span>
+                        <strong className="text-sky-300 text-sm font-mono">{power.totalGenerated} kW</strong>
+                      </div>
 
-                  <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 block text-[11px]">Active Automaton Load:</span>
-                    <strong className="text-amber-300 text-sm font-mono">{power.totalRequired} kW</strong>
-                  </div>
-                </div>
+                      <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                        <span className="text-slate-400 block text-[11px]">Active Automaton Load:</span>
+                        <strong className="text-amber-300 text-sm font-mono">{power.totalRequired} kW</strong>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
@@ -19941,13 +22119,178 @@ export default function App() {
                   onClick={() => dismantleDeployedStructure(struct.id)}
                   className="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-xl transition-all shadow flex items-center justify-center gap-2 min-h-[40px] text-xs active:scale-95">
                   <Package className="w-4 h-4" />
-                  <span>📦 [Q] Dismantle to Inventory</span>
+                  <span>📦 [Q / Y] Store to Bag</span>
                 </button>
 
                 <button
                   onClick={() => setInspectingStructureId(null)}
                   className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-4 py-2.5 rounded-xl transition-colors min-h-[40px] text-xs">
                   Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ========================================================================= */}
+      {/* MODAL: CRYSTAL PEDESTAL SOCKETING & INSPECTION */}
+      {/* ========================================================================= */}
+      {socketingPedestalId && (() => {
+        const struct = deployedStructuresRef.current.find((s) => s.id === socketingPedestalId);
+        if (!struct) return null;
+        const crystal = struct.socketedCrystal;
+        const availableCrystals = inv.crystals || [];
+
+        return (
+          <div className="fixed top-12 left-0 right-0 bottom-0 z-40 bg-slate-950/95 backdrop-blur-md p-3 sm:p-5 flex flex-col overflow-hidden border-t border-slate-800 text-left">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-950/80 border border-purple-500/50 flex items-center justify-center text-xl shadow">
+                  🔮
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-100">
+                    {crystal ? `Pedestal with ${crystal.name}` : 'Empty Pedestal'}
+                  </h3>
+                  <span className="text-xs text-purple-300 font-bold">
+                    {crystal ? 'Artifact Socketed • Active Halo Bonus' : 'Can Host Crystal Artifacts'}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSocketingPedestalId(null)}
+                className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="max-w-xl w-full mx-auto space-y-4 flex-1 overflow-y-auto pr-1">
+              {/* Current Pedestal Status Card */}
+              <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-3 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Current Pedestal Status
+                  </span>
+                  {crystal && (
+                    <span
+                      style={{ color: crystal.color, borderColor: `${crystal.color}60` }}
+                      className="text-[11px] font-bold px-2.5 py-0.5 rounded-full border bg-slate-950">
+                      ✨ Active Socket
+                    </span>
+                  )}
+                </div>
+
+                {crystal ? (
+                  <div
+                    style={{ borderColor: `${crystal.color}50` }}
+                    className="bg-slate-950/80 p-3.5 rounded-xl border flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div
+                        style={{ backgroundColor: `${crystal.color}20`, borderColor: crystal.color }}
+                        className="w-12 h-12 rounded-xl border-2 flex items-center justify-center text-2xl shadow">
+                        💎
+                      </div>
+                      <div>
+                        <h4 style={{ color: crystal.color }} className="font-bold text-sm">
+                          {crystal.name}
+                        </h4>
+                        <div className="text-xs text-slate-300 mt-0.5">
+                          Cultivation Potential: <strong>+{crystal.strength} {crystal.crystalType.toUpperCase()} CP / level</strong>
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                          Projects CP onto neighboring bonsais in its halo zone on every level up.
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => unsocketCrystalFromPedestal(struct.id)}
+                      className="bg-slate-800 hover:bg-amber-950 text-slate-300 hover:text-amber-200 border border-slate-700 hover:border-amber-500 font-bold text-xs px-3 py-2 rounded-xl transition-all shadow active:scale-95 shrink-0 cursor-pointer">
+                      Unsocket Crystal
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-dashed border-slate-800 text-center space-y-1">
+                    <div className="text-2xl mb-1">🏛️</div>
+                    <h4 className="text-sm font-bold text-slate-200">Empty Pedestal</h4>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                      Can Host Crystal Artifacts. Select an elemental crystal from your inventory below to mount it onto this carved stone pedestal.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Crystals Available in Inventory Card */}
+              <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-3 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">💎</span>
+                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                      Crystals in Bag ({availableCrystals.length})
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    Recovered from wilderness expeditions
+                  </span>
+                </div>
+
+                {availableCrystals.length === 0 ? (
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 text-center space-y-1 text-xs text-slate-400">
+                    <p className="font-semibold text-slate-300">No crystals currently in your bag.</p>
+                    <p className="text-[11px]">
+                      Embark on rover excursions into the wilderness (Sunlit Foothills, Misty Highlands, Ancient Caldera) and excavate glowing crystal anomalies!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {availableCrystals.map((cry) => (
+                      <div
+                        key={cry.id}
+                        style={{ borderColor: `${cry.color}40` }}
+                        className="bg-slate-950/80 p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-colors hover:bg-slate-950">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span style={{ color: cry.color }} className="text-xl shrink-0">
+                            💎
+                          </span>
+                          <div className="min-w-0">
+                            <h5 style={{ color: cry.color }} className="font-bold text-xs truncate">
+                              {cry.name}
+                            </h5>
+                            <span className="text-[10px] text-slate-400 block">
+                              +{cry.strength} {cry.crystalType.toUpperCase()} Cultivation Potential per level
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => socketCrystalIntoPedestal(struct.id, cry.id)}
+                          style={{ backgroundColor: `${cry.color}25`, borderColor: cry.color, color: cry.color }}
+                          className="hover:brightness-125 border font-bold text-xs px-3 py-1.5 rounded-xl transition-all shadow active:scale-95 shrink-0 cursor-pointer">
+                          Socket Crystal [E]
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Action Buttons */}
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={() => {
+                    dismantleDeployedStructure(struct.id);
+                    setSocketingPedestalId(null);
+                  }}
+                  className="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-xl transition-all shadow flex items-center justify-center gap-2 min-h-[40px] text-xs active:scale-95 cursor-pointer">
+                  <Package className="w-4 h-4" />
+                  <span>[Q / Y] Store Pedestal to Bag</span>
+                </button>
+
+                <button
+                  onClick={() => setSocketingPedestalId(null)}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-4 py-2.5 rounded-xl transition-colors min-h-[40px] text-xs cursor-pointer">
+                  Close [Esc / B]
                 </button>
               </div>
             </div>
@@ -20758,7 +23101,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 2. Zen Rock Formation (15 Verdure) */}
+                {/* 2. Zen Rock Formation (20 Verdure) */}
                 <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
                   focusedShopIdx === 1
                     ? 'bg-slate-850 ring-4 ring-amber-400 border-amber-300 scale-[1.01] shadow-[0_0_20px_rgba(245,158,11,0.5)]'
@@ -20779,34 +23122,76 @@ export default function App() {
                             {focusedShopIdx === 1 && <span className="text-amber-400 text-xs">► [E/A]</span>}
                             <span>Zen Rock Formation</span>
                           </h4>
-                          <span className="text-[10px] text-amber-300 font-bold">+0.25s Pruning Effect (Quick Prune)</span>
+                          <span className="text-[10px] text-amber-300 font-bold">+15% Level Up Experience (XP Boosted)</span>
                         </div>
                       </div>
                       <span className="text-xs bg-slate-950 text-amber-300 border border-amber-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {inv.decor_rock_formation_inv || 0}
+                        Owned: {getStructureInventoryCount(inv, 'zen_rock_formation')}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      +0.25s Pruning Effect (Quick Prune)
+                      Raked gravel and natural stone boulders. Grants +15% Level Up Experience (XP Boosted) to adjacent bonsais in halo.
                     </p>
                   </div>
 
                   <button
-                    disabled={inv.coins < 15}
-                    onClick={() => buyDecoration('decor_rock_formation', 15, 'Zen Rock Formation')}
+                    disabled={inv.coins < 20}
+                    onClick={() => buyDecoration('zen_rock_formation', 20, 'Zen Rock Formation')}
                     className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
-                      inv.coins >= 15
+                      inv.coins >= 20
                         ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                     }`}>
                     <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase (15 Verdure)</span>
+                    <span>Purchase (20 Verdure)</span>
                   </button>
                 </div>
 
-                {/* 3. Topiary Shrubbery Bush (25 Verdure) */}
+                {/* 3. Water Feature (30 Verdure) */}
                 <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
                   focusedShopIdx === 2
+                    ? 'bg-slate-850 ring-4 ring-cyan-400 border-cyan-300 scale-[1.01] shadow-[0_0_20px_rgba(6,182,212,0.5)]'
+                    : 'bg-slate-900/80 border-cyan-500/30'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-xl bg-cyan-950/60 border border-cyan-500/40 flex items-center justify-center text-xl shrink-0 overflow-hidden">
+                          <span>🌊</span>
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-cyan-200 flex items-center gap-1.5">
+                            {focusedShopIdx === 2 && <span className="text-cyan-400 text-xs">► [E/A]</span>}
+                            <span>Water Feature (Shishi-Odoshi)</span>
+                          </h4>
+                          <span className="text-[10px] text-cyan-300 font-bold">+10% Hydration Growth Speed (Gentle Waters)</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-slate-950 text-cyan-300 border border-cyan-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Owned: {getStructureInventoryCount(inv, 'water_feature')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Soothing Japanese stone water basin fed by a dripping bamboo fountain. Grants +10% Hydration Growth Speed to adjacent bonsais in halo.
+                    </p>
+                  </div>
+
+                  <button
+                    disabled={inv.coins < 30}
+                    onClick={() => buyDecoration('water_feature', 30, 'Water Feature (Shishi-Odoshi)')}
+                    className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
+                      inv.coins >= 30
+                        ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}>
+                    <VerdureIcon className="w-3.5 h-3.5" />
+                    <span>Purchase (30 Verdure)</span>
+                  </button>
+                </div>
+
+                {/* 4. Growing Bamboo Formation (10 Verdure) */}
+                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
+                  focusedShopIdx === 3
                     ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
                     : 'bg-slate-900/80 border-emerald-500/30'
                 }`}>
@@ -20814,91 +23199,125 @@ export default function App() {
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2.5">
                         <div className="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-500/40 flex items-center justify-center text-xl shrink-0 overflow-hidden">
-                          {assets['decor_shrubbery_bush']?.src ? (
-                            <img src={assets['decor_shrubbery_bush'].src} alt="Topiary Shrub" className="w-8 h-8 object-contain" />
-                          ) : (
-                            <span>🌿</span>
-                          )}
+                          <span>🎋</span>
                         </div>
                         <div>
                           <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 2 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
-                            <span>Topiary Shrubbery Bush</span>
+                            {focusedShopIdx === 3 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
+                            <span>Growing Bamboo Formation</span>
                           </h4>
-                          <span className="text-[10px] text-emerald-300 font-bold">+15% Level Up Experience (XP Boosted)</span>
+                          <span className="text-[10px] text-emerald-300 font-bold">+0.25s Pruning Effect (Quick Prune)</span>
                         </div>
                       </div>
                       <span className="text-xs bg-slate-950 text-emerald-300 border border-emerald-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {inv.decor_shrubbery_bush_inv || 0}
+                        Owned: {getStructureInventoryCount(inv, 'growing_bamboo_formation')}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      +15% Level Up Experience (XP Boosted)
+                      A cluster of growing bamboo shoots and culms sprouting from the ground with joint rings and feathered bamboo leaves. Grants +0.25s Pruning Effect.
                     </p>
                   </div>
 
                   <button
-                    disabled={inv.coins < 25}
-                    onClick={() => buyDecoration('decor_shrubbery_bush', 25, 'Topiary Shrubbery Bush')}
+                    disabled={inv.coins < 10}
+                    onClick={() => buyDecoration('growing_bamboo_formation', 10, 'Growing Bamboo Formation')}
                     className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
-                      inv.coins >= 25
+                      inv.coins >= 10
                         ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                     }`}>
                     <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase (25 Verdure)</span>
+                    <span>Purchase (10 Verdure)</span>
                   </button>
                 </div>
 
-                {/* 4. Woven Wooden Lattice Wall (40 Verdure) */}
+                {/* 5. Asparagus Fern Ball (15 Verdure) */}
                 <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
-                  focusedShopIdx === 3
-                    ? 'bg-slate-850 ring-4 ring-yellow-400 border-yellow-300 scale-[1.01] shadow-[0_0_20px_rgba(250,204,21,0.5)]'
-                    : 'bg-slate-900/80 border-yellow-600/30'
+                  focusedShopIdx === 4
+                    ? 'bg-slate-850 ring-4 ring-lime-400 border-lime-300 scale-[1.01] shadow-[0_0_20px_rgba(163,230,53,0.5)]'
+                    : 'bg-slate-900/80 border-lime-500/30'
                 }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-yellow-950/60 border border-yellow-600/40 flex items-center justify-center text-xl shrink-0 overflow-hidden">
-                          {assets['decor_woven_wall']?.src ? (
-                            <img src={assets['decor_woven_wall'].src} alt="Woven Wall" className="w-8 h-8 object-contain" />
-                          ) : (
-                            <span>🎋</span>
-                          )}
+                        <div className="w-10 h-10 rounded-xl bg-lime-950/60 border border-lime-500/40 flex items-center justify-center text-xl shrink-0 overflow-hidden">
+                          <span>🪴</span>
                         </div>
                         <div>
                           <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 3 && <span className="text-yellow-400 text-xs">► [E/A]</span>}
-                            <span>Woven Wooden Lattice Wall</span>
+                            {focusedShopIdx === 4 && <span className="text-lime-400 text-xs">► [E/A]</span>}
+                            <span>Asparagus Fern Ball</span>
                           </h4>
-                          <span className="text-[10px] text-yellow-300 font-bold">+10% Hydration Growth Speed (Private Growing)</span>
+                          <span className="text-[10px] text-lime-300 font-bold">+15% Chance for Extra Organic Waste on Level Up (Efficient Pruning)</span>
                         </div>
                       </div>
-                      <span className="text-xs bg-slate-950 text-yellow-300 border border-yellow-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {inv.decor_woven_wall_inv || 0}
+                      <span className="text-xs bg-slate-950 text-lime-300 border border-lime-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Owned: {getStructureInventoryCount(inv, 'asparagus_fern_ball')}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      +10% Hydration Growth Speed (Private Growing)
+                      An authentic Kokedama moss ball pot on a dark coaster dish with delicate feathery Asparagus Fern fronds. Grants +15% chance to drop extra Organic Waste on level up.
                     </p>
                   </div>
 
                   <button
-                    disabled={inv.coins < 40}
-                    onClick={() => buyDecoration('decor_woven_wall', 40, 'Woven Wooden Lattice Wall')}
+                    disabled={inv.coins < 15}
+                    onClick={() => buyDecoration('asparagus_fern_ball', 15, 'Asparagus Fern Ball')}
                     className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
-                      inv.coins >= 40
-                        ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
+                      inv.coins >= 15
+                        ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                     }`}>
                     <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase (40 Verdure)</span>
+                    <span>Purchase (15 Verdure)</span>
                   </button>
                 </div>
 
-                {/* 5. Torii Gate (0 Verdure / Free) */}
+                {/* 6. Bamboo Fence (3 Verdure) */}
+                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
+                  focusedShopIdx === 5
+                    ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+                    : 'bg-slate-900/80 border-emerald-600/40'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-500/40 flex items-center justify-center text-xl shrink-0 overflow-hidden">
+                          <span>🎋</span>
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 5 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
+                            <span>Bamboo Fence (Takegaki)</span>
+                          </h4>
+                          <span className="text-[10px] text-emerald-400 font-bold">Edge Barrier • Physically Blocks Halos</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-slate-950 text-emerald-300 border border-emerald-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Owned: {inv.bamboo_fence_inv || 0}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Boundary fence placed on plot borders (Top, Right, Bottom, Left). Physically cuts off and isolates halos between separated plots!
+                    </p>
+                  </div>
+
+                  <button
+                    disabled={inv.coins < 3}
+                    onClick={() => buyDecoration('bamboo_fence', 3, 'Bamboo Fence (Takegaki)')}
+                    className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
+                      inv.coins >= 3
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}>
+                    <VerdureIcon className="w-3.5 h-3.5" />
+                    <span>Purchase (3 Verdure)</span>
+                  </button>
+                </div>
+
+                {/* 7. Torii Gate (0 Verdure / Free) */}
                 <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
-                  focusedShopIdx === 4
+                  focusedShopIdx === 6
                     ? 'bg-slate-850 ring-4 ring-red-400 border-red-300 scale-[1.01] shadow-[0_0_20px_rgba(239,68,68,0.5)]'
                     : 'bg-slate-900/80 border-red-500/30'
                 }`}>
@@ -20910,7 +23329,7 @@ export default function App() {
                         </div>
                         <div>
                           <h4 className="font-bold text-xs sm:text-sm text-red-200 flex items-center gap-1.5">
-                            {focusedShopIdx === 4 && <span className="text-red-400 text-xs">► [E/A]</span>}
+                            {focusedShopIdx === 6 && <span className="text-red-400 text-xs">► [E/A]</span>}
                             <span>Torii Gate (3x1 / 1x3)</span>
                           </h4>
                           <span className="text-[10px] text-amber-400 font-bold">3x1 / 1x3 Multi-Plot • Open Center Walkway</span>
@@ -20933,171 +23352,45 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 6. Emerald Leaf Crystal Pedestal (100 Verdure) */}
-                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
-                  focusedShopIdx === 5
-                    ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
-                    : 'bg-slate-900/80 border-emerald-500/40'
-                }`}>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-950/80 border border-emerald-500/60 flex items-center justify-center text-xl shrink-0 shadow-inner">
-                          <span>💎</span>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 5 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
-                            <span>Emerald Leaf Crystal Pedestal</span>
-                          </h4>
-                          <span className="text-[10px] text-emerald-400 font-semibold">+1 Foliage Cultivation Potential / lvl</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-emerald-300 border border-emerald-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {inv.crystal_pedestal_foliage_inv || 0}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Carved stone pedestal topped with a glowing emerald leaf crystal (#22c55e). Proximity halo boosts adjacent bonsai foliage growth potential by +1 per level.
-                    </p>
-                  </div>
-
-                  <button
-                    disabled={inv.coins < 100}
-                    onClick={() => buyDecoration('crystal_pedestal_foliage', 100, 'Emerald Leaf Crystal Pedestal')}
-                    className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
-                      inv.coins >= 100
-                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}>
-                    <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase (100 Verdure)</span>
-                  </button>
-                </div>
-
-                {/* 7. Amber Branch Crystal Pedestal (100 Verdure) */}
-                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
-                  focusedShopIdx === 6
-                    ? 'bg-slate-850 ring-4 ring-amber-400 border-amber-300 scale-[1.01] shadow-[0_0_20px_rgba(245,158,11,0.5)]'
-                    : 'bg-slate-900/80 border-amber-500/40'
-                }`}>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-amber-950/80 border border-amber-500/60 flex items-center justify-center text-xl shrink-0 shadow-inner">
-                          <span>💎</span>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 6 && <span className="text-amber-400 text-xs">► [E/A]</span>}
-                            <span>Amber Branch Crystal Pedestal</span>
-                          </h4>
-                          <span className="text-[10px] text-amber-400 font-semibold">+1 Branches Cultivation Potential / lvl</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-amber-300 border border-amber-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {inv.crystal_pedestal_branches_inv || 0}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Carved stone pedestal topped with a glowing warm amber branching twig crystal (#eab308). Proximity halo boosts adjacent bonsai branch growth potential by +1 per level.
-                    </p>
-                  </div>
-
-                  <button
-                    disabled={inv.coins < 100}
-                    onClick={() => buyDecoration('crystal_pedestal_branches', 100, 'Amber Branch Crystal Pedestal')}
-                    className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
-                      inv.coins >= 100
-                        ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}>
-                    <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase (100 Verdure)</span>
-                  </button>
-                </div>
-
-                {/* 8. Coral Trunk Crystal Pedestal (100 Verdure) */}
+                {/* 8. Empty Pedestal (50 Verdure) */}
                 <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
                   focusedShopIdx === 7
-                    ? 'bg-slate-850 ring-4 ring-rose-400 border-rose-300 scale-[1.01] shadow-[0_0_20px_rgba(244,63,94,0.5)]'
-                    : 'bg-slate-900/80 border-rose-500/40'
+                    ? 'bg-slate-850 ring-4 ring-purple-400 border-purple-300 scale-[1.01] shadow-[0_0_20px_rgba(168,85,247,0.5)]'
+                    : 'bg-slate-900/80 border-purple-500/40'
                 }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-rose-950/80 border border-rose-500/60 flex items-center justify-center text-xl shrink-0 shadow-inner">
-                          <span>💎</span>
+                        <div className="w-10 h-10 rounded-xl bg-purple-950/80 border border-purple-500/60 flex items-center justify-center text-xl shrink-0 shadow-inner">
+                          <span>🔮</span>
                         </div>
                         <div>
                           <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 7 && <span className="text-rose-400 text-xs">► [E/A]</span>}
-                            <span>Coral Trunk Crystal Pedestal</span>
+                            {focusedShopIdx === 7 && <span className="text-purple-400 text-xs">► [E/A]</span>}
+                            <span>Empty Pedestal</span>
                           </h4>
-                          <span className="text-[10px] text-rose-400 font-semibold">+1 Trunk Cultivation Potential / lvl</span>
+                          <span className="text-[10px] text-purple-300 font-semibold">Can Host Crystal Artifacts</span>
                         </div>
                       </div>
-                      <span className="text-xs bg-slate-950 text-rose-300 border border-rose-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {inv.crystal_pedestal_trunk_inv || 0}
+                      <span className="text-xs bg-slate-950 text-purple-300 border border-purple-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Owned: {getStructureInventoryCount(inv, 'empty_crystal_pedestal')}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      Carved stone pedestal topped with a glowing rust coral red trunk crystal (#ef4444). Proximity halo boosts adjacent bonsai trunk growth potential by +1 per level.
+                      Can Host Crystal Artifacts. Deploy onto any open nursery plot and socket an elemental crystal artifact onto it to project cultivation potential onto neighboring bonsais.
                     </p>
                   </div>
 
                   <button
-                    disabled={inv.coins < 100}
-                    onClick={() => buyDecoration('crystal_pedestal_trunk', 100, 'Coral Trunk Crystal Pedestal')}
-                    className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
-                      inv.coins >= 100
-                        ? 'bg-rose-600 hover:bg-rose-500 text-white active:scale-95'
+                    disabled={inv.coins < 50}
+                    onClick={() => buyDecoration('empty_crystal_pedestal', 50, 'Empty Pedestal')}
+                    className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                      inv.coins >= 50
+                        ? 'bg-purple-600 hover:bg-purple-500 text-white active:scale-95'
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                     }`}>
                     <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase (100 Verdure)</span>
-                  </button>
-                </div>
-
-                {/* 9. Azure Root Crystal Pedestal (100 Verdure) */}
-                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
-                  focusedShopIdx === 8
-                    ? 'bg-slate-850 ring-4 ring-blue-400 border-blue-300 scale-[1.01] shadow-[0_0_20px_rgba(59,130,246,0.5)]'
-                    : 'bg-slate-900/80 border-blue-500/40'
-                }`}>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-blue-950/80 border border-blue-500/60 flex items-center justify-center text-xl shrink-0 shadow-inner">
-                          <span>💎</span>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 8 && <span className="text-blue-400 text-xs">► [E/A]</span>}
-                            <span>Azure Root Crystal Pedestal</span>
-                          </h4>
-                          <span className="text-[10px] text-blue-400 font-semibold">+1 Roots Cultivation Potential / lvl</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-blue-300 border border-blue-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {inv.crystal_pedestal_roots_inv || 0}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Carved stone pedestal topped with a glowing deep azure root tendril crystal (#3b82f6). Proximity halo boosts adjacent bonsai root growth potential by +1 per level.
-                    </p>
-                  </div>
-
-                  <button
-                    disabled={inv.coins < 100}
-                    onClick={() => buyDecoration('crystal_pedestal_roots', 100, 'Azure Root Crystal Pedestal')}
-                    className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
-                      inv.coins >= 100
-                        ? 'bg-blue-600 hover:bg-blue-500 text-white active:scale-95'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}>
-                    <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase (100 Verdure)</span>
+                    <span>Purchase (50 Verdure)</span>
                   </button>
                 </div>
               </div>
@@ -21889,12 +24182,12 @@ export default function App() {
               <div className="text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800 flex items-center gap-2">
                 <Wrench className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>
-                  Acquire functional deployable nursery equipment &amp; irrigation systems! Deploy onto unlocked plots via [P] or [E], refill with [E], and dismantle anytime with [Q].
+                  Acquire functional deployable nursery equipment, fertilizer stations &amp; irrigation systems! Deploy onto unlocked plots via [P] or [E].
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* 1. Compost Heap (50 Verdure) */}
+                {/* 1. Compost Heap (20 Verdure) */}
                 <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
                   focusedShopIdx === 0
                     ? 'bg-slate-850 ring-4 ring-lime-400 border-lime-300 scale-[1.01] shadow-[0_0_20px_rgba(163,230,53,0.5)]'
@@ -21915,7 +24208,7 @@ export default function App() {
                             {focusedShopIdx === 0 && <span className="text-lime-400 text-xs">► [E/A]</span>}
                             <span>Compost Heap</span>
                           </h4>
-                          <span className="text-xs text-lime-400 font-bold">20 Waste Capacity • Passive Fertilizer</span>
+                          <span className="text-xs text-lime-400 font-bold">20 Waste Capacity • Passive Compost</span>
                         </div>
                       </div>
                       <span className="text-xs bg-slate-950 text-lime-300 border border-lime-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
@@ -21929,21 +24222,107 @@ export default function App() {
                   </div>
 
                   <button
-                    disabled={inv.coins < 50}
-                    onClick={() => buyTool('tool_compost_heap', 50, 'Compost Heap')}
-                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
-                      inv.coins >= 50
+                    disabled={inv.coins < 20}
+                    onClick={() => buyTool('tool_compost_heap', 20, 'Compost Heap')}
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                      inv.coins >= 20
                         ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                     }`}>
                     <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase Compost Heap (50 Verdure)</span>
+                    <span>Purchase Compost Heap (20 Verdure)</span>
                   </button>
                 </div>
 
-                {/* 2. T1 Manual Irrigation System (10 Verdure) */}
+                {/* 2. Fertilizer Station (50 Verdure) */}
                 <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
                   focusedShopIdx === 1
+                    ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(52,211,153,0.5)]'
+                    : 'bg-slate-900/80 border-emerald-500/40'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-2xl bg-emerald-950/80 border border-emerald-500/50 flex items-center justify-center overflow-hidden shrink-0">
+                          <span className="text-2xl">🧪</span>
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 1 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
+                            <span>Fertilizer Station</span>
+                          </h4>
+                          <span className="text-xs text-emerald-400 font-bold">Eco-Chemical Distiller • 60s Cycle</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-slate-950 text-emerald-300 border border-emerald-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Stock: {getStructureInventoryCount(inv, 'fertilizer_station')}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Eco-chemical distillery with glass retort, copper condensing coil, bronze valves, and nutrient chamber. Distills 3 Waste + 1 Biochemical into 1 Fertilizer (60s).
+                    </p>
+                  </div>
+
+                  <button
+                    disabled={inv.coins < 50}
+                    onClick={() => buyTool('fertilizer_station', 50, 'Fertilizer Station')}
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                      inv.coins >= 50
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}>
+                    <VerdureIcon className="w-3.5 h-3.5" />
+                    <span>Purchase Fertilizer Station (50 Verdure)</span>
+                  </button>
+                </div>
+
+                {/* 3. Biochemicals (5 Verdure each) */}
+                <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
+                  focusedShopIdx === 2
+                    ? 'bg-slate-850 ring-4 ring-cyan-400 border-cyan-300 scale-[1.01] shadow-[0_0_20px_rgba(6,182,212,0.5)]'
+                    : 'bg-slate-900/80 border-cyan-500/40'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-2xl bg-cyan-950/80 border border-cyan-500/50 flex items-center justify-center overflow-hidden shrink-0">
+                          <span className="text-2xl">🧪</span>
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 2 && <span className="text-cyan-400 text-xs">► [E/A]</span>}
+                            <span>Biochemicals</span>
+                          </h4>
+                          <span className="text-xs text-cyan-300 font-bold">Eco-Chemical Reagent (For Fertilizer Distillation)</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-slate-950 text-cyan-300 border border-cyan-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Stock: {inv.biochemicals ?? inv.resources?.biochemicals ?? 0}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Essential chemical catalyst reagent. Synthesizes Fertilizer at the Fertilizer Station when combined with Organic Waste (3 Waste + 1 Biochemical &rarr; 1 Fertilizer).
+                    </p>
+                  </div>
+
+                  <button
+                    disabled={inv.coins < 5}
+                    onClick={() => buyBiochemicalsItem(5)}
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                      inv.coins >= 5
+                        ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}>
+                    <VerdureIcon className="w-3.5 h-3.5" />
+                    <span>Purchase Biochemical (5 Verdure)</span>
+                  </button>
+                </div>
+
+                {/* 4. T1 Manual Irrigation System (10 Verdure) */}
+                <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
+                  focusedShopIdx === 3
                     ? 'bg-slate-850 ring-4 ring-sky-400 border-sky-300 scale-[1.01] shadow-[0_0_20px_rgba(56,189,248,0.5)]'
                     : 'bg-slate-900/80 border-sky-500/40'
                 }`}>
@@ -21955,7 +24334,7 @@ export default function App() {
                         </div>
                         <div>
                           <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 1 && <span className="text-sky-400 text-xs">► [E/A]</span>}
+                            {focusedShopIdx === 3 && <span className="text-sky-400 text-xs">► [E/A]</span>}
                             <span>T1 Manual Irrigation System</span>
                           </h4>
                           <span className="text-xs text-sky-400 font-bold">Left &amp; Right Plots (2 Total) • 30 Seconds</span>
@@ -21974,7 +24353,7 @@ export default function App() {
                   <button
                     disabled={inv.coins < 10}
                     onClick={() => buyManualIrrigation('irrigation_t1', 10, 'T1 Manual Irrigation System')}
-                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
                       inv.coins >= 10
                         ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed'
@@ -21984,9 +24363,9 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 3. T2 Manual Irrigation System (25 Verdure) */}
+                {/* 5. T2 Manual Irrigation System (25 Verdure) */}
                 <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
-                  focusedShopIdx === 2
+                  focusedShopIdx === 4
                     ? 'bg-slate-850 ring-4 ring-sky-400 border-sky-300 scale-[1.01] shadow-[0_0_20px_rgba(56,189,248,0.5)]'
                     : 'bg-slate-900/80 border-sky-500/40'
                 }`}>
@@ -21998,7 +24377,7 @@ export default function App() {
                         </div>
                         <div>
                           <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 2 && <span className="text-sky-400 text-xs">► [E/A]</span>}
+                            {focusedShopIdx === 4 && <span className="text-sky-400 text-xs">► [E/A]</span>}
                             <span>T2 Manual Irrigation System</span>
                           </h4>
                           <span className="text-xs text-sky-400 font-bold">4-Way Cross Plots (4 Total) • 90 Seconds</span>
@@ -22017,7 +24396,7 @@ export default function App() {
                   <button
                     disabled={inv.coins < 25}
                     onClick={() => buyManualIrrigation('irrigation_t2', 25, 'T2 Manual Irrigation System')}
-                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
                       inv.coins >= 25
                         ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed'
@@ -22027,9 +24406,9 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 4. T3 Manual Irrigation System (75 Verdure) */}
+                {/* 6. T3 Manual Irrigation System (75 Verdure) */}
                 <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
-                  focusedShopIdx === 3
+                  focusedShopIdx === 5
                     ? 'bg-slate-850 ring-4 ring-sky-400 border-sky-300 scale-[1.01] shadow-[0_0_20px_rgba(56,189,248,0.5)]'
                     : 'bg-slate-900/80 border-sky-500/40'
                 }`}>
@@ -22041,7 +24420,7 @@ export default function App() {
                         </div>
                         <div>
                           <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 3 && <span className="text-sky-400 text-xs">► [E/A]</span>}
+                            {focusedShopIdx === 5 && <span className="text-sky-400 text-xs">► [E/A]</span>}
                             <span>T3 Manual Irrigation System</span>
                           </h4>
                           <span className="text-xs text-sky-400 font-bold">All 8 Surrounding Plots (3x3 Grid) • 300 Seconds</span>
@@ -22060,7 +24439,7 @@ export default function App() {
                   <button
                     disabled={inv.coins < 75}
                     onClick={() => buyManualIrrigation('irrigation_t3', 75, 'T3 Manual Irrigation System')}
-                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
                       inv.coins >= 75
                         ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed'
@@ -22087,9 +24466,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL: BONSAI INSPECTION & TIERED AUTOMATON / SELL / PICK UP */}
-      {/* ========================================================================= */}
+      {/* MODAL: BONSAI INSPECTION */}
       <BonsaiInspectionModal
         isOpen={!!inspectingBonsai}
         onClose={() => setInspectingBonsaiId(null)}
@@ -22097,39 +24474,41 @@ export default function App() {
         synergies={
           inspectingBonsai
             ? getCachedBonsaiSynergies(inspectingBonsai)
-            : {
-                bonsaiCount: 0,
-                wallCount: 0,
-                rockCount: 0,
-                bushCount: 0,
-                decorCount: 0,
-                pebbleCount: 0,
-                energyCount: 0,
-                hasAdjacentBonsai: false,
-                hasAdjacentWall: false,
-                hasAdjacentRock: false,
-                hasAdjacentBush: false,
-                hasAdjacentDecor: false,
-                hasAdjacentPebbles: false,
-                hasAdjacentEnergy: false,
-                growthMultiplier: 1,
-                expMultiplier: 1,
-                quickPruneBonus: 0,
-                growingTogetherBonus: 0,
-                privateGrowingBonus: 0,
-                isStalled: false,
-                maxIdenticalCount: 0,
-              }
+            : DEFAULT_BONSAI_SYNERGIES
         }
         powerSufficient={power.isPowerSufficient}
         inventory={inv}
         greenThumbRank={zenSkillsRef.current.greenThumb || 0}
+        isEcoRequestMatch={
+          inspectingBonsai
+            ? checkMatchesEcoRequest(
+                inspectingBonsai,
+                masterQuestsRef.current.eco.activeRequestIndex,
+                masterQuestsRef.current.eco.requestCounts,
+              ).matches
+            : false
+        }
         onDonate={donatePlantedBonsai}
         onStore={pickUpBonsaiToInventory}
         onCompost={applyOrganicCompost}
+        onFertilize={applyFertilizer}
         onPrune={manualPruneBonsai}
         onAttachAutomaton={attachAutomatonTier}
         onDetachAutomaton={detachAutomaton}
+      />
+
+      {/* ========================================================================= */}
+      {/* MODAL: BONSAI SOCIETY GRAND HALL & MASTER QUEST */}
+      {/* ========================================================================= */}
+      <BonsaiSocietyModal
+        isOpen={isBonsaiSocietyOpen}
+        onClose={handleCloseBonsaiSociety}
+        masterQuests={masterQuestsRef.current}
+        discoveredSpeciesCount={Object.values(bondexDiscoveryRef.current).filter((d) => d.discovered).length}
+        discoveredStylesCount={Object.values(bondexDiscoveryRef.current).reduce((acc, d) => acc + (d.stylesRaised?.length || 0), 0)}
+        onCompleteDiscoveryTier1={handleCompleteDiscoveryTier1}
+        onCompleteCompetitionTier1={handleCompleteCompetitionTier1}
+        onCompleteEcoTier1={handleCompleteEcoTier1}
       />
 
       {/* ========================================================================= */}
@@ -22628,6 +25007,15 @@ export default function App() {
                                 </button>
                               )}
                               <button
+                                onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'craft_biochemicals')}
+                                className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
+                                  lane.targetRecipeId === 'craft_biochemicals'
+                                    ? 'bg-cyan-600 text-white border border-cyan-400'
+                                    : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
+                                }`}>
+                                🧪 Bio
+                              </button>
+                              <button
                                 onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'solar_panel')}
                                 className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
                                   lane.targetRecipeId === 'solar_panel'
@@ -23079,6 +25467,7 @@ export default function App() {
                           'craft_gears',
                           'craft_microcircuits',
                           'craft_quantum_chips',
+                          'craft_biochemicals',
                           'craft_enriched_compost',
                           'tier1_automaton',
                           'tier2_automaton',
@@ -23627,14 +26016,17 @@ export default function App() {
                       <div className="bg-slate-900/90 p-2 rounded-xl border border-emerald-500/30">
                         <strong className="text-emerald-300">🌿 Growing Together:</strong> Each neighboring Bonsai in the 3x3 zone grants <strong>+10% Hydration Growth Speed</strong> (stackable). Up to 4 adjacent bonsais can coexist without stalling!
                       </div>
-                      <div className="bg-slate-900/90 p-2 rounded-xl border border-amber-500/30">
-                        <strong className="text-amber-300">🎋 Private Growing:</strong> Each neighboring Woven Lattice Wall in the 3x3 zone grants <strong>+10% Hydration Growth Speed</strong> with its own independent counter. 4 walls and 4 bonsais safely give +80% Hydration Growth Speed!
+                      <div className="bg-slate-900/90 p-2 rounded-xl border border-cyan-500/30">
+                        <strong className="text-cyan-300">🌊 Gentle Waters:</strong> Each neighboring Water Feature in the 3x3 zone grants <strong>+10% Hydration Growth Speed</strong> (stackable).
                       </div>
-                      <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-700">
-                        <strong className="text-slate-200">🪨 Quick Prune:</strong> Each neighboring Zen Rock Formation in the 3x3 zone grants <strong>+0.25s Pruning Effect</strong> to manual care.
+                      <div className="bg-slate-900/90 p-2 rounded-xl border border-amber-500/30">
+                        <strong className="text-amber-300">🪨 XP Boosted:</strong> Each neighboring Zen Rock Formation in the 3x3 zone grants <strong>+15% Level Up Experience</strong>.
                       </div>
                       <div className="bg-slate-900/90 p-2 rounded-xl border border-emerald-500/30">
-                        <strong className="text-emerald-300">🌿 XP Boosted:</strong> Each neighboring Topiary Shrubbery Bush in the 3x3 zone grants <strong>+15% Level Up Experience</strong>.
+                        <strong className="text-emerald-300">🎋 Quick Prune:</strong> Each neighboring Growing Bamboo Formation in the 3x3 zone grants <strong>+0.25s Pruning Effect</strong> to manual care.
+                      </div>
+                      <div className="bg-slate-900/90 p-2 rounded-xl border border-lime-500/30">
+                        <strong className="text-lime-300">🪴 Efficient Pruning:</strong> Each neighboring Asparagus Fern Ball in the 3x3 zone grants <strong>+15% Chance for Extra Organic Waste on Level Up</strong>.
                       </div>
                       <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-700">
                         <strong className="text-slate-200">🪨 Zen Pebble Path:</strong> Moving along pebble paths grants a <strong>+35% movement speed boost</strong>! Pure pathway flooring that does not trigger or contribute to stalling surroundings.

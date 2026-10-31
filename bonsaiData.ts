@@ -461,11 +461,127 @@ export const SPECIES_PALETTE: Record<BonsaiLeafType, SpeciesPaletteEntry> = {
   bell: { base: '#92D050', highlight: '#B8E685', shadow: '#669238' },
 };
 
+export const SPECIES_NAME_MAP: Record<string, string> = {
+  circle: 'Maru',
+  oval: 'Daen',
+  circle_hole: 'Yubiwa',
+  circle_with_hole: 'Yubiwa',
+  'circle with hole': 'Yubiwa',
+  donut: 'Yubiwa',
+  ring: 'Yubiwa',
+  raindrop: 'Otosu',
+  fire: 'Hi',
+  flame: 'Hi',
+  cloud: 'Kumo',
+  hexagon: 'Rokkakkei',
+  star: 'Asutarisuku',
+  snowflake: 'Sunōfurēku',
+  feather: 'Fezā',
+  snail: 'Makigai',
+  'snail shell': 'Makigai',
+  snail_shell: 'Makigai',
+  eye: 'Me',
+  triangle: 'Sankakkei',
+  arrow: 'Yajirushi',
+  shield: 'Shīrudo',
+  diamond: 'Daiyamondo',
+  cube: 'Shikaku',
+  square: 'Shikaku',
+  rectangle: 'Kukei',
+  gear: 'Sōbi',
+  bell: 'Beru',
+  maru: 'Maru',
+  daen: 'Daen',
+  yubiwa: 'Yubiwa',
+  otosu: 'Otosu',
+  hi: 'Hi',
+  kumo: 'Kumo',
+  rokkakkei: 'Rokkakkei',
+  asutarisuku: 'Asutarisuku',
+  sunōfurēku: 'Sunōfurēku',
+  sunofureku: 'Sunōfurēku',
+  fezā: 'Fezā',
+  feza: 'Fezā',
+  makigai: 'Makigai',
+  me: 'Me',
+  sankakkei: 'Sankakkei',
+  yajirushi: 'Yajirushi',
+  shīrudo: 'Shīrudo',
+  shirudo: 'Shīrudo',
+  daiyamondo: 'Daiyamondo',
+  shikaku: 'Shikaku',
+  kukei: 'Kukei',
+  sōbi: 'Sōbi',
+  sobi: 'Sōbi',
+  beru: 'Beru',
+  'pristine circle': 'Maru',
+  'horizontal oval': 'Daen',
+  'ring donut': 'Yubiwa',
+  'tapered raindrop': 'Otosu',
+  'dancing flame': 'Hi',
+  'cumulus cloud': 'Kumo',
+  'geometric hexagon': 'Rokkakkei',
+  'six-pointed star': 'Asutarisuku',
+  'crystalline snowflake': 'Sunōfurēku',
+  'airy feather': 'Fezā',
+  'nautilus snail': 'Makigai',
+  'comic eye': 'Me',
+  'rounded triangle': 'Sankakkei',
+  'chevron arrow': 'Yajirushi',
+  'heater shield': 'Shīrudo',
+  'rhombus diamond': 'Daiyamondo',
+  'isometric cube': 'Shikaku',
+  'orthogonal brick': 'Kukei',
+  'mechanical gear': 'Sōbi',
+  'temple bell': 'Beru',
+};
+
+export function getSpeciesName(speciesOrLeafType?: any): string {
+  if (!speciesOrLeafType) return 'Maru';
+  let str = '';
+  if (typeof speciesOrLeafType === 'object') {
+    str = speciesOrLeafType.species || speciesOrLeafType.leafType || speciesOrLeafType.name || '';
+  } else {
+    str = String(speciesOrLeafType);
+  }
+
+  // Strip prefixes like [Erementaru], [Kihon], etc. and suffixes like (Sprout)
+  str = str.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').trim();
+  const lower = str.toLowerCase();
+
+  if (SPECIES_NAME_MAP[lower]) {
+    return SPECIES_NAME_MAP[lower];
+  }
+
+  for (const [k, v] of Object.entries(SPECIES_NAME_MAP)) {
+    if (lower === k || lower.startsWith(k + ' ') || lower.includes(k)) {
+      return v;
+    }
+  }
+
+  const cleaned = str.replace(/\s*(Bonsai|Seedling)\s*$/i, '').trim();
+  if (SPECIES_NAME_MAP[cleaned.toLowerCase()]) {
+    return SPECIES_NAME_MAP[cleaned.toLowerCase()];
+  }
+
+  return cleaned || 'Maru';
+}
+
+export function getBonsaiDisplayName(bonsai: any): string {
+  const speciesName = getSpeciesName(bonsai);
+  return `${speciesName} Bonsai`;
+}
+
+export function getSeedlingDisplayName(seedling: any): string {
+  const speciesName = getSpeciesName(seedling);
+  return `${speciesName} Bonsai`;
+}
+
 export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   // Raundo
   circle: {
     id: 'circle',
-    name: 'Pristine Circle Bonsai',
+    name: 'Maru',
     leafShapeName: 'Spherical Orb',
     group: 'Raundo',
     groupLabel: 'Raundo (Round)',
@@ -474,7 +590,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.circle.base,
     accentColor: SPECIES_PALETTE.circle.highlight,
     kanji: '円',
-    japanese: 'En-maru',
+    japanese: 'Maru',
     description: 'Pristine spherical orb foliage pads symbolizing wholeness, serenity, and continuous life flow.',
     icon: '🟢',
     digSpots: 2,
@@ -482,7 +598,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   },
   oval: {
     id: 'oval',
-    name: 'Horizontal Oval Bonsai',
+    name: 'Daen',
     leafShapeName: 'Elongated Cloud',
     group: 'Raundo',
     groupLabel: 'Raundo (Round)',
@@ -491,7 +607,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.oval.base,
     accentColor: SPECIES_PALETTE.oval.highlight,
     kanji: '楕',
-    japanese: 'Da-en',
+    japanese: 'Daen',
     description: 'Elongated horizontal cloud foliage clusters floating peacefully across staggered boughs.',
     icon: '☁️',
     digSpots: 3,
@@ -499,7 +615,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   },
   circle_hole: {
     id: 'circle_hole',
-    name: 'Ring Donut Bonsai',
+    name: 'Yubiwa',
     leafShapeName: 'Ring with Center Hole',
     group: 'Raundo',
     groupLabel: 'Raundo (Round)',
@@ -508,7 +624,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.circle_hole.base,
     accentColor: SPECIES_PALETTE.circle_hole.highlight,
     kanji: '環',
-    japanese: 'En-kan',
+    japanese: 'Yubiwa',
     description: 'Concentric ring torus foliage with a negative zen aperture in its center.',
     icon: '🔘',
     digSpots: 4,
@@ -518,7 +634,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   // Erementaru
   raindrop: {
     id: 'raindrop',
-    name: 'Tapered Raindrop Bonsai',
+    name: 'Otosu',
     leafShapeName: 'Teardrop Dew',
     group: 'Erementaru',
     groupLabel: 'Erementaru (Elemental)',
@@ -527,7 +643,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.raindrop.base,
     accentColor: SPECIES_PALETTE.raindrop.highlight,
     kanji: '雫',
-    japanese: 'Shizuku',
+    japanese: 'Otosu',
     description: 'Teardrop-shaped foliage with tapered apex, channeling dew nourishment and mountain rain.',
     icon: '💧',
     digSpots: 4,
@@ -535,7 +651,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   },
   fire: {
     id: 'fire',
-    name: 'Dancing Flame Bonsai',
+    name: 'Hi',
     leafShapeName: 'Flame Crest',
     group: 'Erementaru',
     groupLabel: 'Erementaru (Elemental)',
@@ -544,7 +660,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.fire.base,
     accentColor: SPECIES_PALETTE.fire.highlight,
     kanji: '炎',
-    japanese: 'Homura',
+    japanese: 'Hi',
     description: 'Dancing multi-pointed flame crest foliage radiating vibrant warmth and spiritual vitality.',
     icon: '🔥',
     digSpots: 5,
@@ -552,7 +668,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   },
   cloud: {
     id: 'cloud',
-    name: 'Cumulus Cloud Bonsai',
+    name: 'Kumo',
     leafShapeName: 'Puffy Cloud',
     group: 'Erementaru',
     groupLabel: 'Erementaru (Elemental)',
@@ -571,7 +687,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   // Roku-men
   hexagon: {
     id: 'hexagon',
-    name: 'Geometric Hexagon Bonsai',
+    name: 'Rokkakkei',
     leafShapeName: 'Hexagonal Plate',
     group: 'Roku-men',
     groupLabel: 'Roku-men (Six-sides)',
@@ -580,7 +696,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.hexagon.base,
     accentColor: SPECIES_PALETTE.hexagon.highlight,
     kanji: '六',
-    japanese: 'Rokkaku',
+    japanese: 'Rokkakkei',
     description: 'Faceted geometric hexagonal foliage plates embodying structural precision and sacred geometry.',
     icon: '⬡',
     digSpots: 5,
@@ -588,7 +704,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   },
   star: {
     id: 'star',
-    name: 'Six-Pointed Star Bonsai',
+    name: 'Asutarisuku',
     leafShapeName: 'Starburst Aster',
     group: 'Roku-men',
     groupLabel: 'Roku-men (Six-sides)',
@@ -597,7 +713,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.star.base,
     accentColor: SPECIES_PALETTE.star.highlight,
     kanji: '星',
-    japanese: 'Hoshikuzu',
+    japanese: 'Asutarisuku',
     description: 'Legendary 6-pointed aster starburst linear foliage glowing with radiant astral brilliance.',
     icon: '⭐',
     digSpots: 6,
@@ -605,7 +721,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   },
   snowflake: {
     id: 'snowflake',
-    name: 'Crystalline Snowflake Bonsai',
+    name: 'Sunōfurēku',
     leafShapeName: 'Ice Crystal',
     group: 'Roku-men',
     groupLabel: 'Roku-men (Six-sides)',
@@ -614,7 +730,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.snowflake.base,
     accentColor: SPECIES_PALETTE.snowflake.highlight,
     kanji: '雪',
-    japanese: 'Yukibana',
+    japanese: 'Sunōfurēku',
     description: 'Delicate six-armed ice crystal star foliage radiating intricate branching symmetry.',
     icon: '❄️',
     digSpots: 5,
@@ -624,7 +740,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   // Seikatsu
   feather: {
     id: 'feather',
-    name: 'Airy Feather Bonsai',
+    name: 'Fezā',
     leafShapeName: 'Quill Vane',
     group: 'Seikatsu',
     groupLabel: 'Seikatsu (Life / Nature)',
@@ -633,7 +749,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.feather.base,
     accentColor: SPECIES_PALETTE.feather.highlight,
     kanji: '羽',
-    japanese: 'Hane',
+    japanese: 'Fezā',
     description: 'Stylized airy quill shaft with sleek diagonal feather barbs swaying gently in mountain winds.',
     icon: '🪶',
     digSpots: 3,
@@ -641,7 +757,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   },
   snail: {
     id: 'snail',
-    name: 'Nautilus Snail Bonsai',
+    name: 'Makigai',
     leafShapeName: 'Spiral Shell',
     group: 'Seikatsu',
     groupLabel: 'Seikatsu (Life / Nature)',
@@ -650,7 +766,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.snail.base,
     accentColor: SPECIES_PALETTE.snail.highlight,
     kanji: '螺',
-    japanese: 'Maimai',
+    japanese: 'Makigai',
     description: 'Curved spiral whorl shell foliage illustrating nature’s sacred golden ratio spiral.',
     icon: '🐌',
     digSpots: 4,
@@ -658,7 +774,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   },
   eye: {
     id: 'eye',
-    name: 'Comic Eye Bonsai',
+    name: 'Me',
     leafShapeName: 'Playful Eye Iris',
     group: 'Seikatsu',
     groupLabel: 'Seikatsu (Life / Nature)',
@@ -667,7 +783,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.eye.base,
     accentColor: SPECIES_PALETTE.eye.highlight,
     kanji: '瞳',
-    japanese: 'Hitomi',
+    japanese: 'Me',
     description: 'Playful cartoon almond foliage pad featuring an inquisitive dark pupil and glossy highlight.',
     icon: '👁️',
     digSpots: 5,
@@ -677,7 +793,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   // Sanmen
   triangle: {
     id: 'triangle',
-    name: 'Rounded Triangle Bonsai',
+    name: 'Sankakkei',
     leafShapeName: 'Soft Delta',
     group: 'Sanmen',
     groupLabel: 'Sanmen (Three-faces)',
@@ -686,7 +802,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.triangle.base,
     accentColor: SPECIES_PALETTE.triangle.highlight,
     kanji: '三',
-    japanese: 'Sankaku',
+    japanese: 'Sankakkei',
     description: 'Soft three-cornered rounded delta foliage pads embodying stability and three-way balance.',
     icon: '🔺',
     digSpots: 3,
@@ -694,7 +810,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   },
   arrow: {
     id: 'arrow',
-    name: 'Chevron Arrow Bonsai',
+    name: 'Yajirushi',
     leafShapeName: 'Arrowhead Chevron',
     group: 'Sanmen',
     groupLabel: 'Sanmen (Three-faces)',
@@ -711,7 +827,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   },
   shield: {
     id: 'shield',
-    name: 'Heater Shield Bonsai',
+    name: 'Shīrudo',
     leafShapeName: 'Heraldic Heater Shield',
     group: 'Sanmen',
     groupLabel: 'Sanmen (Three-faces)',
@@ -720,7 +836,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.shield.base,
     accentColor: SPECIES_PALETTE.shield.highlight,
     kanji: '盾',
-    japanese: 'Tate',
+    japanese: 'Shīrudo',
     description: 'Classic heraldic curved heater shield foliage with flat top crest and pointed base.',
     icon: '🛡️',
     digSpots: 4,
@@ -728,7 +844,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   },
   diamond: {
     id: 'diamond',
-    name: 'Rhombus Diamond Bonsai',
+    name: 'Daiyamondo',
     leafShapeName: 'Faceted Rhombus',
     group: 'Sanmen',
     groupLabel: 'Sanmen (Three-faces)',
@@ -737,7 +853,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.diamond.base,
     accentColor: SPECIES_PALETTE.diamond.highlight,
     kanji: '菱',
-    japanese: 'Hishigata',
+    japanese: 'Daiyamondo',
     description: 'Sharp 4-point diamond rhombus facet foliage reflecting pristine crystalline clarity.',
     icon: '💎',
     digSpots: 4,
@@ -747,7 +863,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   // Shihen
   cube: {
     id: 'cube',
-    name: 'Isometric Cube Bonsai',
+    name: 'Shikaku',
     leafShapeName: '3D Box Cube',
     group: 'Shihen',
     groupLabel: 'Shihen (Four-sides)',
@@ -756,7 +872,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.cube.base,
     accentColor: SPECIES_PALETTE.cube.highlight,
     kanji: '箱',
-    japanese: 'Rittai',
+    japanese: 'Shikaku',
     description: 'Isometric 3D outlined box/cube foliage pads with three distinct shaded facets.',
     icon: '🧊',
     digSpots: 4,
@@ -764,7 +880,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   },
   rectangle: {
     id: 'rectangle',
-    name: 'Orthogonal Brick Bonsai',
+    name: 'Kukei',
     leafShapeName: 'Rounded Rectangle',
     group: 'Shihen',
     groupLabel: 'Shihen (Four-sides)',
@@ -773,7 +889,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.rectangle.base,
     accentColor: SPECIES_PALETTE.rectangle.highlight,
     kanji: '矩',
-    japanese: 'Chōhō',
+    japanese: 'Kukei',
     description: 'Clean vertical and orthogonal brick-block foliage pads showcasing architectural poise.',
     icon: '🧱',
     digSpots: 3,
@@ -783,7 +899,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   // Jinkō-teki
   gear: {
     id: 'gear',
-    name: 'Mechanical Gear Bonsai',
+    name: 'Sōbi',
     leafShapeName: 'Toothed Cogwheel',
     group: 'Jinkō-teki',
     groupLabel: 'Jinkō-teki (Crafted)',
@@ -792,7 +908,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.gear.base,
     accentColor: SPECIES_PALETTE.gear.highlight,
     kanji: '輪',
-    japanese: 'Haguruma',
+    japanese: 'Sōbi',
     description: 'Circular disc foliage with 6 protruding square gear teeth reflecting automata synergy.',
     icon: '⚙️',
     digSpots: 4,
@@ -800,7 +916,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
   },
   bell: {
     id: 'bell',
-    name: 'Temple Bell Bonsai',
+    name: 'Beru',
     leafShapeName: 'Resonant Bell Dome',
     group: 'Jinkō-teki',
     groupLabel: 'Jinkō-teki (Crafted)',
@@ -809,7 +925,7 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
     color: SPECIES_PALETTE.bell.base,
     accentColor: SPECIES_PALETTE.bell.highlight,
     kanji: '鐘',
-    japanese: 'Bonshō',
+    japanese: 'Beru',
     description: 'Arched dome temple bell silhouette with flared rim and resonant bottom clapper.',
     icon: '🔔',
     digSpots: 5,
@@ -820,6 +936,12 @@ export const LEAF_TYPE_CONFIGS: Record<BonsaiLeafType, LeafTypeDefinition> = {
 export function getLeafTypeDef(type?: string): LeafTypeDefinition {
   if (type && type in LEAF_TYPE_CONFIGS) {
     return LEAF_TYPE_CONFIGS[type as BonsaiLeafType];
+  }
+  const clean = (type || '').toLowerCase().trim();
+  for (const [k, conf] of Object.entries(LEAF_TYPE_CONFIGS)) {
+    if (k === clean || conf.name.toLowerCase() === clean || conf.japanese.toLowerCase() === clean) {
+      return conf;
+    }
   }
   return LEAF_TYPE_CONFIGS['circle'];
 }

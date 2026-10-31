@@ -6,6 +6,40 @@ import type {
 
 export type RoverChassisTier = 1 | 2 | 3;
 
+export type DeployedInfrastructureType =
+  | 'solar_panel'
+  | 'wind_turbine'
+  | 'tool_compost_heap'
+  | 'tool_garden_well'
+  | 'fertilizer_station'
+  | 'automaton_t1'
+  | 'automaton_t2'
+  | 'automaton_t3'
+  | 'irrigation_t1'
+  | 'irrigation_t2'
+  | 'irrigation_t3'
+  | 'water_feature'
+  | 'decor_woven_wall'
+  | 'bamboo_fence'
+  | 'decor_pebble_path'
+  | 'decor_rock_formation'
+  | 'zen_rock_formation'
+  | 'decor_shrubbery_bush'
+  | 'growing_bamboo_formation'
+  | 'asparagus_fern_ball'
+  | 'torii_gate';
+
+export type GameResourceType =
+  | 'scrap_metal'
+  | 'copper_wire'
+  | 'brass_gears'
+  | 'circuit_boards'
+  | 'electronic_chips'
+  | 'organic_waste'
+  | 'organic_compost'
+  | 'biochemicals'
+  | 'fertilizer';
+
 export const AREA_EXCAVATION_SPEEDS = {
   FOOTHILLS: 3.2,
   HIGHLANDS: 4.4,
@@ -196,10 +230,10 @@ export interface CrystalPedestalDef {
 
 export const EMPTY_CRYSTAL_PEDESTAL: CrystalPedestalDef = {
   type: 'empty_crystal_pedestal',
-  name: 'Empty Crystal Pedestal',
+  name: 'Empty Pedestal',
   price: 50,
-  bonusLabel: 'Socket with expedition crystals for +CP',
-  description: 'Carved stone pedestal without any crystal on top. Deploy in sanctuary, then interact [E] to socket any crystal shard found during expeditions.',
+  bonusLabel: 'Can Host Crystal Artifacts',
+  description: 'Can Host Crystal Artifacts',
 };
 
 export const CRYSTAL_PEDESTALS: Record<string, CrystalPedestalDef> = {
@@ -431,11 +465,81 @@ export interface GridPlacementPreview {
   width: number;
   height: number;
   orientation: 'horizontal' | 'vertical'; // default 'horizontal'
+  edgeSide?: 'top' | 'right' | 'bottom' | 'left';
+  fenceEdge?: 'top' | 'right' | 'bottom' | 'left';
+  edgeKey?: string;
   style?: GrowthStyle;
   nature?: BonsaiNature;
   bonsai?: any;
   data?: any;
   item?: any;
+}
+
+/**
+ * Checks whether the halo connection between two plots (c1, r1) and (c2, r2)
+ * is blocked by a physical bamboo fence on the intervening borders.
+ */
+export function isHaloBlockedByFence(
+  c1: number,
+  r1: number,
+  c2: number,
+  r2: number,
+  fenceSet: Set<string>,
+): boolean {
+  if (!fenceSet || fenceSet.size === 0) return false;
+  const dc = c2 - c1;
+  const dr = r2 - r1;
+
+  // Direct orthogonal separation
+  if (dc === 0 && dr === -1) {
+    // Neighbor is directly UP
+    return fenceSet.has(`H_${c1}_${r1}`);
+  }
+  if (dc === 0 && dr === 1) {
+    // Neighbor is directly DOWN
+    return fenceSet.has(`H_${c1}_${r1 + 1}`);
+  }
+  if (dc === -1 && dr === 0) {
+    // Neighbor is directly LEFT
+    return fenceSet.has(`V_${c1}_${r1}`);
+  }
+  if (dc === 1 && dr === 0) {
+    // Neighbor is directly RIGHT
+    return fenceSet.has(`V_${c1 + 1}_${r1}`);
+  }
+
+  // Diagonal separation (|dc| === 1 && |dr| === 1)
+  if (Math.abs(dc) === 1 && Math.abs(dr) === 1) {
+    // Path 1: through (c1 + dc, r1)
+    const edge1A = `V_${Math.max(c1, c1 + dc)}_${r1}`;
+    const edge1B = `H_${c1 + dc}_${Math.max(r1, r1 + dr)}`;
+    const path1Blocked = fenceSet.has(edge1A) || fenceSet.has(edge1B);
+
+    // Path 2: through (c1, r1 + dr)
+    const edge2A = `H_${c1}_${Math.max(r1, r1 + dr)}`;
+    const edge2B = `V_${Math.max(c1, c1 + dc)}_${r1 + dr}`;
+    const path2Blocked = fenceSet.has(edge2A) || fenceSet.has(edge2B);
+
+    return path1Blocked && path2Blocked;
+  }
+
+  // Distance 2 orthogonal (dc === ±2, dr === 0)
+  if (Math.abs(dc) === 2 && dr === 0) {
+    const midC = c1 + dc / 2;
+    const edgeA = `V_${Math.max(c1, midC)}_${r1}`;
+    const edgeB = `V_${Math.max(midC, c2)}_${r1}`;
+    return fenceSet.has(edgeA) || fenceSet.has(edgeB);
+  }
+
+  // Distance 2 orthogonal (dc === 0, dr === ±2)
+  if (dc === 0 && Math.abs(dr) === 2) {
+    const midR = r1 + dr / 2;
+    const edgeA = `H_${c1}_${Math.max(r1, midR)}`;
+    const edgeB = `H_${c1}_${Math.max(midR, r2)}`;
+    return fenceSet.has(edgeA) || fenceSet.has(edgeB);
+  }
+
+  return false;
 }
 
 export const STYLE_ATTRIBUTE_WEIGHTS: Record<
@@ -980,4 +1084,244 @@ export function calculateBonsaiAttributes(precisions: number[]): {
     },
   };
 }
+
+/**
+ * Bonsai Master Quests and Botanical Eco Requests system
+ */
+export interface EcoRequestProgress {
+  activeRequestIndex: number; // 0 to 9 (corresponds to Requests 1 to 10)
+  requestCounts: Record<string, number>; // e.g. { any: 4, raundo: 2, erementaru: 1, ... }
+  completedRequests: number; // 0 to 10
+  tier1Completed: boolean;
+}
+
+export interface MasterQuestsState {
+  discovery: { tier1Completed: boolean };
+  competition: { tier1Completed: boolean };
+  eco: EcoRequestProgress;
+}
+
+export interface EcoRequestTarget {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface EcoRequestDef {
+  index: number; // 0 to 9
+  id: number; // 1 to 10
+  title: string;
+  description: string;
+  targets: EcoRequestTarget[];
+}
+
+export const ECO_REQUESTS: EcoRequestDef[] = [
+  {
+    index: 0,
+    id: 1,
+    title: 'Request 1: Foundation Donations',
+    description: 'Donate any Bonsai (10x)',
+    targets: [{ key: 'any', label: 'Any Bonsai', count: 10 }],
+  },
+  {
+    index: 1,
+    id: 2,
+    title: 'Request 2: Sacred Archetype Triad',
+    description: 'Donate Raundo, Erementaru & Roku-Men Bonsai (3x each)',
+    targets: [
+      { key: 'raundo', label: 'Raundo Bonsai', count: 3 },
+      { key: 'erementaru', label: 'Erementaru Bonsai', count: 3 },
+      { key: 'rokumen', label: 'Roku-Men Bonsai', count: 3 },
+    ],
+  },
+  {
+    index: 2,
+    id: 3,
+    title: 'Request 3: Classical Silhouettes',
+    description: 'Donate Chokan, Moyogi & Shakan Bonsai (3x each)',
+    targets: [
+      { key: 'chokan', label: 'Chokan (Formal Upright)', count: 3 },
+      { key: 'moyogi', label: 'Moyogi (Informal Upright)', count: 3 },
+      { key: 'shakan', label: 'Shakan (Slanting)', count: 3 },
+    ],
+  },
+  {
+    index: 3,
+    id: 4,
+    title: 'Request 4: Seasoned Cultivation',
+    description: 'Donate any Level 10+ Bonsai (10x)',
+    targets: [{ key: 'lv10', label: 'Level 10+ Bonsai', count: 10 }],
+  },
+  {
+    index: 4,
+    id: 5,
+    title: 'Request 5: Natural Equilibrium',
+    description: 'Donate Balanced, Equalized, Adjusted, or Tempered (Nature) Bonsai (8x)',
+    targets: [{ key: 'neutralNature', label: 'Neutral Nature Bonsai', count: 8 }],
+  },
+  {
+    index: 5,
+    id: 6,
+    title: 'Request 6: High Aesthetic Standard',
+    description: 'Donate any BA 25+ Bonsai (10x)',
+    targets: [{ key: 'ba25', label: 'BA 25+ Bonsai', count: 10 }],
+  },
+  {
+    index: 6,
+    id: 7,
+    title: 'Request 7: Rare Species Heritage',
+    description: 'Donate Daen, Hi, and Asutarisuku Bonsai (3x each)',
+    targets: [
+      { key: 'daen', label: 'Daen Bonsai', count: 3 },
+      { key: 'hi', label: 'Hi Bonsai', count: 3 },
+      { key: 'asutarisuku', label: 'Asutarisuku Bonsai', count: 3 },
+    ],
+  },
+  {
+    index: 7,
+    id: 8,
+    title: 'Request 8: Sapling Development',
+    description: 'Donate any Maturity Rating 2 Bonsai (5x)',
+    targets: [{ key: 'rating2', label: 'Maturity Rating 2 (Sapling)', count: 5 }],
+  },
+  {
+    index: 8,
+    id: 9,
+    title: 'Request 9: Early Genetic Prodigy',
+    description: 'Donate any BA 25+ Bonsai under Level 10 (5x)',
+    targets: [{ key: 'ba25under10', label: 'BA 25+ under Lv.10', count: 5 }],
+  },
+  {
+    index: 9,
+    id: 10,
+    title: 'Request 10: Masterwork Upright Pinnacle',
+    description: 'Donate Level 25+ Chokan Style Daen, Hi, or Asutarisuku Bonsai (5x)',
+    targets: [{ key: 'req10', label: 'Lv.25+ Chokan Daen, Hi, or Asutarisuku', count: 5 }],
+  },
+];
+
+export function checkMatchesEcoRequest(
+  bonsai: Bonsai | any,
+  activeRequestIndex: number,
+  currentCounts: Record<string, number> = {},
+): { matches: boolean; key?: string } {
+  if (!bonsai || activeRequestIndex < 0 || activeRequestIndex >= ECO_REQUESTS.length) {
+    return { matches: false };
+  }
+
+  const leaf = (bonsai.leafType || bonsai.species || '').toLowerCase();
+  const name = (bonsai.name || '').toLowerCase();
+  const group = (bonsai.group || '').toLowerCase();
+  const style = (bonsai.style || '').toUpperCase().replace('-', '_');
+  const level = bonsai.level || 0;
+  const rating = getBonsaiMaturityRating(bonsai);
+  const ba = calculateBaseAesthetic(bonsai).total;
+
+  const isRaundo =
+    group === 'raundo' ||
+    ['circle', 'oval', 'circle_hole'].includes(leaf) ||
+    name.includes('maru') ||
+    name.includes('daen') ||
+    name.includes('yubiwa');
+  const isErementaru =
+    group === 'erementaru' ||
+    ['raindrop', 'fire', 'cloud'].includes(leaf) ||
+    name.includes('otosu') ||
+    name.includes('hi') ||
+    name.includes('kumo');
+  const isRokumen =
+    group === 'roku-men' ||
+    group === 'rokumen' ||
+    ['hexagon', 'star', 'snowflake'].includes(leaf) ||
+    name.includes('rokkakkei') ||
+    name.includes('asutarisuku') ||
+    name.includes('sunōfurēku') ||
+    name.includes('sunofureku');
+
+  const isDaen = leaf === 'oval' || name.includes('daen');
+  const isHi = leaf === 'fire' || name.includes('hi');
+  const isAsutarisuku = leaf === 'star' || name.includes('asutarisuku');
+
+  switch (activeRequestIndex) {
+    case 0: {
+      // Request 1: Donate any Bonsai (10x)
+      if ((currentCounts.any || 0) < 10) return { matches: true, key: 'any' };
+      return { matches: false };
+    }
+    case 1: {
+      // Request 2: Donate Raundo, Erementaru & Roku-Men Bonsai (3x each)
+      if (isRaundo && (currentCounts.raundo || 0) < 3) return { matches: true, key: 'raundo' };
+      if (isErementaru && (currentCounts.erementaru || 0) < 3) return { matches: true, key: 'erementaru' };
+      if (isRokumen && (currentCounts.rokumen || 0) < 3) return { matches: true, key: 'rokumen' };
+      return { matches: false };
+    }
+    case 2: {
+      // Request 3: Donate Chokan, Moyogi & Shakan Bonsai (3x each)
+      if (style === 'CHOKAN' && (currentCounts.chokan || 0) < 3) return { matches: true, key: 'chokan' };
+      if (style === 'MOYOGI' && (currentCounts.moyogi || 0) < 3) return { matches: true, key: 'moyogi' };
+      if (style === 'SHAKAN' && (currentCounts.shakan || 0) < 3) return { matches: true, key: 'shakan' };
+      return { matches: false };
+    }
+    case 3: {
+      // Request 4: Donate any Level 10+ Bonsai (10x)
+      if (level >= 10 && (currentCounts.lv10 || 0) < 10) return { matches: true, key: 'lv10' };
+      return { matches: false };
+    }
+    case 4: {
+      // Request 5: Donate Balanced, Equalized, Adjusted, or Tempered (Nature) Bonsai (8x)
+      const natureName = (
+        typeof bonsai.nature === 'string' ? bonsai.nature : bonsai.nature?.name || ''
+      ).toLowerCase();
+      const neutralNatures = ['balanced', 'equalised', 'equalized', 'adjusted', 'tempered'];
+      if (neutralNatures.includes(natureName) && (currentCounts.neutralNature || 0) < 8) {
+        return { matches: true, key: 'neutralNature' };
+      }
+      return { matches: false };
+    }
+    case 5: {
+      // Request 6: Donate any BA 25+ Bonsai (10x)
+      if (ba >= 25 && (currentCounts.ba25 || 0) < 10) return { matches: true, key: 'ba25' };
+      return { matches: false };
+    }
+    case 6: {
+      // Request 7: Donate Daen, Hi, and Asutarisuku Bonsai (3x each)
+      if (isDaen && (currentCounts.daen || 0) < 3) return { matches: true, key: 'daen' };
+      if (isHi && (currentCounts.hi || 0) < 3) return { matches: true, key: 'hi' };
+      if (isAsutarisuku && (currentCounts.asutarisuku || 0) < 3) return { matches: true, key: 'asutarisuku' };
+      return { matches: false };
+    }
+    case 7: {
+      // Request 8: Donate any Maturity Rating 2 Bonsai (5x)
+      if (rating === 2 && (currentCounts.rating2 || 0) < 5) return { matches: true, key: 'rating2' };
+      return { matches: false };
+    }
+    case 8: {
+      // Request 9: Donate any BA 25+ Bonsai under Level 10 (5x)
+      if (ba >= 25 && level < 10 && (currentCounts.ba25under10 || 0) < 5) {
+        return { matches: true, key: 'ba25under10' };
+      }
+      return { matches: false };
+    }
+    case 9: {
+      // Request 10: Donate Level 25+ Chokan Style Daen, Hi, or Asutarisuku Bonsai (5x)
+      const isTargetSpecies = isDaen || isHi || isAsutarisuku;
+      if (level >= 25 && style === 'CHOKAN' && isTargetSpecies && (currentCounts.req10 || 0) < 5) {
+        return { matches: true, key: 'req10' };
+      }
+      return { matches: false };
+    }
+    default:
+      return { matches: false };
+  }
+}
+
+export function isEcoRequestComplete(
+  activeRequestIndex: number,
+  currentCounts: Record<string, number> = {},
+): boolean {
+  const req = ECO_REQUESTS[activeRequestIndex];
+  if (!req) return false;
+  return req.targets.every((t) => (currentCounts[t.key] || 0) >= t.count);
+}
+
 

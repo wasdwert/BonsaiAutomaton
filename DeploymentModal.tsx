@@ -23,6 +23,8 @@ import {
   calculateDonationValue,
   getStyleAttributeWeights,
   drawBonsaiTrunkAndCanopy,
+  getBonsaiDisplayName,
+  getSpeciesName,
 } from './bonsaiData';
 import {
   SeedlingItem,
@@ -295,6 +297,7 @@ export default function DeploymentModal({
   }, [activeCategory]);
 
   const compostCount = getStructureInventoryCount(inv, 'tool_compost_heap');
+  const fertilizerStationCount = getStructureInventoryCount(inv, 'fertilizer_station');
   const wellCount = getStructureInventoryCount(inv, 'tool_garden_well');
   const solarCount = getStructureInventoryCount(inv, 'solar_panel');
   const windCount = getStructureInventoryCount(inv, 'wind_turbine');
@@ -320,18 +323,18 @@ export default function DeploymentModal({
     'solar_panel',
     'wind_turbine',
     'tool_compost_heap',
+    'fertilizer_station',
   ];
 
   const decorItems: DeployedStructureType[] = [
+    'bamboo_fence',
     'decor_pebble_path',
-    'decor_rock_formation',
-    'decor_shrubbery_bush',
-    'decor_woven_wall',
+    'zen_rock_formation',
+    'growing_bamboo_formation',
+    'asparagus_fern_ball',
+    'water_feature',
     'torii_gate',
-    'crystal_pedestal_foliage',
-    'crystal_pedestal_branches',
-    'crystal_pedestal_trunk',
-    'crystal_pedestal_roots',
+    'empty_crystal_pedestal',
   ];
 
   // Handle keyboard navigation and gamepad events
@@ -524,15 +527,14 @@ export default function DeploymentModal({
   if (!isOpen) return null;
 
   const decorCount =
+    (inv.bamboo_fence_inv || 0) +
     (inv.decor_pebble_path_inv || 0) +
-    (inv.decor_rock_formation_inv || 0) +
-    (inv.decor_shrubbery_bush_inv || 0) +
-    (inv.decor_woven_wall_inv || 0) +
+    (inv.zen_rock_formation_inv || inv.decor_rock_formation_inv || 0) +
+    (inv.growing_bamboo_formation_inv || inv.decor_shrubbery_bush_inv || 0) +
+    (inv.asparagus_fern_ball_inv || 0) +
+    (inv.water_feature_inv || inv.decor_woven_wall_inv || 0) +
     (inv.torii_gate_inv || inv.decorations?.toriiGate || inv.decorations?.['torii_gate'] || 0) +
-    (inv.crystal_pedestal_foliage_inv || 0) +
-    (inv.crystal_pedestal_branches_inv || 0) +
-    (inv.crystal_pedestal_trunk_inv || 0) +
-    (inv.crystal_pedestal_roots_inv || 0);
+    getStructureInventoryCount(inv, 'empty_crystal_pedestal');
 
   const attributeRowConfigs = [
     {
@@ -660,7 +662,7 @@ export default function DeploymentModal({
                   </div>
                   <div className="min-w-0 flex items-center gap-2 flex-wrap">
                     <h3 className="text-sm sm:text-base font-black text-slate-100 truncate">
-                      Choose Style to Plant: {seedling.name || `${leafDef.name} Bonsai`}
+                      Choose Style to Plant: {getBonsaiDisplayName(seedling)}
                     </h3>
                     <span
                       style={{
@@ -1024,7 +1026,7 @@ export default function DeploymentModal({
                             </div>
                             <div className="min-w-0 flex-1 space-y-1.5">
                               <h4 className="font-bold text-xs sm:text-sm text-slate-100 truncate">
-                                {seedling.name || `${leafDef.name} Bonsai`}
+                                {getBonsaiDisplayName(seedling)}
                               </h4>
                               {/* Directly underneath the name: Maturity rating badge, Tree type group badge, and Nature pill */}
                               <div className="flex items-center gap-1.5 flex-wrap">
@@ -1182,7 +1184,7 @@ export default function DeploymentModal({
                                   <span>{sMat.name}</span>
                                   <span className="opacity-80 font-mono">({sMat.multiplier}x)</span>
                                 </span>
-                                <span>{stored.name}</span>
+                                <span>{getBonsaiDisplayName(stored)}</span>
                                 <span className="text-emerald-400 font-bold">(Lv.{stored.level} • {ba.total.toFixed(2)} BA)</span>
                                 {stored.nature && (() => {
                                   const nat = getBonsaiNature(stored.nature);
@@ -1666,6 +1668,49 @@ export default function DeploymentModal({
                       {compostCount > 0 ? 'Deploy Compost Heap' : 'Buy in Botanical Market'}
                     </button>
                   </div>
+
+                  {/* Fertilizer Station */}
+                  <div className="bg-slate-900/90 border border-emerald-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">🧪</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Fertilizer Station</h4>
+                          <span className="text-[10px] text-emerald-400 font-bold">Eco-Chemical Distiller • 60s Cycle</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-emerald-950 text-emerald-300 border border-emerald-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {fertilizerStationCount}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Sophisticated eco-chemical apparatus. Distills 3 Organic Waste + 1 Biochemical into 1 high-potency Fertilizer in 60s (-300s growth boost).
+                    </p>
+                    <button
+                      disabled={fertilizerStationCount <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'fertilizer_station',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('fertilizer_station');
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        fertilizerStationCount > 0
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <span>🧪</span>
+                      {fertilizerStationCount > 0 ? 'Deploy Fertilizer Station' : 'Buy in Botanical Market'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -1723,41 +1768,41 @@ export default function DeploymentModal({
                     </button>
                   </div>
 
-                  {/* Rock Formation */}
+                  {/* Zen Rock Formation */}
                   <div className="bg-slate-900/80 border border-amber-500/30 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <span className="text-2xl">🪨</span>
                         <div>
                           <h5 className="font-bold text-xs sm:text-sm text-slate-200 truncate">Zen Rock Formation</h5>
-                          <span className="text-[10px] text-amber-400">+0.25s Pruning Effect (Quick Prune)</span>
+                          <span className="text-[10px] text-amber-400 font-bold">+15% Level Up Experience (XP Boosted)</span>
                         </div>
                       </div>
                       <span className="text-xs bg-slate-950 text-amber-300 border border-amber-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Stock: {inv.decor_rock_formation_inv || 0}
+                        Stock: {getStructureInventoryCount(inv, 'zen_rock_formation')}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      +0.25s Pruning Effect (Quick Prune) to adjacent bonsais in a 3×3 halo.
+                      Raked gravel and natural stone boulders. Grants +15% Level Up Experience (XP Boosted) to adjacent bonsais in halo.
                     </p>
                     <button
-                      disabled={(inv.decor_rock_formation_inv || 0) <= 0}
+                      disabled={getStructureInventoryCount(inv, 'zen_rock_formation') <= 0}
                       onClick={() => {
                         if (onStartPlacementPreview) {
                           onStartPlacementPreview({
                             category: 'decoration',
-                            payload: 'decor_rock_formation',
+                            payload: 'zen_rock_formation',
                             width: 1,
                             height: 1,
                             orientation: 'horizontal',
                           });
                           onClose();
                         } else {
-                          onDeployStructure('decor_rock_formation');
+                          onDeployStructure('zen_rock_formation');
                         }
                       }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                        (inv.decor_rock_formation_inv || 0) > 0
+                        getStructureInventoryCount(inv, 'zen_rock_formation') > 0
                           ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
                           : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                       }`}>
@@ -1765,87 +1810,173 @@ export default function DeploymentModal({
                     </button>
                   </div>
 
-                  {/* Topiary Shrub */}
+                  {/* Growing Bamboo Formation */}
                   <div className="bg-slate-900/80 border border-emerald-500/30 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-2xl">🌿</span>
-                        <div>
-                          <h5 className="font-bold text-xs sm:text-sm text-slate-200 truncate">Topiary Shrubbery Bush</h5>
-                          <span className="text-[10px] text-emerald-400">+15% Level Up Experience (XP Boosted)</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-emerald-300 border border-emerald-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Stock: {inv.decor_shrubbery_bush_inv || 0}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      +15% Level Up Experience (XP Boosted) to adjacent bonsais in a 3×3 halo per bush.
-                    </p>
-                    <button
-                      disabled={(inv.decor_shrubbery_bush_inv || 0) <= 0}
-                      onClick={() => {
-                        if (onStartPlacementPreview) {
-                          onStartPlacementPreview({
-                            category: 'decoration',
-                            payload: 'decor_shrubbery_bush',
-                            width: 1,
-                            height: 1,
-                            orientation: 'horizontal',
-                          });
-                          onClose();
-                        } else {
-                          onDeployStructure('decor_shrubbery_bush');
-                        }
-                      }}
-                      className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                        (inv.decor_shrubbery_bush_inv || 0) > 0
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                      }`}>
-                      Place Topiary Shrubbery
-                    </button>
-                  </div>
-
-                  {/* Woven Lattice Wall */}
-                  <div className="bg-slate-900/80 border border-yellow-600/30 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <span className="text-2xl">🎋</span>
                         <div>
-                          <h5 className="font-bold text-xs sm:text-sm text-slate-200 truncate">Woven Wooden Lattice Wall</h5>
-                          <span className="text-[10px] text-yellow-400">+10% Hydration Growth Speed (Private Growing)</span>
+                          <h5 className="font-bold text-xs sm:text-sm text-slate-200 truncate">Growing Bamboo Formation</h5>
+                          <span className="text-[10px] text-emerald-400 font-bold">+0.25s Pruning Effect (Quick Prune)</span>
                         </div>
                       </div>
-                      <span className="text-xs bg-slate-950 text-yellow-300 border border-yellow-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Stock: {inv.decor_woven_wall_inv || 0}
+                      <span className="text-xs bg-slate-950 text-emerald-300 border border-emerald-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Stock: {getStructureInventoryCount(inv, 'growing_bamboo_formation')}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      +10% Hydration Growth Speed (Private Growing) to adjacent bonsais in a 3×3 halo per wall. Separate counter from adjacent bonsais.
+                      A cluster of growing bamboo shoots and culms with vibrant feathered leaves. Grants +0.25s Pruning Effect (Quick Prune) to adjacent bonsais.
                     </p>
                     <button
-                      disabled={(inv.decor_woven_wall_inv || 0) <= 0}
+                      disabled={getStructureInventoryCount(inv, 'growing_bamboo_formation') <= 0}
                       onClick={() => {
                         if (onStartPlacementPreview) {
                           onStartPlacementPreview({
                             category: 'decoration',
-                            payload: 'decor_woven_wall',
+                            payload: 'growing_bamboo_formation',
                             width: 1,
                             height: 1,
                             orientation: 'horizontal',
                           });
                           onClose();
                         } else {
-                          onDeployStructure('decor_woven_wall');
+                          onDeployStructure('growing_bamboo_formation');
                         }
                       }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                        (inv.decor_woven_wall_inv || 0) > 0
-                          ? 'bg-amber-700 hover:bg-amber-600 text-white active:scale-95'
+                        getStructureInventoryCount(inv, 'growing_bamboo_formation') > 0
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
                           : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                       }`}>
-                      Place Woven Lattice Wall
+                      Place Growing Bamboo Formation
+                    </button>
+                  </div>
+
+                  {/* Asparagus Fern Ball */}
+                  <div className="bg-slate-900/80 border border-lime-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-2xl">🪴</span>
+                        <div>
+                          <h5 className="font-bold text-xs sm:text-sm text-slate-200 truncate">Asparagus Fern Ball</h5>
+                          <span className="text-[10px] text-lime-400 font-bold">+15% Chance for Extra Organic Waste on Level Up (Efficient Pruning)</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-slate-950 text-lime-300 border border-lime-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Stock: {getStructureInventoryCount(inv, 'asparagus_fern_ball')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      An authentic Kokedama moss ball pot on a dark coaster dish with delicate feathery Asparagus Fern fronds. Grants +15% chance to drop extra Organic Waste on level up.
+                    </p>
+                    <button
+                      disabled={getStructureInventoryCount(inv, 'asparagus_fern_ball') <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'decoration',
+                            payload: 'asparagus_fern_ball',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('asparagus_fern_ball');
+                        }
+                      }}
+                      className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        getStructureInventoryCount(inv, 'asparagus_fern_ball') > 0
+                          ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      Place Asparagus Fern Ball
+                    </button>
+                  </div>
+
+                  {/* Bamboo Fence (Edge-placed Takegaki) */}
+                  <div className="bg-slate-900/80 border border-emerald-600/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-2xl">🎋</span>
+                        <div>
+                          <h5 className="font-bold text-xs sm:text-sm text-slate-200 truncate">Bamboo Fence (Takegaki)</h5>
+                          <span className="text-[10px] text-emerald-400 font-bold">Edge Placed • Blocks Physical Halos</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-slate-950 text-emerald-300 border border-emerald-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Stock: {getStructureInventoryCount(inv, 'bamboo_fence')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Slender bamboo stalks lashed with hemp cords. Placed on plot edges (Top/Right/Bottom/Left) via [← / →] rotation. Physically cuts off halos between separated plots!
+                    </p>
+                    <button
+                      disabled={getStructureInventoryCount(inv, 'bamboo_fence') <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'decoration',
+                            payload: 'bamboo_fence',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                            edgeSide: 'top',
+                            fenceEdge: 'top',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('bamboo_fence');
+                        }
+                      }}
+                      className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        getStructureInventoryCount(inv, 'bamboo_fence') > 0
+                          ? 'bg-emerald-700 hover:bg-emerald-600 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      Place Bamboo Fence [E / A]
+                    </button>
+                  </div>
+
+                  {/* Water Feature (Japanese Shishi-Odoshi Bamboo Fountain) */}
+                  <div className="bg-slate-900/80 border border-cyan-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-2xl">🌊</span>
+                        <div>
+                          <h5 className="font-bold text-xs sm:text-sm text-cyan-200 truncate">Water Feature (Shishi-Odoshi)</h5>
+                          <span className="text-[10px] text-cyan-400 font-bold">+10% Hydration Growth Speed</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-slate-950 text-cyan-300 border border-cyan-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Stock: {inv.water_feature_inv || inv.decor_woven_wall_inv || inv.decorations?.waterFeature || 0}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Soothing Japanese stone water basin fed by a dripping bamboo fountain. Grants +10% Hydration Growth Speed to adjacent bonsais in halo.
+                    </p>
+                    <button
+                      disabled={(inv.water_feature_inv || inv.decor_woven_wall_inv || inv.decorations?.waterFeature || 0) <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'decoration',
+                            payload: 'water_feature',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('water_feature');
+                        }
+                      }}
+                      className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        (inv.water_feature_inv || inv.decor_woven_wall_inv || inv.decorations?.waterFeature || 0) > 0
+                          ? 'bg-cyan-700 hover:bg-cyan-600 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      Place Water Feature
                     </button>
                   </div>
 
@@ -1891,171 +2022,45 @@ export default function DeploymentModal({
                     </button>
                   </div>
 
-                  {/* Emerald Leaf Crystal Pedestal */}
-                  <div className="bg-slate-900/80 border border-emerald-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                  {/* Empty Pedestal */}
+                  <div className="bg-slate-900/80 border border-purple-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-2xl">💎</span>
+                        <span className="text-2xl">🏛️</span>
                         <div>
-                          <h5 className="font-bold text-xs sm:text-sm text-emerald-300 truncate">Emerald Leaf Crystal Pedestal</h5>
-                          <span className="text-[10px] text-emerald-400 font-semibold">+1 Foliage Cultivation Potential per level</span>
+                          <h5 className="font-bold text-xs sm:text-sm text-purple-300 truncate">Empty Pedestal</h5>
+                          <span className="text-[10px] text-purple-400 font-semibold">Can Host Crystal Artifacts</span>
                         </div>
                       </div>
-                      <span className="text-xs bg-slate-950 text-emerald-300 border border-emerald-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Stock: {inv.crystal_pedestal_foliage_inv || 0}
+                      <span className="text-xs bg-slate-950 text-purple-300 border border-purple-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Stock: {getStructureInventoryCount(inv, 'empty_crystal_pedestal')}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      Carved dark slate pedestal topped with a glowing emerald leaf crystal. Stacks as part of the Crystal Pedestal family.
+                      Can Host Crystal Artifacts. Deploy on the nursery grid, then interact to socket an elemental crystal artifact from your bag.
                     </p>
                     <button
-                      disabled={(inv.crystal_pedestal_foliage_inv || 0) <= 0}
+                      disabled={getStructureInventoryCount(inv, 'empty_crystal_pedestal') <= 0}
                       onClick={() => {
                         if (onStartPlacementPreview) {
                           onStartPlacementPreview({
                             category: 'decoration',
-                            payload: 'crystal_pedestal_foliage',
+                            payload: 'empty_crystal_pedestal',
                             width: 1,
                             height: 1,
                             orientation: 'horizontal',
                           });
                           onClose();
                         } else {
-                          onDeployStructure('crystal_pedestal_foliage');
+                          onDeployStructure('empty_crystal_pedestal');
                         }
                       }}
                       className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                        (inv.crystal_pedestal_foliage_inv || 0) > 0
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
+                        getStructureInventoryCount(inv, 'empty_crystal_pedestal') > 0
+                          ? 'bg-purple-600 hover:bg-purple-500 text-white active:scale-95'
                           : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                       }`}>
-                      {(inv.crystal_pedestal_foliage_inv || 0) > 0 ? 'Place Emerald Leaf Pedestal' : 'Buy in Botanical Market'}
-                    </button>
-                  </div>
-
-                  {/* Amber Branch Crystal Pedestal */}
-                  <div className="bg-slate-900/80 border border-amber-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-2xl">💎</span>
-                        <div>
-                          <h5 className="font-bold text-xs sm:text-sm text-amber-300 truncate">Amber Branch Crystal Pedestal</h5>
-                          <span className="text-[10px] text-amber-400 font-semibold">+1 Branches Cultivation Potential per level</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-amber-300 border border-amber-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Stock: {inv.crystal_pedestal_branches_inv || 0}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Carved dark slate pedestal topped with a glowing warm amber branching crystal. Stacks as part of the Crystal Pedestal family.
-                    </p>
-                    <button
-                      disabled={(inv.crystal_pedestal_branches_inv || 0) <= 0}
-                      onClick={() => {
-                        if (onStartPlacementPreview) {
-                          onStartPlacementPreview({
-                            category: 'decoration',
-                            payload: 'crystal_pedestal_branches',
-                            width: 1,
-                            height: 1,
-                            orientation: 'horizontal',
-                          });
-                          onClose();
-                        } else {
-                          onDeployStructure('crystal_pedestal_branches');
-                        }
-                      }}
-                      className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                        (inv.crystal_pedestal_branches_inv || 0) > 0
-                          ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                      }`}>
-                      {(inv.crystal_pedestal_branches_inv || 0) > 0 ? 'Place Amber Branch Pedestal' : 'Buy in Botanical Market'}
-                    </button>
-                  </div>
-
-                  {/* Coral Trunk Crystal Pedestal */}
-                  <div className="bg-slate-900/80 border border-rose-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-2xl">💎</span>
-                        <div>
-                          <h5 className="font-bold text-xs sm:text-sm text-rose-300 truncate">Coral Trunk Crystal Pedestal</h5>
-                          <span className="text-[10px] text-rose-400 font-semibold">+1 Trunk Cultivation Potential per level</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-rose-300 border border-rose-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Stock: {inv.crystal_pedestal_trunk_inv || 0}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Carved dark slate pedestal topped with a glowing rust coral trunk crystal. Stacks as part of the Crystal Pedestal family.
-                    </p>
-                    <button
-                      disabled={(inv.crystal_pedestal_trunk_inv || 0) <= 0}
-                      onClick={() => {
-                        if (onStartPlacementPreview) {
-                          onStartPlacementPreview({
-                            category: 'decoration',
-                            payload: 'crystal_pedestal_trunk',
-                            width: 1,
-                            height: 1,
-                            orientation: 'horizontal',
-                          });
-                          onClose();
-                        } else {
-                          onDeployStructure('crystal_pedestal_trunk');
-                        }
-                      }}
-                      className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                        (inv.crystal_pedestal_trunk_inv || 0) > 0
-                          ? 'bg-rose-600 hover:bg-rose-500 text-white active:scale-95'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                      }`}>
-                      {(inv.crystal_pedestal_trunk_inv || 0) > 0 ? 'Place Coral Trunk Pedestal' : 'Buy in Botanical Market'}
-                    </button>
-                  </div>
-
-                  {/* Azure Root Crystal Pedestal */}
-                  <div className="bg-slate-900/80 border border-blue-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-2xl">💎</span>
-                        <div>
-                          <h5 className="font-bold text-xs sm:text-sm text-blue-300 truncate">Azure Root Crystal Pedestal</h5>
-                          <span className="text-[10px] text-blue-400 font-semibold">+1 Roots Cultivation Potential per level</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-blue-300 border border-blue-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Stock: {inv.crystal_pedestal_roots_inv || 0}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Carved dark slate pedestal topped with a glowing deep azure root tendril crystal. Stacks as part of the Crystal Pedestal family.
-                    </p>
-                    <button
-                      disabled={(inv.crystal_pedestal_roots_inv || 0) <= 0}
-                      onClick={() => {
-                        if (onStartPlacementPreview) {
-                          onStartPlacementPreview({
-                            category: 'decoration',
-                            payload: 'crystal_pedestal_roots',
-                            width: 1,
-                            height: 1,
-                            orientation: 'horizontal',
-                          });
-                          onClose();
-                        } else {
-                          onDeployStructure('crystal_pedestal_roots');
-                        }
-                      }}
-                      className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                        (inv.crystal_pedestal_roots_inv || 0) > 0
-                          ? 'bg-blue-600 hover:bg-blue-500 text-white active:scale-95'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                      }`}>
-                      {(inv.crystal_pedestal_roots_inv || 0) > 0 ? 'Place Azure Root Pedestal' : 'Buy in Botanical Market'}
+                      {getStructureInventoryCount(inv, 'empty_crystal_pedestal') > 0 ? 'Place Empty Pedestal' : 'Buy in Botanical Market'}
                     </button>
                   </div>
                 </div>

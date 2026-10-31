@@ -13,6 +13,8 @@ import {
   MaturityTier,
   getLeafTypeDef,
   getMaturityDef,
+  getBonsaiDisplayName,
+  getSpeciesName,
 } from './bonsaiData';
 import {
   BonsaiAttributes,
@@ -317,7 +319,7 @@ export default function BonsaiExcavationModal({
                     )}
                   </div>
                   <h4 className="font-bold text-sm sm:text-base text-slate-100 mt-1 truncate">
-                    {isCrystal && crystal ? `✨ ${cTypeLabel} Crystal (${crystal.strength} Strength)` : result.name}
+                    {isCrystal && crystal ? `✨ ${cTypeLabel} Crystal (${crystal.strength} Strength)` : getBonsaiDisplayName(result)}
                   </h4>
                   <p className="text-[11px] text-slate-400 mt-0.5">
                     {isCrystal && crystal ? (
@@ -471,7 +473,7 @@ export default function BonsaiExcavationModal({
               <span>
                 {isCrystal
                   ? `Collect ✨ ${cTypeLabel} Crystal [Space / X] (${cWeight} kg)`
-                  : `Collect Seedling [Space / X] or [E / A] (3.0 kg)`}
+                  : `Collect ${getBonsaiDisplayName(result)} [Space / X] or [E / A] (3.0 kg)`}
               </span>
               <ArrowRight className="w-4 h-4" />
             </button>
