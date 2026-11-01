@@ -300,9 +300,9 @@ export function getSpeciesFindOdds(leafType?: BonsaiLeafType): number {
  *   Formula: Math.min(5.0, 1.8 + Math.max(0, 33 - oddsPercent) * 0.1).
  * - MaturityRatingMultiplier:
  *   Rating 1: 1.0, Rating 2: 1.2, Rating 3: 1.5, Rating 4: 2.0, Rating 5: 3.0.
- * - LevelMultiplier: 1.0 + level * 0.05 (Level 1 = 1.05, Level 100 = 6.00).
+ * - LevelMultiplier: level * 0.05 (Level 1 = 0.05, Level 100 = 5.00).
  * - Rounding: Strictly rounded DOWN to two decimal places: Math.floor(value * 100) / 100.
- * (Maximum specimen donation value = 1 * 5.0 * 3.0 * 6.0 = 90.00 Verdure).
+ * (Maximum specimen donation value = 1 * 5.0 * 3.0 * 5.0 = 75.00 Verdure).
  */
 export function calculateDonationValue(bonsai: {
   leafType?: BonsaiLeafType;
@@ -311,9 +311,10 @@ export function calculateDonationValue(bonsai: {
   level?: number;
   findOdds?: number;
   foundOdds?: number;
+  basePriceBonus?: number;
   [key: string]: any;
 }): number {
-  const basePrice = 1.0;
+  const basePrice = 1.0 + (bonsai.basePriceBonus || 0);
 
   // Species Find Odds Multiplier
   const oddsPercent = bonsai.findOdds ?? bonsai.foundOdds ?? getSpeciesFindOdds(bonsai.leafType);
@@ -330,9 +331,9 @@ export function calculateDonationValue(bonsai: {
   };
   const maturityRatingMultiplier = maturityMultipliers[rating] ?? 1.0;
 
-  // Level Multiplier (Level 1 = 1.05, Level 100 = 6.00)
+  // Level Multiplier (Level 1 = 0.05, +0.05 per level up to 5.00 for Level 100)
   const level = bonsai.level ?? 1;
-  const levelMultiplier = 1.0 + level * 0.05;
+  const levelMultiplier = Math.min(5.0, level * 0.05);
 
   const rawValue = basePrice * speciesFindOddsMultiplier * maturityRatingMultiplier * levelMultiplier;
   const roundedValue = Math.floor(rawValue * 100) / 100;

@@ -31,11 +31,13 @@ import {
   StoredSapling,
   PlantedBonsai,
   DeployedStructure,
+  AutoFabricatorLane,
   getBonsaiGroupBadgeClass,
   getBonsaiStyleDef,
   calculateDonationValue,
   calculateBonsaiSellPrice,
   getStructureInventoryCount,
+  VerdureIcon,
 } from './App';
 import {
   BonsaiAttributes,
@@ -47,6 +49,7 @@ import {
   SeedlingItem,
   getBonsaiNature,
   calculateBaseAesthetic,
+  checkMatchesEcoRequest,
 } from './types';
 
 export interface EquipmentCardProps {
@@ -113,8 +116,14 @@ export interface InventoryModalProps {
   deployedStructures: DeployedStructure[];
   installedCraftingArms: number;
   autoFabricatorLanesCount: number;
+  autoFabricatorLanes?: AutoFabricatorLane[];
   onPlantStoredBonsai: (id: string) => void;
   onPlantSaplingClick: (sap: any) => void;
+  onInspectBonsai?: (id: string) => void;
+  onDonateStoredBonsai?: (id: string) => void;
+  activeEcoRequestIndex?: number;
+  ecoRequestCounts?: Record<string, number>;
+  isInspecting?: boolean;
 }
 
 export default function InventoryModal({
@@ -130,8 +139,14 @@ export default function InventoryModal({
   deployedStructures,
   installedCraftingArms,
   autoFabricatorLanesCount,
+  autoFabricatorLanes = [],
   onPlantStoredBonsai,
   onPlantSaplingClick,
+  onInspectBonsai,
+  onDonateStoredBonsai,
+  activeEcoRequestIndex = 0,
+  ecoRequestCounts = {},
+  isInspecting = false,
 }: InventoryModalProps) {
   const [focusedIdx, setFocusedIdx] = useState<number>(0);
 
@@ -178,6 +193,7 @@ export default function InventoryModal({
       ];
 
       if (e.key === 'Escape') {
+        if (isInspecting) return;
         e.preventDefault();
         onClose();
       } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
@@ -324,7 +340,9 @@ export default function InventoryModal({
             (inv.asparagus_fern_ball_inv || 0) +
             (inv.water_feature_inv || inv.decor_woven_wall_inv || 0) +
             (inv.torii_gate_inv || inv.decorations?.toriiGate || inv.decorations?.['torii_gate'] || 0) +
-            getStructureInventoryCount(inv, 'empty_crystal_pedestal')
+            getStructureInventoryCount(inv, 'empty_crystal_pedestal') +
+            getStructureInventoryCount(inv, 'seven_lucky_gods') +
+            getStructureInventoryCount(inv, 'stone_lantern')
           })</span>
         </button>
       </div>
@@ -355,15 +373,27 @@ export default function InventoryModal({
                   const sDef = getLeafTypeDef(stored.leafType);
                   const attrs: BonsaiAttributes = stored.attributes || DEFAULT_BONSAI_ATTRIBUTES;
                   const ba = calculateBaseAesthetic(stored);
+                  const isEcoMatch = checkMatchesEcoRequest(
+                    stored,
+                    activeEcoRequestIndex,
+                    ecoRequestCounts,
+                  ).matches;
+                  const baseValue = calculateDonationValue(stored);
+                  const donationPayout = isEcoMatch ? Number((baseValue * 2).toFixed(2)) : baseValue;
+
                   return (
                     <div
                       key={stored.id}
-                      style={{borderColor: `${sMat.border}50`}}
-                      className="bg-slate-900/80 border p-3 rounded-2xl flex flex-col justify-between gap-2.5 shadow hover:border-sky-500/50 transition-all">
+                      style={{borderColor: stored.isFavorite ? '#f59e0b' : `${sMat.border}50`}}
+                      className={`bg-slate-900/80 border p-3 rounded-2xl flex flex-col justify-between gap-2.5 shadow transition-all ${
+                        stored.isFavorite
+                          ? 'border-amber-500/80 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                          : 'hover:border-sky-500/50'
+                      }`}>
                       <div>
                         <div className="flex items-center justify-between gap-2">
-                          <div className="font-bold text-xs sm:text-sm text-slate-200 flex items-center gap-1.5 flex-wrap">
-                            <span style={{backgroundColor: sDef.color}} className="w-3 h-3 rounded-full inline-block shadow-sm" />
+                          <div className="font-bold text-xs sm:text-sm text-slate-200 flex items-center gap-1.5 flex-wrap min-w-0">
+                            <span style={{backgroundColor: sDef.color}} className="w-3 h-3 rounded-full inline-block shadow-sm shrink-0" />
                             <span className={`text-[10px] px-1.5 py-0.2 rounded font-black border ${getBonsaiGroupBadgeClass(stored.group)}`}>
                               {stored.group}
                             </span>
@@ -374,21 +404,23 @@ export default function InventoryModal({
                                 color: sMat.color,
                                 boxShadow: `0 0 8px ${sMat.color}30`,
                               }}
-                              className="text-[10px] px-2 py-0.5 rounded-full font-black border flex items-center gap-1">
+                              className="text-[10px] px-2 py-0.5 rounded-full font-black border flex items-center gap-1 shrink-0">
                               <span>{sMat.kanji}</span>
                               <span>{sMat.name}</span>
                               <span className="opacity-80 font-mono">({sMat.multiplier}x)</span>
                             </span>
-                            <span>{getBonsaiDisplayName(stored)} (Lv.{stored.level} • {ba.total.toFixed(2)} BA)</span>
+                            <span className="truncate">{getBonsaiDisplayName(stored)} (Lv.{stored.level} • {ba.total.toFixed(2)} BA)</span>
+                            {stored.isFavorite && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-amber-500 text-slate-950 border border-amber-300 flex items-center gap-1 shadow-sm shrink-0">
+                                <span>⭐</span>
+                                <span>Favorited</span>
+                              </span>
+                            )}
                           </div>
-                          <button
-                            onClick={() => onPlantStoredBonsai(stored.id)}
-                            className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-2.5 py-1 rounded-xl transition-transform active:scale-95 shadow shrink-0">
-                            Plant on Plot
-                          </button>
                         </div>
+
                         <div className="text-[10px] text-slate-400 mt-1">
-                          Style: <span className="text-emerald-400 font-medium">{getBonsaiStyleDef(stored.style).japanese}</span> • Shape: <span className="text-slate-300">{sDef.leafShapeName}</span> • BA: <span className="text-amber-300 font-bold font-mono">{ba.total.toFixed(2)} BA</span> • Donation: <span className="text-emerald-300 font-bold">+{calculateDonationValue(stored).toFixed(2)} Verdure</span>
+                          Style: <span className="text-emerald-400 font-medium">{getBonsaiStyleDef(stored.style).japanese}</span> • Shape: <span className="text-slate-300">{sDef.leafShapeName}</span> • BA: <span className="text-amber-300 font-bold font-mono">{ba.total.toFixed(2)} BA</span> • Valuation: <span className={`font-bold ${isEcoMatch ? 'text-amber-300' : 'text-emerald-300'}`}>+{donationPayout.toFixed(2)} Verdure{isEcoMatch ? ' (🌟 2x Match)' : ''}</span>
                         </div>
                       </div>
 
@@ -417,6 +449,57 @@ export default function InventoryModal({
                             🪴 Roots: {getAttributeTier(attrs.roots)}
                           </div>
                         </div>
+                      </div>
+
+                      {/* Action Buttons: Plant, Inspect, Donate */}
+                      <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/80 flex-wrap">
+                        <button
+                          onClick={() => onPlantStoredBonsai(stored.id)}
+                          className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-2.5 py-1.5 rounded-xl transition-transform active:scale-95 shadow shrink-0 cursor-pointer">
+                          Plant on Plot
+                        </button>
+
+                        <button
+                          onClick={() => onInspectBonsai?.(stored.id)}
+                          className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 font-bold text-xs px-2.5 py-1.5 rounded-xl transition-transform active:scale-95 shadow shrink-0 flex items-center gap-1 cursor-pointer">
+                          <span>🔍</span>
+                          <span>Inspect</span>
+                        </button>
+
+                        <button
+                          disabled={stored.isFavorite}
+                          onClick={() => {
+                            if (stored.isFavorite) {
+                              gameAudio?.playErrorBuzz?.();
+                              return;
+                            }
+                            onDonateStoredBonsai?.(stored.id);
+                          }}
+                          title={stored.isFavorite ? 'Favorited - Locked from Donation' : undefined}
+                          className={`font-bold text-xs px-2.5 py-1.5 rounded-xl transition-transform active:scale-95 shadow shrink-0 flex items-center gap-1 ${
+                            stored.isFavorite
+                              ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-75'
+                              : isEcoMatch
+                              ? 'bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-amber-100 border border-amber-300 ring-1 ring-emerald-400 cursor-pointer'
+                              : 'bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer'
+                          }`}>
+                          {stored.isFavorite ? (
+                            <>
+                              <span>⭐</span>
+                              <span>Favorited (Locked)</span>
+                            </>
+                          ) : (
+                            <>
+                              <VerdureIcon className="w-3.5 h-3.5" />
+                              <span>Donate (+{donationPayout.toFixed(2)})</span>
+                              {isEcoMatch && (
+                                <span className="text-[9px] bg-amber-400 text-slate-950 px-1 py-0.2 rounded font-black">
+                                  2x
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </button>
                       </div>
                     </div>
                   );
@@ -533,6 +616,24 @@ export default function InventoryModal({
       {storageTab === 'MATERIALS' && (
         <div className="flex-1 space-y-3 mb-3 overflow-y-auto pr-1">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-amber-500/40">
+              <div className="text-xs text-amber-300 font-semibold mb-1">📜 T1 License</div>
+              <div className="text-2xl font-black text-amber-300">{inv.license_t1 || inv.licenseT1 || 0}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Tier 1 Engineering Certification</div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-sky-500/40">
+              <div className="text-xs text-sky-300 font-semibold mb-1">📜 T2 License</div>
+              <div className="text-2xl font-black text-sky-300">{inv.license_t2 || inv.licenseT2 || 0}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Tier 2 Engineering Certification</div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-purple-500/40">
+              <div className="text-xs text-purple-300 font-semibold mb-1">📜 T3 License</div>
+              <div className="text-2xl font-black text-purple-300">{inv.license_t3 || inv.licenseT3 || 0}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Tier 3 Master Certification</div>
+            </div>
+
             <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800">
               <div className="text-xs text-slate-400 font-semibold mb-1">🔩 Scrap Metal (Tier 1)</div>
               <div className="text-2xl font-black text-slate-200">{inv.scrap_metal ?? inv.scrapMetal ?? 0}</div>
@@ -673,6 +774,28 @@ export default function InventoryModal({
               />
 
               <EquipmentCard
+                icon={<span className="text-xl">☀️</span>}
+                iconBg="bg-sky-950/80"
+                iconBorder="border-sky-500/50"
+                title="Solar Panel Farm (2x2)"
+                subtitle="+24 kW Clean Power (+1.0 kW/adj unit)"
+                stockCount={getStructureInventoryCount(inv, 'solar_farm_2x2' as any)}
+                activeCount={deployedStructures.filter((s) => s.type === 'solar_farm_2x2').length}
+                activeLabel="Deployed"
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">☀️</span>}
+                iconBg="bg-sky-950/80"
+                iconBorder="border-sky-500/50"
+                title="Big Solar Panel Farm (3x3)"
+                subtitle="+87 kW Clean Power (+1.5 kW/adj unit)"
+                stockCount={getStructureInventoryCount(inv, 'solar_farm_3x3' as any)}
+                activeCount={deployedStructures.filter((s) => s.type === 'solar_farm_3x3').length}
+                activeLabel="Deployed"
+              />
+
+              <EquipmentCard
                 icon={<Wind className="w-5 h-5 text-amber-400" />}
                 iconBg="bg-amber-950/80"
                 iconBorder="border-amber-500/50"
@@ -680,6 +803,28 @@ export default function InventoryModal({
                 subtitle="+6 kW Clean Power (+1.0 kW/neighbor)"
                 stockCount={getStructureInventoryCount(inv, 'wind_turbine')}
                 activeCount={deployedStructures.filter((s) => s.type === 'wind_turbine').length}
+                activeLabel="Deployed"
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">💨</span>}
+                iconBg="bg-amber-950/80"
+                iconBorder="border-amber-500/50"
+                title="Wind Turbine Farm (2x2)"
+                subtitle="+42 kW Clean Power (+1.5 kW/adj unit)"
+                stockCount={getStructureInventoryCount(inv, 'wind_farm_2x2' as any)}
+                activeCount={deployedStructures.filter((s) => s.type === 'wind_farm_2x2').length}
+                activeLabel="Deployed"
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">💨</span>}
+                iconBg="bg-amber-950/80"
+                iconBorder="border-amber-500/50"
+                title="Big Wind Turbine Farm (3x3)"
+                subtitle="+134 kW Clean Power (+2.0 kW/adj unit)"
+                stockCount={getStructureInventoryCount(inv, 'wind_farm_3x3' as any)}
+                activeCount={deployedStructures.filter((s) => s.type === 'wind_farm_3x3').length}
                 activeLabel="Deployed"
               />
             </div>
@@ -738,22 +883,77 @@ export default function InventoryModal({
             <div className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <Wrench className="w-3.5 h-3.5" />
-                <span>Workbench</span>
+                <span>Workbench Modules</span>
               </span>
               <span className="text-[11px] text-slate-400 font-normal">
-                Modular assembly arms and continuous synthesis lanes
+                Assembly queue expansions and overclock modules
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <EquipmentCard
-                icon={<Wrench className="w-5 h-5 text-sky-400" />}
+                icon={<span className="text-xl">🦾</span>}
                 iconBg="bg-sky-950/80"
                 iconBorder="border-sky-500/50"
-                title="Crafting Assembly Arms"
-                subtitle="+1 Queue Slot • +25% Speed (3 kW)"
-                stockCount={inv.crafting_automatons_inv || 0}
-                activeCount={installedCraftingArms}
+                title="T1 Assembly Bench Module"
+                subtitle="+1 Queue Slot"
+                stockCount={inv.assembly_module_t1_inv || 0}
+                activeCount={(inv.attached_workbench_modules || []).filter((m) => m === 'assembly_module_t1').length}
+                activeLabel="Attached"
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">🦾</span>}
+                iconBg="bg-sky-950/80"
+                iconBorder="border-sky-500/50"
+                title="T2 Assembly Bench Module"
+                subtitle="+2 Queue Slots"
+                stockCount={inv.assembly_module_t2_inv || 0}
+                activeCount={(inv.attached_workbench_modules || []).filter((m) => m === 'assembly_module_t2').length}
+                activeLabel="Attached"
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">🦾</span>}
+                iconBg="bg-sky-950/80"
+                iconBorder="border-sky-500/50"
+                title="T3 Assembly Bench Module"
+                subtitle="+3 Queue Slots"
+                stockCount={inv.assembly_module_t3_inv || 0}
+                activeCount={(inv.attached_workbench_modules || []).filter((m) => m === 'assembly_module_t3').length}
+                activeLabel="Attached"
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">⚡</span>}
+                iconBg="bg-amber-950/80"
+                iconBorder="border-amber-500/50"
+                title="T1 Overclock Workbench Module"
+                subtitle="+5% Craft Speed"
+                stockCount={inv.overclock_module_t1_inv || 0}
+                activeCount={(inv.attached_workbench_modules || []).filter((m) => m === 'overclock_module_t1').length}
+                activeLabel="Attached"
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">⚡</span>}
+                iconBg="bg-amber-950/80"
+                iconBorder="border-amber-500/50"
+                title="T2 Overclock Workbench Module"
+                subtitle="+10% Craft Speed"
+                stockCount={inv.overclock_module_t2_inv || 0}
+                activeCount={(inv.attached_workbench_modules || []).filter((m) => m === 'overclock_module_t2').length}
+                activeLabel="Attached"
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">⚡</span>}
+                iconBg="bg-amber-950/80"
+                iconBorder="border-amber-500/50"
+                title="T3 Overclock Workbench Module"
+                subtitle="+20% Craft Speed"
+                stockCount={inv.overclock_module_t3_inv || 0}
+                activeCount={(inv.attached_workbench_modules || []).filter((m) => m === 'overclock_module_t3').length}
                 activeLabel="Attached"
               />
 
@@ -761,10 +961,32 @@ export default function InventoryModal({
                 icon={<span className="text-xl">🏭</span>}
                 iconBg="bg-cyan-950/80"
                 iconBorder="border-cyan-500/50"
-                title="Auto-Fabrication Automatons"
-                subtitle="Dedicated Auto-Synthesis Lane (10 kW)"
-                stockCount={inv.auto_fabricators_inv || 0}
-                activeCount={autoFabricatorLanesCount}
+                title="T1 Auto-Fabrication Module"
+                subtitle="Dedicated Auto-Synthesis Lane (50% Speed • 6 kW)"
+                stockCount={inv.auto_fabrication_t1_inv || 0}
+                activeCount={(autoFabricatorLanes || []).filter((l) => (l.tier || 1) === 1).length}
+                activeLabel="Attached"
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">🏭</span>}
+                iconBg="bg-cyan-950/80"
+                iconBorder="border-cyan-500/50"
+                title="T2 Auto-Fabrication Module"
+                subtitle="Dedicated Auto-Synthesis Lane (100% Speed • 10 kW)"
+                stockCount={(inv.auto_fabrication_t2_inv || 0) + (inv.auto_fabricators_inv || 0)}
+                activeCount={(autoFabricatorLanes || []).filter((l) => l.tier === 2).length}
+                activeLabel="Attached"
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">🏭</span>}
+                iconBg="bg-cyan-950/80"
+                iconBorder="border-cyan-500/50"
+                title="T3 Auto-Fabrication Module"
+                subtitle="Dedicated Auto-Synthesis Lane (150% Speed • 14 kW)"
+                stockCount={inv.auto_fabrication_t3_inv || 0}
+                activeCount={(autoFabricatorLanes || []).filter((l) => l.tier === 3).length}
                 activeLabel="Attached"
               />
             </div>
@@ -788,8 +1010,8 @@ export default function InventoryModal({
                 icon={<span className="text-xl">📦</span>}
                 iconBg="bg-emerald-950/80"
                 iconBorder="border-emerald-500/50"
-                title="Storage Module I"
-                subtitle="Modular Cargo Bin (+2.5 kg Payload)"
+                title="T1 Storage Module"
+                subtitle="Modular Cargo Bin (+2.5 kg Payload • 4 kW)"
                 stockCount={inv.rover_modules.storage_1 || 0}
                 activeCount={(inv.attached_rover_modules || []).filter((m) => m === 'storage_1').length}
                 activeLabel="Attached"
@@ -799,8 +1021,8 @@ export default function InventoryModal({
                 icon={<span className="text-xl">📦</span>}
                 iconBg="bg-emerald-950/80"
                 iconBorder="border-emerald-500/50"
-                title="Storage Module II"
-                subtitle="Reinforced Cargo Module (+5.0 kg Payload)"
+                title="T2 Storage Module"
+                subtitle="Reinforced Cargo Module (+5.0 kg Payload • 7 kW)"
                 stockCount={inv.rover_modules.storage_2 || 0}
                 activeCount={(inv.attached_rover_modules || []).filter((m) => m === 'storage_2').length}
                 activeLabel="Attached"
@@ -810,8 +1032,8 @@ export default function InventoryModal({
                 icon={<span className="text-xl">🚜</span>}
                 iconBg="bg-emerald-950/80"
                 iconBorder="border-emerald-500/50"
-                title="Storage Module III"
-                subtitle="Titanium Cargo Rack (+7.5 kg Payload)"
+                title="T3 Storage Module"
+                subtitle="Titanium Cargo Rack (+7.5 kg Payload • 10 kW)"
                 stockCount={inv.rover_modules.storage_3 || 0}
                 activeCount={(inv.attached_rover_modules || []).filter((m) => m === 'storage_3').length}
                 activeLabel="Attached"
@@ -822,8 +1044,8 @@ export default function InventoryModal({
                 icon={<Battery className="w-5 h-5 text-amber-400" />}
                 iconBg="bg-amber-950/80"
                 iconBorder="border-amber-500/50"
-                title="Battery Module I"
-                subtitle="Lead-Acid Energy Cell (+25 kWh Battery)"
+                title="T1 Battery Module"
+                subtitle="Lead-Acid Energy Cell (+25 kWh Battery • 3 kW)"
                 stockCount={inv.rover_modules.battery_1 || 0}
                 activeCount={(inv.attached_rover_modules || []).filter((m) => m === 'battery_1').length}
                 activeLabel="Attached"
@@ -833,8 +1055,8 @@ export default function InventoryModal({
                 icon={<Zap className="w-5 h-5 text-amber-400" />}
                 iconBg="bg-amber-950/80"
                 iconBorder="border-amber-500/50"
-                title="Battery Module II"
-                subtitle="Nickel-Iron Energy Pack (+50 kWh Battery)"
+                title="T2 Battery Module"
+                subtitle="Nickel-Iron Energy Pack (+50 kWh Battery • 5 kW)"
                 stockCount={inv.rover_modules.battery_2 || 0}
                 activeCount={(inv.attached_rover_modules || []).filter((m) => m === 'battery_2').length}
                 activeLabel="Attached"
@@ -844,8 +1066,8 @@ export default function InventoryModal({
                 icon={<Sparkles className="w-5 h-5 text-amber-400" />}
                 iconBg="bg-amber-950/80"
                 iconBorder="border-amber-500/50"
-                title="Battery Module III"
-                subtitle="Solid-State Matrix (+75 kWh Battery)"
+                title="T3 Battery Module"
+                subtitle="Solid-State Matrix (+75 kWh Battery • 7 kW)"
                 stockCount={inv.rover_modules.battery_3 || 0}
                 activeCount={(inv.attached_rover_modules || []).filter((m) => m === 'battery_3').length}
                 activeLabel="Attached"
@@ -856,8 +1078,8 @@ export default function InventoryModal({
                 icon={<Navigation className="w-5 h-5 text-sky-400" />}
                 iconBg="bg-sky-950/80"
                 iconBorder="border-sky-500/50"
-                title="Radar Module I"
-                subtitle="High-Frequency Scanner (+1 Step Vision)"
+                title="T1 Radar Module"
+                subtitle="High-Frequency Scanner (+1 Step Vision • 5 kW)"
                 stockCount={inv.rover_modules.radar_1 || 0}
                 activeCount={(inv.attached_rover_modules || []).filter((m) => m === 'radar_1').length}
                 activeLabel="Attached"
@@ -867,8 +1089,8 @@ export default function InventoryModal({
                 icon={<Navigation className="w-5 h-5 text-sky-400" />}
                 iconBg="bg-sky-950/80"
                 iconBorder="border-sky-500/50"
-                title="Radar Module II"
-                subtitle="Pulsed Radar Antenna (+2 Steps Vision)"
+                title="T2 Radar Module"
+                subtitle="Pulsed Radar Antenna (+2 Steps Vision • 8 kW)"
                 stockCount={inv.rover_modules.radar_2 || 0}
                 activeCount={(inv.attached_rover_modules || []).filter((m) => m === 'radar_2').length}
                 activeLabel="Attached"
@@ -878,8 +1100,8 @@ export default function InventoryModal({
                 icon={<Navigation className="w-5 h-5 text-sky-400" />}
                 iconBg="bg-sky-950/80"
                 iconBorder="border-sky-500/50"
-                title="Radar Module III"
-                subtitle="Quantum Bio-Resonance Core (+3 Steps Vision)"
+                title="T3 Radar Module"
+                subtitle="Quantum Bio-Resonance Core (+3 Steps Vision • 12 kW)"
                 stockCount={inv.rover_modules.radar_3 || 0}
                 activeCount={(inv.attached_rover_modules || []).filter((m) => m === 'radar_3').length}
                 activeLabel="Attached"
@@ -1017,6 +1239,38 @@ export default function InventoryModal({
                 <div className="text-lg font-black text-purple-400">{getStructureInventoryCount(inv, 'empty_crystal_pedestal')} in Stock</div>
                 <span className="text-[10px] text-slate-400">
                   {deployedStructures.filter((s) => s.type === 'empty_crystal_pedestal' || s.type === 'crystal_pedestal').length} Placed
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-amber-500/40 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">✨</span>
+                <div>
+                  <h4 className="font-bold text-xs sm:text-sm text-amber-200">Seven Lucky Gods</h4>
+                  <p className="text-[10px] text-amber-400 font-semibold">+0.01 Baseprice/lvl (Fortunate Blessings)</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-black text-amber-300">{getStructureInventoryCount(inv, 'seven_lucky_gods')} in Stock</div>
+                <span className="text-[10px] text-slate-400">
+                  {deployedStructures.filter((s) => s.type === 'seven_lucky_gods').length} Placed
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-cyan-500/40 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🏮</span>
+                <div>
+                  <h4 className="font-bold text-xs sm:text-sm text-cyan-200">Stone Lanterns (Kasuga-dōrō)</h4>
+                  <p className="text-[10px] text-cyan-400 font-semibold">+0.5% Zen Point Chance/lvl (Skilled Knowledge)</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-black text-cyan-300">{getStructureInventoryCount(inv, 'stone_lantern')} in Stock</div>
+                <span className="text-[10px] text-slate-400">
+                  {deployedStructures.filter((s) => s.type === 'stone_lantern').length} Placed
                 </span>
               </div>
             </div>

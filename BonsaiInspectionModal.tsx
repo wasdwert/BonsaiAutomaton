@@ -71,17 +71,19 @@ function getFactorDisplay(val: number): { arrow: string; text: string; colorClas
 export interface BonsaiInspectionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  bonsai: PlantedBonsai | null;
+  bonsai: PlantedBonsai | any | null;
   synergies: BonsaiSynergies;
   powerSufficient: boolean;
   inventory: SanctuaryInventory;
   greenThumbRank: number;
   isEcoRequestMatch?: boolean;
+  isStored?: boolean;
   onDonate: (id: string) => void;
-  onStore: (id: string) => void;
-  onCompost: (id: string) => void;
-  onFertilize: (id: string) => void;
+  onStore?: (id: string) => void;
+  onCompost?: (id: string) => void;
+  onFertilize?: (id: string) => void;
   onPrune?: (id: string) => void;
+  onToggleFavorite?: (id: string) => void;
   onAttachAutomaton?: (id: string, tier: 1 | 2 | 3) => void;
   onDetachAutomaton?: (id: string) => void;
 }
@@ -90,7 +92,7 @@ export interface BonsaiInspectionModalProps {
  * Live canvas visualization of the inspected bonsai tree with its specific
  * style (Chokan, Moyogi, Shakan), leaf morphology, pot, and nebari root structure.
  */
-function InspectedBonsaiCanvas({ bonsai }: { bonsai: PlantedBonsai }) {
+function InspectedBonsaiCanvas({ bonsai }: { bonsai: PlantedBonsai | any }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -188,35 +190,46 @@ export default function BonsaiInspectionModal({
   inventory: inv,
   greenThumbRank,
   isEcoRequestMatch = false,
+  isStored = false,
   onDonate,
   onStore,
   onCompost,
   onFertilize,
   onPrune,
+  onToggleFavorite,
 }: BonsaiInspectionModalProps) {
   // Navigation focus index for interactive buttons:
-  // 0: Fertilize, 1: Compost, 2: Donate / Sell, 3: Store in Bag, 4: Close Inspection
+  // 0: Fertilize, 1: Compost, 2: Donate / Sell, 3: Store in Bag, 4: Favorite Toggle, 5: Close Inspection
   const [focusedBtnIdx, setFocusedBtnIdx] = useState<number>(0);
 
   const activateFocusedButton = () => {
     if (!bonsai) return;
     if (focusedBtnIdx === 0) {
       if ((inv.fertilizer || inv.resources?.fertilizer || 0) > 0 && bonsai.level < 100) {
-        onFertilize(bonsai.id);
+        onFertilize?.(bonsai.id);
       } else {
         gameAudio?.playErrorBuzz?.();
       }
     } else if (focusedBtnIdx === 1) {
       if (inv.organic_compost > 0 && bonsai.level < 100) {
-        onCompost(bonsai.id);
+        onCompost?.(bonsai.id);
       } else {
         gameAudio?.playErrorBuzz?.();
       }
     } else if (focusedBtnIdx === 2) {
-      onDonate(bonsai.id);
+      if (bonsai.isFavorite) {
+        gameAudio?.playErrorBuzz?.();
+      } else {
+        onDonate(bonsai.id);
+      }
     } else if (focusedBtnIdx === 3) {
-      onStore(bonsai.id);
+      if (!isStored && onStore) {
+        onStore(bonsai.id);
+      }
     } else if (focusedBtnIdx === 4) {
+      onToggleFavorite?.(bonsai.id);
+      gameAudio?.playConfirmSelect?.();
+    } else if (focusedBtnIdx === 5) {
       onClose();
     }
   };
@@ -230,7 +243,8 @@ export default function BonsaiInspectionModal({
         e.preventDefault();
         setFocusedBtnIdx((idx) => {
           if (idx === 2 || idx === 3) return idx - 2; // move to row 1 (0 or 1)
-          if (idx === 4) return 2; // move from close to donate
+          if (idx === 4) return 2; // move from favorite to donate
+          if (idx === 5) return 4; // move from close to favorite
           return Math.max(0, idx - 1);
         });
         gameAudio?.playHoverMicroTone?.();
@@ -238,8 +252,9 @@ export default function BonsaiInspectionModal({
         e.preventDefault();
         setFocusedBtnIdx((idx) => {
           if (idx === 0 || idx === 1) return idx + 2; // move to row 2 (2 or 3)
-          if (idx === 2 || idx === 3) return 4; // move to close button
-          return Math.min(4, idx + 1);
+          if (idx === 2 || idx === 3) return 4; // move to favorite toggle
+          if (idx === 4) return 5; // move to close button
+          return Math.min(5, idx + 1);
         });
         gameAudio?.playHoverMicroTone?.();
       } else if (e.key === 'a' || e.key === 'A') {
@@ -255,29 +270,37 @@ export default function BonsaiInspectionModal({
         setFocusedBtnIdx((idx) => {
           if (idx === 0) return 1;
           if (idx === 2) return 3;
-          return Math.min(4, idx + 1);
+          return Math.min(5, idx + 1);
         });
         gameAudio?.playHoverMicroTone?.();
       } else if (e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
         e.preventDefault();
         activateFocusedButton();
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        onToggleFavorite?.(bonsai.id);
+        gameAudio?.playConfirmSelect?.();
       } else if (e.key === ' ' || e.key === 'x' || e.key === 'X') {
         e.preventDefault();
         if ((inv.fertilizer || inv.resources?.fertilizer || 0) > 0 && bonsai.level < 100) {
-          onFertilize(bonsai.id);
+          onFertilize?.(bonsai.id);
         } else {
           gameAudio?.playErrorBuzz?.();
         }
       } else if (e.key === 'c' || e.key === 'C') {
         e.preventDefault();
         if (inv.organic_compost > 0 && bonsai.level < 100) {
-          onCompost(bonsai.id);
+          onCompost?.(bonsai.id);
         } else {
           gameAudio?.playErrorBuzz?.();
         }
       } else if (e.key === 'v' || e.key === 'V') {
         e.preventDefault();
-        onDonate(bonsai.id);
+        if (bonsai.isFavorite) {
+          gameAudio?.playErrorBuzz?.();
+        } else {
+          onDonate(bonsai.id);
+        }
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -286,7 +309,7 @@ export default function BonsaiInspectionModal({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, bonsai, focusedBtnIdx, inv.organic_compost, inv.fertilizer, onFertilize, onCompost, onDonate, onStore, onClose]);
+  }, [isOpen, bonsai, focusedBtnIdx, inv.organic_compost, inv.fertilizer, isStored, onFertilize, onCompost, onDonate, onStore, onToggleFavorite, onClose]);
 
   if (!isOpen || !bonsai) return null;
 
@@ -334,7 +357,7 @@ export default function BonsaiInspectionModal({
   const remainingSeconds = Math.max(0, (targetSeconds - bonsai.progressSeconds) / tierSpeed);
 
   return (
-    <div className="fixed top-12 left-0 right-0 bottom-0 z-40 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm pointer-events-auto select-none">
+    <div className="fixed top-12 left-0 right-0 bottom-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm pointer-events-auto select-none">
       <div className="w-full max-w-6xl h-full max-h-[calc(100vh-3.5rem)] flex flex-col bg-slate-950/95 border border-emerald-500/30 rounded-3xl p-3 sm:p-5 shadow-2xl backdrop-blur-xl overflow-hidden text-left">
         {/* Top Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4 shrink-0">
@@ -373,6 +396,12 @@ export default function BonsaiInspectionModal({
                   <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
                   <span>Base Aesthetic: <strong>{baseAesthetic.total.toFixed(2)} BA</strong></span>
                 </span>
+                {bonsai.isFavorite && (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full font-black bg-amber-500 text-slate-950 border border-amber-300 flex items-center gap-1 shadow-[0_0_12px_rgba(245,158,11,0.5)]">
+                    <span>⭐</span>
+                    <span>Favorited (Locked from Donation)</span>
+                  </span>
+                )}
                 <h3 className="text-base sm:text-lg font-black text-slate-100 truncate">{getBonsaiDisplayName(bonsai)}</h3>
                 {(() => {
                   const nat = getBonsaiNature(bonsai.nature);
@@ -519,29 +548,49 @@ export default function BonsaiInspectionModal({
                     ⛔ Stalling Surroundings (&gt;4 {bSyn.stalledEntityLabel || 'identical neighbors'})
                   </span>
                 )}
+                {!bSyn.isStalled && bSyn.hasToriiGate && (
+                  <span className="bg-red-950 text-red-200 border border-red-500/60 px-1.5 py-0.2 rounded font-bold">
+                    ⛩️ Doubling Down (2x All Halo Effects)
+                  </span>
+                )}
                 {!bSyn.isStalled && bSyn.bonsaiCount > 0 && (
                   <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/50 px-1.5 py-0.2 rounded font-bold">
-                    🌿 Growing Together x{bSyn.bonsaiCount} (+{bSyn.bonsaiCount * 10}% Hydration Growth Speed)
+                    🌿 Growing Together x{bSyn.bonsaiCount} (+{(bSyn.bonsaiCount * 10 * (bSyn.haloMultiplier || 1))}% Hydration Growth Speed)
                   </span>
                 )}
                 {!bSyn.isStalled && bSyn.wallCount > 0 && (
                   <span className="bg-cyan-950 text-cyan-300 border border-cyan-500/50 px-1.5 py-0.2 rounded font-bold">
-                    🌊 Gentle Waters x{bSyn.wallCount} (+{bSyn.wallCount * 10}% Hydration Growth Speed)
+                    🌊 Gentle Waters x{bSyn.wallCount} (+{(bSyn.wallCount * 10 * (bSyn.haloMultiplier || 1))}% Hydration Growth Speed)
                   </span>
                 )}
                 {!bSyn.isStalled && bSyn.rockCount > 0 && (
                   <span className="bg-amber-950 text-amber-300 border border-amber-500/50 px-1.5 py-0.2 rounded font-bold">
-                    🪨 XP Boosted x{bSyn.rockCount} (+{bSyn.rockCount * 15}% Level Up EXP)
+                    🪨 XP Boosted x{bSyn.rockCount} (+{(bSyn.rockCount * 15 * (bSyn.haloMultiplier || 1))}% Level Up EXP)
                   </span>
                 )}
                 {!bSyn.isStalled && (bSyn.bambooCount > 0 || bSyn.bushCount > 0) && (
                   <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/50 px-1.5 py-0.2 rounded font-bold">
-                    🎋 Quick Prune x{bSyn.bambooCount || bSyn.bushCount} (+{((bSyn.bambooCount || bSyn.bushCount) * 0.25).toFixed(2)}s Pruning Effect)
+                    🎋 Quick Prune x{bSyn.bambooCount || bSyn.bushCount} (+{((bSyn.bambooCount || bSyn.bushCount) * 0.25 * (bSyn.haloMultiplier || 1)).toFixed(2)}s Pruning Effect)
                   </span>
                 )}
                 {!bSyn.isStalled && (bSyn.fernBallCount || 0) > 0 && (
                   <span className="bg-lime-950 text-lime-300 border border-lime-500/50 px-1.5 py-0.2 rounded font-bold">
-                    🪴 Efficient Pruning x{bSyn.fernBallCount} (+{(bSyn.fernBallCount || 0) * 15}% Extra Waste Chance)
+                    🪴 Efficient Pruning x{bSyn.fernBallCount} (+{Math.round((bSyn.fernBallCount || 0) * 15 * (bSyn.haloMultiplier || 1))}% Extra Waste Chance)
+                  </span>
+                )}
+                {!bSyn.isStalled && (bSyn.sevenLuckyGodsCount || 0) > 0 && (
+                  <span className="bg-amber-950 text-amber-300 border border-amber-500/50 px-1.5 py-0.2 rounded font-bold">
+                    🌟 Fortunate Blessings x{bSyn.sevenLuckyGodsCount} (+{(bSyn.basePriceBonusRate || 0).toFixed(2)} Baseprice/lvl)
+                  </span>
+                )}
+                {!bSyn.isStalled && (bSyn.stoneLanternCount || 0) > 0 && (
+                  <span className="bg-cyan-950 text-cyan-300 border border-cyan-500/50 px-1.5 py-0.2 rounded font-bold">
+                    🏮 Skilled Knowledge x{bSyn.stoneLanternCount} ({(((bSyn.zenPointChance || 0) * 100)).toFixed(1)}% Zen Point/lvl)
+                  </span>
+                )}
+                {bSyn.isDisruptedZen && (
+                  <span className="bg-amber-950 text-amber-300 border border-amber-500/50 px-1.5 py-0.2 rounded font-bold">
+                    ⚠️ Disrupted Zen (-{bSyn.totalDisruptedZenPenalty}% Growth Speed)
                   </span>
                 )}
               </div>
@@ -677,7 +726,7 @@ export default function BonsaiInspectionModal({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   disabled={(inv.fertilizer || inv.resources?.fertilizer || 0) <= 0 || bonsai.level >= 100}
-                  onClick={() => onFertilize(bonsai.id)}
+                  onClick={() => onFertilize?.(bonsai.id)}
                   className={`font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow active:scale-95 ${
                     focusedBtnIdx === 0
                       ? 'ring-4 ring-emerald-400 border-emerald-300 scale-[1.02] shadow-[0_0_15px_rgba(52,211,153,0.7)]'
@@ -696,7 +745,7 @@ export default function BonsaiInspectionModal({
 
                 <button
                   disabled={inv.organic_compost <= 0 || bonsai.level >= 100}
-                  onClick={() => onCompost(bonsai.id)}
+                  onClick={() => onCompost?.(bonsai.id)}
                   className={`py-2.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow ${
                     focusedBtnIdx === 1
                       ? 'ring-4 ring-lime-400 border-lime-300 scale-[1.02] shadow-[0_0_15px_rgba(163,230,53,0.7)]'
@@ -716,33 +765,57 @@ export default function BonsaiInspectionModal({
 
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => onDonate(bonsai.id)}
-                  className={`font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow active:scale-95 ${
-                    isEcoRequestMatch
-                      ? 'bg-gradient-to-r from-amber-600 via-emerald-600 to-amber-600 hover:from-amber-500 hover:to-emerald-500 text-amber-100 border-2 border-amber-300 ring-2 ring-emerald-400 shadow-[0_0_20px_rgba(250,204,21,0.5)]'
-                      : 'bg-emerald-600 hover:bg-emerald-500 text-white ring-1 ring-emerald-400/40'
+                  disabled={bonsai.isFavorite}
+                  onClick={() => {
+                    if (bonsai.isFavorite) {
+                      gameAudio?.playErrorBuzz?.();
+                      return;
+                    }
+                    onDonate(bonsai.id);
+                  }}
+                  title={bonsai.isFavorite ? 'Favorited - Locked from Donation' : undefined}
+                  className={`font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow ${
+                    bonsai.isFavorite
+                      ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-80'
+                      : isEcoRequestMatch
+                      ? 'bg-gradient-to-r from-amber-600 via-emerald-600 to-amber-600 hover:from-amber-500 hover:to-emerald-500 text-amber-100 border-2 border-amber-300 ring-2 ring-emerald-400 shadow-[0_0_20px_rgba(250,204,21,0.5)] active:scale-95 cursor-pointer'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white ring-1 ring-emerald-400/40 active:scale-95 cursor-pointer'
                   } ${
                     focusedBtnIdx === 2
                       ? 'ring-4 ring-emerald-400 border-emerald-300 scale-[1.02] shadow-[0_0_15px_rgba(16,185,129,0.7)]'
                       : ''
                   }`}>
-                  <VerdureIcon className="w-4 h-4" />
-                  <span>
-                    {focusedBtnIdx === 2 && '► '}
-                    {isEcoRequestMatch
-                      ? `[E / V] Donate (🌟 2x Bonus: +${(calculateDonationValue(bonsai) * 2).toFixed(2)})`
-                      : `[E / V] Donate (+${calculateDonationValue(bonsai).toFixed(2)})`}
-                  </span>
-                  {isEcoRequestMatch && (
-                    <span className="bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">
-                      🌟 2x Eco Bonus
-                    </span>
+                  {bonsai.isFavorite ? (
+                    <>
+                      <span>🔒</span>
+                      <span>Favorited (Locked from Donation)</span>
+                    </>
+                  ) : (
+                    <>
+                      <VerdureIcon className="w-4 h-4" />
+                      <span>
+                        {focusedBtnIdx === 2 && '► '}
+                        {isEcoRequestMatch
+                          ? `[E / V] Donate (🌟 2x Bonus: +${(calculateDonationValue(bonsai) * 2).toFixed(2)})`
+                          : `[E / V] Donate (+${calculateDonationValue(bonsai).toFixed(2)})`}
+                      </span>
+                      {isEcoRequestMatch && (
+                        <span className="bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">
+                          🌟 2x Eco Bonus
+                        </span>
+                      )}
+                    </>
                   )}
                 </button>
 
                 <button
-                  onClick={() => onStore(bonsai.id)}
-                  className={`bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow border border-slate-700 active:scale-95 ${
+                  disabled={isStored}
+                  onClick={() => onStore?.(bonsai.id)}
+                  className={`font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow border active:scale-95 ${
+                    isStored
+                      ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-default opacity-75'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 cursor-pointer'
+                  } ${
                     focusedBtnIdx === 3
                       ? 'ring-4 ring-sky-400 border-sky-300 scale-[1.02] shadow-[0_0_15px_rgba(56,189,248,0.7)]'
                       : ''
@@ -750,10 +823,35 @@ export default function BonsaiInspectionModal({
                   <span>🪴</span>
                   <span>
                     {focusedBtnIdx === 3 && '► '}
-                    [E] Store in Bag
+                    {isStored ? 'In Storage' : '[E] Store in Bag'}
                   </span>
                 </button>
               </div>
+
+              {/* FAVORITE / UNFAVORITE TOGGLE BUTTON */}
+              <button
+                onClick={() => {
+                  onToggleFavorite?.(bonsai.id);
+                  gameAudio?.playConfirmSelect?.();
+                }}
+                className={`w-full font-bold text-xs py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow active:scale-95 border cursor-pointer ${
+                  bonsai.isFavorite
+                    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300 ring-2 ring-amber-400/50 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
+                    : 'bg-slate-900 hover:bg-slate-800 text-amber-300 border-amber-500/50 hover:border-amber-400'
+                } ${
+                  focusedBtnIdx === 4
+                    ? 'ring-4 ring-amber-400 border-amber-300 scale-[1.02]'
+                    : ''
+                }`}>
+                <span className="text-sm">⭐</span>
+                <span>
+                  {focusedBtnIdx === 4 && '► '}
+                  {bonsai.isFavorite
+                    ? 'Unfavorite (Unlock for Donation)'
+                    : 'Favorite (Lock from Donation)'}
+                </span>
+                <span className="text-[10px] font-mono opacity-80">[F]</span>
+              </button>
             </div>
           </div>
 

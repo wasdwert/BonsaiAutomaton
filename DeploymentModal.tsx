@@ -47,6 +47,7 @@ import {
   getBonsaiGroupBadgeClass,
   getBonsaiStyleDef,
   getStructureInventoryCount,
+  ItemVectorPreview,
 } from './App';
 import { gameAudio } from './utils/helper';
 
@@ -300,7 +301,11 @@ export default function DeploymentModal({
   const fertilizerStationCount = getStructureInventoryCount(inv, 'fertilizer_station');
   const wellCount = getStructureInventoryCount(inv, 'tool_garden_well');
   const solarCount = getStructureInventoryCount(inv, 'solar_panel');
+  const solarFarm2x2Count = getStructureInventoryCount(inv, 'solar_farm_2x2' as any);
+  const solarFarm3x3Count = getStructureInventoryCount(inv, 'solar_farm_3x3' as any);
   const windCount = getStructureInventoryCount(inv, 'wind_turbine');
+  const windFarm2x2Count = getStructureInventoryCount(inv, 'wind_farm_2x2' as any);
+  const windFarm3x3Count = getStructureInventoryCount(inv, 'wind_farm_3x3' as any);
   const autoT1Count = getStructureInventoryCount(inv, 'automaton_t1');
   const autoT2Count = getStructureInventoryCount(inv, 'automaton_t2');
   const autoT3Count = getStructureInventoryCount(inv, 'automaton_t3');
@@ -321,7 +326,11 @@ export default function DeploymentModal({
     'irrigation_t2',
     'irrigation_t3',
     'solar_panel',
+    'solar_farm_2x2',
+    'solar_farm_3x3',
     'wind_turbine',
+    'wind_farm_2x2',
+    'wind_farm_3x3',
     'tool_compost_heap',
     'fertilizer_station',
   ];
@@ -329,12 +338,14 @@ export default function DeploymentModal({
   const decorItems: DeployedStructureType[] = [
     'bamboo_fence',
     'decor_pebble_path',
-    'zen_rock_formation',
     'growing_bamboo_formation',
     'asparagus_fern_ball',
+    'zen_rock_formation',
     'water_feature',
-    'torii_gate',
     'empty_crystal_pedestal',
+    'seven_lucky_gods',
+    'stone_lantern',
+    'torii_gate',
   ];
 
   // Handle keyboard navigation and gamepad events
@@ -441,11 +452,13 @@ export default function DeploymentModal({
               if (count > 0) {
                 gameAudio.playCrispClick();
                 if (onStartPlacementPreview) {
+                  const is3x3 = item === 'solar_farm_3x3' || item === 'wind_farm_3x3';
+                  const is2x2 = item === 'solar_farm_2x2' || item === 'wind_farm_2x2';
                   onStartPlacementPreview({
                     category: 'infrastructure',
                     payload: item,
-                    width: 1,
-                    height: 1,
+                    width: is3x3 ? 3 : is2x2 ? 2 : 1,
+                    height: is3x3 ? 3 : is2x2 ? 2 : 1,
                     orientation: 'horizontal',
                   });
                 } else {
@@ -534,7 +547,9 @@ export default function DeploymentModal({
     (inv.asparagus_fern_ball_inv || 0) +
     (inv.water_feature_inv || inv.decor_woven_wall_inv || 0) +
     (inv.torii_gate_inv || inv.decorations?.toriiGate || inv.decorations?.['torii_gate'] || 0) +
-    getStructureInventoryCount(inv, 'empty_crystal_pedestal');
+    getStructureInventoryCount(inv, 'empty_crystal_pedestal') +
+    getStructureInventoryCount(inv, 'seven_lucky_gods') +
+    getStructureInventoryCount(inv, 'stone_lantern');
 
   const attributeRowConfigs = [
     {
@@ -961,7 +976,7 @@ export default function DeploymentModal({
               <Wrench className="w-4 h-4 text-amber-300" />
               <span>Infrastructure</span>
               <span className="text-[10px] bg-slate-950/60 px-1.5 py-0.5 rounded-full font-mono text-amber-300">
-                {solarCount + windCount + compostCount + wellCount + autoT1Count + autoT2Count + autoT3Count + irrigT1Count + irrigT2Count + irrigT3Count}
+                {solarCount + solarFarm2x2Count + solarFarm3x3Count + windCount + windFarm2x2Count + windFarm3x3Count + compostCount + fertilizerStationCount + wellCount + autoT1Count + autoT2Count + autoT3Count + irrigT1Count + irrigT2Count + irrigT3Count}
               </span>
             </button>
 
@@ -1583,6 +1598,92 @@ export default function DeploymentModal({
                     </button>
                   </div>
 
+                  {/* Solar Panel Farm (2x2) */}
+                  <div className="bg-slate-900/90 border border-sky-500/50 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">☀️</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Solar Panel Farm (2x2)</h4>
+                          <span className="text-[10px] text-sky-300 font-bold">+24 kW Clean Power (+1.0 kW/adj unit)</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-sky-950 text-sky-300 border border-sky-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {solarFarm2x2Count}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Interconnected 2x2 cluster of 4 high-tech solar panels. Radiates Disrupted Zen 1 tile outwards unless enclosed with fences.
+                    </p>
+                    <button
+                      disabled={solarFarm2x2Count <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'solar_farm_2x2',
+                            width: 2,
+                            height: 2,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('solar_farm_2x2' as any);
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        solarFarm2x2Count > 0
+                          ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <Sun className="w-4 h-4" />
+                      {solarFarm2x2Count > 0 ? 'Deploy Solar Farm (2x2 • 24 kW)' : 'Craft at Workbench First'}
+                    </button>
+                  </div>
+
+                  {/* Big Solar Panel Farm (3x3) */}
+                  <div className="bg-slate-900/90 border border-sky-500/50 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">☀️</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Big Solar Panel Farm (3x3)</h4>
+                          <span className="text-[10px] text-sky-300 font-bold">+87 kW Clean Power (+1.5 kW/adj unit)</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-sky-950 text-sky-300 border border-sky-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {solarFarm3x3Count}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Interconnected 3x3 mega cluster of 9 high-tech solar panels. Radiates Disrupted Zen 1 tile outwards unless enclosed with fences.
+                    </p>
+                    <button
+                      disabled={solarFarm3x3Count <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'solar_farm_3x3',
+                            width: 3,
+                            height: 3,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('solar_farm_3x3' as any);
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        solarFarm3x3Count > 0
+                          ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <Sun className="w-4 h-4" />
+                      {solarFarm3x3Count > 0 ? 'Deploy Big Solar Farm (3x3 • 87 kW)' : 'Craft at Workbench First'}
+                    </button>
+                  </div>
+
                   {/* Wind Turbine */}
                   <div className="bg-slate-900/90 border border-amber-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
                     <div className="flex items-center justify-between">
@@ -1623,6 +1724,92 @@ export default function DeploymentModal({
                       }`}>
                       <Wind className="w-4 h-4" />
                       {windCount > 0 ? 'Deploy Wind Turbine (6 kW)' : 'Craft at Workbench First'}
+                    </button>
+                  </div>
+
+                  {/* Wind Turbine Farm (2x2) */}
+                  <div className="bg-slate-900/90 border border-amber-500/50 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">💨</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Wind Turbine Farm (2x2)</h4>
+                          <span className="text-[10px] text-amber-300 font-bold">+42 kW Clean Power (+1.5 kW/adj unit)</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-amber-950 text-amber-300 border border-amber-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {windFarm2x2Count}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Interconnected 2x2 cluster of 4 aero-helix turbines. Radiates Disrupted Zen 1 tile outwards unless enclosed with fences.
+                    </p>
+                    <button
+                      disabled={windFarm2x2Count <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'wind_farm_2x2',
+                            width: 2,
+                            height: 2,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('wind_farm_2x2' as any);
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        windFarm2x2Count > 0
+                          ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <Wind className="w-4 h-4" />
+                      {windFarm2x2Count > 0 ? 'Deploy Wind Farm (2x2 • 42 kW)' : 'Craft at Workbench First'}
+                    </button>
+                  </div>
+
+                  {/* Big Wind Turbine Farm (3x3) */}
+                  <div className="bg-slate-900/90 border border-amber-500/50 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">💨</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Big Wind Turbine Farm (3x3)</h4>
+                          <span className="text-[10px] text-amber-300 font-bold">+134 kW Clean Power (+2.0 kW/adj unit)</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-amber-950 text-amber-300 border border-amber-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {windFarm3x3Count}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Interconnected 3x3 mega cluster of 9 aero-helix turbines. Radiates Disrupted Zen 1 tile outwards unless enclosed with fences.
+                    </p>
+                    <button
+                      disabled={windFarm3x3Count <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'wind_farm_3x3',
+                            width: 3,
+                            height: 3,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('wind_farm_3x3' as any);
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        windFarm3x3Count > 0
+                          ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <Wind className="w-4 h-4" />
+                      {windFarm3x3Count > 0 ? 'Deploy Big Wind Farm (3x3 • 134 kW)' : 'Craft at Workbench First'}
                     </button>
                   </div>
 
@@ -2026,7 +2213,7 @@ export default function DeploymentModal({
                   <div className="bg-slate-900/80 border border-purple-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-2xl">🏛️</span>
+                        <ItemVectorPreview itemKey="empty_crystal_pedestal" width={44} height={44} />
                         <div>
                           <h5 className="font-bold text-xs sm:text-sm text-purple-300 truncate">Empty Pedestal</h5>
                           <span className="text-[10px] text-purple-400 font-semibold">Can Host Crystal Artifacts</span>
@@ -2061,6 +2248,90 @@ export default function DeploymentModal({
                           : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                       }`}>
                       {getStructureInventoryCount(inv, 'empty_crystal_pedestal') > 0 ? 'Place Empty Pedestal' : 'Buy in Botanical Market'}
+                    </button>
+                  </div>
+
+                  {/* Seven Lucky Gods */}
+                  <div className="bg-slate-900/80 border border-amber-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <ItemVectorPreview itemKey="seven_lucky_gods" width={44} height={44} />
+                        <div>
+                          <h5 className="font-bold text-xs sm:text-sm text-amber-200 truncate">Seven Lucky Gods (Shichifukujin)</h5>
+                          <span className="text-[10px] text-amber-400 font-bold">+0.01 Baseprice/lvl (Fortunate Blessings)</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-slate-950 text-amber-300 border border-amber-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Stock: {getStructureInventoryCount(inv, 'seven_lucky_gods')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      7 revered deities of fortune and wealth (Ebisu, Daikokuten, Bishamonten, Benzaiten, Fukurokuju, Jurojin, Hotei). Halo: +0.01 Bonsai Baseprice on Level Up.
+                    </p>
+                    <button
+                      disabled={getStructureInventoryCount(inv, 'seven_lucky_gods') <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'decoration',
+                            payload: 'seven_lucky_gods',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('seven_lucky_gods');
+                        }
+                      }}
+                      className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        getStructureInventoryCount(inv, 'seven_lucky_gods') > 0
+                          ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      {getStructureInventoryCount(inv, 'seven_lucky_gods') > 0 ? 'Place Seven Lucky Gods' : 'Buy in Botanical Market'}
+                    </button>
+                  </div>
+
+                  {/* Stone Lantern */}
+                  <div className="bg-slate-900/80 border border-cyan-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <ItemVectorPreview itemKey="stone_lantern" width={44} height={44} />
+                        <div>
+                          <h5 className="font-bold text-xs sm:text-sm text-cyan-200 truncate">Stone Lantern (Kasuga-dōrō)</h5>
+                          <span className="text-[10px] text-cyan-400 font-bold">+0.5% Zen Point Chance/lvl (Skilled Knowledge)</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-slate-950 text-cyan-300 border border-cyan-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                        Stock: {getStructureInventoryCount(inv, 'stone_lantern')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Classical Kasuga-dōrō stone lantern glowing with warm candlelight. Halo: Roll 0.5% chance per stone lantern to award +1 Zen Point on level up.
+                    </p>
+                    <button
+                      disabled={getStructureInventoryCount(inv, 'stone_lantern') <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'decoration',
+                            payload: 'stone_lantern',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('stone_lantern');
+                        }
+                      }}
+                      className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        getStructureInventoryCount(inv, 'stone_lantern') > 0
+                          ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      {getStructureInventoryCount(inv, 'stone_lantern') > 0 ? 'Place Stone Lantern' : 'Buy in Botanical Market'}
                     </button>
                   </div>
                 </div>

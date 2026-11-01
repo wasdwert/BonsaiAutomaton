@@ -206,16 +206,16 @@ export default function BonsaiExcavationModal({
 
   return (
     <div className="fixed top-12 left-0 right-0 bottom-0 z-40 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md select-none">
-      <div className="w-full max-w-4xl max-h-[calc(100vh-3.5rem)] overflow-y-auto bg-slate-900 border-2 border-emerald-500 rounded-3xl p-4 sm:p-5 shadow-[0_0_50px_rgba(16,185,129,0.3)] flex flex-col justify-between text-left animate-in fade-in zoom-in-95 duration-200 gap-3 sm:gap-4">
+      <div className={`w-full ${isCrystal ? 'max-w-xl' : 'max-w-4xl'} max-h-[calc(100vh-3.5rem)] overflow-y-auto bg-slate-900 border-2 ${isCrystal ? 'border-emerald-400' : 'border-emerald-500'} rounded-3xl p-4 sm:p-6 shadow-[0_0_50px_rgba(16,185,129,0.3)] flex flex-col justify-between text-left animate-in fade-in zoom-in-95 duration-200 gap-4`}>
         {/* Header Ribbon */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 shrink-0">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl border flex items-center justify-center shadow-inner shrink-0 ${
+            <div className={`w-10 h-10 rounded-2xl border flex items-center justify-center shadow-inner shrink-0 ${
               isCrystal
-                ? 'bg-purple-950/80 border-purple-500/60 text-purple-300'
+                ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300'
                 : 'bg-emerald-950/80 border-emerald-500/60 text-emerald-400'
             }`}>
-              {isCrystal ? <span className="text-xl">💎</span> : <Trophy className="w-5 h-5 text-emerald-400" />}
+              {isCrystal ? <span className="text-2xl">✨</span> : <Trophy className="w-5 h-5 text-emerald-400" />}
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -225,14 +225,6 @@ export default function BonsaiExcavationModal({
                 <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 px-2 py-0.5 rounded-full font-black">
                   100% Success
                 </span>
-                {isCrystal && (
-                  <span
-                    style={{ borderColor: crystal?.color || '#38bdf8', color: crystal?.color || '#38bdf8' }}
-                    className="text-[10px] bg-slate-950 px-2 py-0.5 rounded-full font-black border flex items-center gap-1 shadow-sm">
-                    <Sparkles className="w-3 h-3" />
-                    <span>✨ {crystal?.strength} Strength</span>
-                  </span>
-                )}
                 {!isCrystal && result.wasUpgraded && (
                   <span className="text-[10px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 px-2 py-0.5 rounded-full font-black flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-yellow-400" />
@@ -242,31 +234,67 @@ export default function BonsaiExcavationModal({
               </div>
               <p className="text-[11px] text-slate-400">
                 {isCrystal
-                  ? 'Precision excavation preserved pristine crystalline structure and energy density'
+                  ? 'Pristine elemental crystal extracted from deep mineral resonance'
                   : 'Precision digging extracted pristine root Genetic Potential'}
               </p>
             </div>
           </div>
         </div>
 
-        {/* 2-Column Responsive Dashboard Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-stretch">
-          {/* LEFT COLUMN: Crystal or Seedling Specimen Card & Digging Accuracy */}
-          <div className="flex flex-col justify-between gap-3">
-            {/* Specimen Card */}
-            <div className="bg-slate-950/90 border border-slate-800 p-3 sm:p-3.5 rounded-2xl shadow-inner flex flex-col justify-between gap-2.5">
-              <div className="flex items-center gap-3">
-                {isCrystal && crystal ? (
-                  <div
-                    style={{
-                      borderColor: crystal.color || '#38bdf8',
-                      backgroundColor: `${crystal.color || '#38bdf8'}15`,
-                      boxShadow: `0 0 16px ${crystal.color || '#38bdf8'}40`,
-                    }}
-                    className="w-14 h-14 rounded-2xl border-2 flex items-center justify-center shrink-0 overflow-hidden">
-                    <CrystalThumbnailCanvas crystalType={crystal.crystalType} strength={crystal.strength} />
-                  </div>
-                ) : (
+        {/* CRYSTAL DEDICATED RESULTS CARD (Completely stripped of tree-specific breakdown) */}
+        {isCrystal && crystal ? (
+          <div className="flex flex-col items-center text-center p-4 sm:p-6 bg-slate-950/90 border border-slate-800 rounded-2xl space-y-4">
+            {/* Elemental Aspect Icon / Glowing Gem Visual */}
+            <div
+              style={{
+                borderColor: crystal.color || '#10b981',
+                backgroundColor: `${crystal.color || '#10b981'}18`,
+                boxShadow: `0 0 35px ${crystal.color || '#10b981'}45`,
+              }}
+              className="w-24 h-24 rounded-3xl border-2 flex items-center justify-center p-2 relative">
+              <CrystalThumbnailCanvas crystalType={crystal.crystalType} strength={crystal.strength} />
+              <div
+                style={{ backgroundColor: crystal.color || '#10b981' }}
+                className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-slate-950 font-black text-xs shadow-md">
+                ✨
+              </div>
+            </div>
+
+            {/* Crystal Name */}
+            <div>
+              <div className="text-[11px] font-mono uppercase tracking-widest text-slate-400 mb-0.5">
+                Elemental Aspect Shard
+              </div>
+              <h4
+                style={{ color: crystal.color || '#10b981' }}
+                className="text-xl sm:text-2xl font-black tracking-wide">
+                ✨ {cTypeLabel} Crystal
+              </h4>
+            </div>
+
+            {/* Strength Rating Card */}
+            <div className="w-full max-w-sm bg-slate-900/90 border border-slate-700/80 p-3.5 rounded-2xl space-y-2">
+              <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                Strength Rating
+              </div>
+              <div
+                style={{ color: crystal.color || '#34d399' }}
+                className="text-base sm:text-lg font-black font-mono">
+                +{crystal.strength.toFixed(1)} Cultivation Potential / Lv
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Mount this artifact onto a <strong>Crystal Pedestal</strong> in your Sanctuary to empower surrounding bonsais with permanent {cTypeLabel.toLowerCase()} cultivation growth on every level up!
+              </p>
+            </div>
+          </div>
+        ) : (
+          /* REGULAR SEEDLING 2-COLUMN APPRAISAL CARD */
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-stretch">
+            {/* LEFT COLUMN: Seedling Specimen Card & Digging Accuracy */}
+            <div className="flex flex-col justify-between gap-3">
+              {/* Specimen Card */}
+              <div className="bg-slate-950/90 border border-slate-800 p-3 sm:p-3.5 rounded-2xl shadow-inner flex flex-col justify-between gap-2.5">
+                <div className="flex items-center gap-3">
                   <div
                     style={{
                       backgroundColor: matDef.bg,
@@ -277,169 +305,132 @@ export default function BonsaiExcavationModal({
                     className="w-12 h-12 rounded-2xl border-2 flex items-center justify-center text-xl font-black shrink-0">
                     {matDef.kanji}
                   </div>
-                )}
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {isCrystal && crystal ? (
-                      <>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-black border bg-purple-950 text-purple-300 border-purple-500/60">
-                          Elemental Crystal
-                        </span>
-                        <span
-                          style={{
-                            borderColor: crystal.color || '#38bdf8',
-                            color: crystal.color || '#38bdf8',
-                          }}
-                          className="text-[10px] px-2 py-0.5 rounded-full font-black border bg-slate-900">
-                          +{crystal.strength} Potential/Lv
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${getBonsaiGroupBadgeClass(
-                            result.group,
-                          )}`}>
-                          {result.group}
-                        </span>
-                        <span
-                          style={{
-                            backgroundColor: matDef.bg,
-                            borderColor: matDef.border,
-                            color: matDef.color,
-                          }}
-                          className="text-[10px] px-2 py-0.5 rounded-full font-black border">
-                          {matDef.name} (Rank {matDef.rank})
-                        </span>
-                        <span className="text-[10px] bg-slate-900 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-full font-semibold">
-                          {result.rarity || leafDef.rarity}
-                        </span>
-                      </>
-                    )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${getBonsaiGroupBadgeClass(
+                          result.group,
+                        )}`}>
+                        {result.group}
+                      </span>
+                      <span
+                        style={{
+                          backgroundColor: matDef.bg,
+                          borderColor: matDef.border,
+                          color: matDef.color,
+                        }}
+                        className="text-[10px] px-2 py-0.5 rounded-full font-black border">
+                        {matDef.name} (Rank {matDef.rank})
+                      </span>
+                      <span className="text-[10px] bg-slate-900 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-full font-semibold">
+                        {result.rarity || leafDef.rarity}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-sm sm:text-base text-slate-100 mt-1 truncate">
+                      {getBonsaiDisplayName(result)}
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Leaf Shape: <strong className="text-slate-200">{leafDef.leafShapeName}</strong> • Growth Rate: <strong style={{color: matDef.color}}>{matDef.growthMultiplier}x</strong>
+                    </p>
                   </div>
-                  <h4 className="font-bold text-sm sm:text-base text-slate-100 mt-1 truncate">
-                    {isCrystal && crystal ? `✨ ${cTypeLabel} Crystal (${crystal.strength} Strength)` : getBonsaiDisplayName(result)}
-                  </h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    {isCrystal && crystal ? (
-                      <span>
-                        Socket onto <strong>Crystal Pedestals</strong> to empower surrounding bonsai growth!
-                      </span>
-                    ) : (
-                      <span>
-                        Leaf Shape: <strong className="text-slate-200">{leafDef.leafShapeName}</strong> • Growth Rate: <strong style={{color: matDef.color}}>{matDef.growthMultiplier}x</strong>
-                      </span>
-                    )}
-                  </p>
                 </div>
               </div>
-            </div>
 
-            {/* Overall Digging Precision & Zone Hit Badges */}
-            <div className="bg-slate-950/80 border border-slate-800/90 rounded-2xl p-3 sm:p-3.5 space-y-2.5 flex-1 flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-base">🎯</span>
-                  <span className="text-xs font-bold text-slate-200">
-                    Overall Digging Precision Average
+              {/* Overall Digging Precision & Zone Hit Badges */}
+              <div className="bg-slate-950/80 border border-slate-800/90 rounded-2xl p-3 sm:p-3.5 space-y-2.5 flex-1 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base">🎯</span>
+                    <span className="text-xs font-bold text-slate-200">
+                      Overall Digging Precision Average
+                    </span>
+                  </div>
+                  <span
+                    className={`text-xs font-black px-2.5 py-0.5 rounded-full border ${avgTierColor.bg} ${avgTierColor.text} ${avgTierColor.border}`}>
+                    {avgTierName} ({result.averagePrecision}% precision)
                   </span>
                 </div>
-                <span
-                  className={`text-xs font-black px-2.5 py-0.5 rounded-full border ${avgTierColor.bg} ${avgTierColor.text} ${avgTierColor.border}`}>
-                  {avgTierName} ({result.averagePrecision}% precision)
-                </span>
-              </div>
 
-              {/* Individual Zone Hit Precision Pills */}
-              <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                  <span>Individual Target Precision:</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {result.zoneHits.map((z) => {
-                    const zTier = getAttributeTierColor(z.precision);
-                    return (
-                      <div
-                        key={z.zoneIndex}
-                        className={`px-2 py-1 rounded-xl text-[11px] font-bold border flex items-center gap-1 shadow-sm ${zTier.bg} ${zTier.border} ${zTier.text}`}>
-                        <span>T{z.zoneIndex + 1}:</span>
-                        <span className="font-mono">{z.precision}%</span>
-                        {z.isBullseye && (
-                          <span className="text-[9px] bg-amber-400 text-slate-950 font-black px-1 py-0.2 rounded uppercase">
-                            Bullseye
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN: The 4 Genetic / Cultivation Potential Attribute Cards */}
-          <div className="bg-slate-950/80 border border-slate-800/90 p-3 sm:p-3.5 rounded-2xl flex flex-col justify-between gap-2">
-            <div className="flex items-center justify-between text-xs pb-1 border-b border-slate-800/80">
-              <span className="font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                <Award className="w-3.5 h-3.5 text-amber-400" />
-                <span>
-                  {isCrystal ? 'Crystal Resonance Alignment:' : 'Assigned Genetic Potential:'}
-                </span>
-              </span>
-              <span className="text-[11px] text-slate-400">
-                {isCrystal ? `Boosts ${cTypeLabel} Pedestals` : `Distributed from ${result.averagePrecision}% precision`}
-              </span>
-            </div>
-
-            <div className="space-y-2 flex-1 flex flex-col justify-around">
-              {attributesList.map(({key, config, value}) => {
-                const tierStr = getAttributeTier(value);
-                const isTargetAttr = isCrystal && crystal?.crystalType === key;
-
-                return (
-                  <div
-                    key={key}
-                    className={`bg-slate-900/90 border p-2 sm:p-2.5 rounded-xl space-y-1 shadow-sm transition-all ${
-                      isTargetAttr
-                        ? 'border-2 border-emerald-400 bg-emerald-950/30 ring-2 ring-emerald-400/20'
-                        : config.border
-                    }`}>
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-base shrink-0">{config.icon}</span>
-                        <span className={`font-bold ${config.text}`}>
-                          {config.name} {isTargetAttr ? '★ Socket Resonance' : ''}
-                        </span>
-                        <span className="text-[10px] text-slate-400 truncate hidden sm:inline">
-                          — {config.desc}
-                        </span>
-                      </div>
-
-                      <span
-                        className={`text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded-lg border font-mono shrink-0 ${
-                          isTargetAttr
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
-                            : `${config.badgeBg} ${config.badgeText} ${config.badgeBorder}`
-                        }`}>
-                        {isTargetAttr ? `+${crystal?.strength} Potential/Lv` : tierStr}
-                      </span>
-                    </div>
-
-                    {/* Themed Progress Bar */}
-                    <div className="w-full bg-slate-950 h-2 sm:h-2.5 rounded-full overflow-hidden border border-slate-800 relative">
-                      <div
-                        style={{width: `${isTargetAttr ? 100 : value}%`}}
-                        className={`h-full rounded-full transition-all duration-500 ${config.bar}`}
-                      />
-                    </div>
+                {/* Individual Zone Hit Precision Pills */}
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    <span>Individual Target Precision:</span>
                   </div>
-                );
-              })}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {result.zoneHits.map((z) => {
+                      const zTier = getAttributeTierColor(z.precision);
+                      return (
+                        <div
+                          key={z.zoneIndex}
+                          className={`px-2 py-1 rounded-xl text-[11px] font-bold border flex items-center gap-1 shadow-sm ${zTier.bg} ${zTier.border} ${zTier.text}`}>
+                          <span>T{z.zoneIndex + 1}:</span>
+                          <span className="font-mono">{z.precision}%</span>
+                          {z.isBullseye && (
+                            <span className="text-[9px] bg-amber-400 text-slate-950 font-black px-1 py-0.2 rounded uppercase">
+                              Bullseye
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: The 4 Genetic / Cultivation Potential Attribute Cards */}
+            <div className="bg-slate-950/80 border border-slate-800/90 p-3 sm:p-3.5 rounded-2xl flex flex-col justify-between gap-2">
+              <div className="flex items-center justify-between text-xs pb-1 border-b border-slate-800/80">
+                <span className="font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <Award className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Assigned Genetic Potential:</span>
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  Distributed from {result.averagePrecision}% precision
+                </span>
+              </div>
+
+              <div className="space-y-2 flex-1 flex flex-col justify-around">
+                {attributesList.map(({key, config, value}) => {
+                  const tierStr = getAttributeTier(value);
+
+                  return (
+                    <div
+                      key={key}
+                      className={`bg-slate-900/90 border p-2 sm:p-2.5 rounded-xl space-y-1 shadow-sm transition-all ${config.border}`}>
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-base shrink-0">{config.icon}</span>
+                          <span className={`font-bold ${config.text}`}>
+                            {config.name}
+                          </span>
+                          <span className="text-[10px] text-slate-400 truncate hidden sm:inline">
+                            — {config.desc}
+                          </span>
+                        </div>
+
+                        <span
+                          className={`text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded-lg border font-mono shrink-0 ${config.badgeBg} ${config.badgeText} ${config.badgeBorder}`}>
+                          {tierStr}
+                        </span>
+                      </div>
+
+                      {/* Themed Progress Bar */}
+                      <div className="w-full bg-slate-950 h-2 sm:h-2.5 rounded-full overflow-hidden border border-slate-800 relative">
+                        <div
+                          style={{width: `${value}%`}}
+                          className={`h-full rounded-full transition-all duration-500 ${config.bar}`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Bottom Action Bar: Collect or Decline */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3 shrink-0 pt-2 border-t border-slate-800">
@@ -464,15 +455,13 @@ export default function BonsaiExcavationModal({
               autoFocus
               className={`flex-1 sm:flex-none px-6 py-2.5 rounded-2xl font-black text-xs sm:text-sm shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 ${
                 selectedAction === 'collect'
-                  ? isCrystal
-                    ? 'bg-purple-600 hover:bg-purple-500 text-white ring-2 ring-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.5)] scale-[1.02]'
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.5)] scale-[1.02]'
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.5)] scale-[1.02]'
                   : 'bg-emerald-700 text-emerald-100 hover:bg-emerald-600'
               }`}>
               <Package className="w-4 h-4" />
               <span>
                 {isCrystal
-                  ? `Collect ✨ ${cTypeLabel} Crystal [Space / X] (${cWeight} kg)`
+                  ? 'Collect & Transfer to Cargo'
                   : `Collect ${getBonsaiDisplayName(result)} [Space / X] or [E / A] (3.0 kg)`}
               </span>
               <ArrowRight className="w-4 h-4" />

@@ -8,7 +8,11 @@ export type RoverChassisTier = 1 | 2 | 3;
 
 export type DeployedInfrastructureType =
   | 'solar_panel'
+  | 'solar_farm_2x2'
+  | 'solar_farm_3x3'
   | 'wind_turbine'
+  | 'wind_farm_2x2'
+  | 'wind_farm_3x3'
   | 'tool_compost_heap'
   | 'tool_garden_well'
   | 'fertilizer_station'
@@ -27,6 +31,8 @@ export type DeployedInfrastructureType =
   | 'decor_shrubbery_bush'
   | 'growing_bamboo_formation'
   | 'asparagus_fern_ball'
+  | 'seven_lucky_gods'
+  | 'stone_lantern'
   | 'torii_gate';
 
 export type GameResourceType =
@@ -38,7 +44,10 @@ export type GameResourceType =
   | 'organic_waste'
   | 'organic_compost'
   | 'biochemicals'
-  | 'fertilizer';
+  | 'fertilizer'
+  | 'license_t1'
+  | 'license_t2'
+  | 'license_t3';
 
 export const AREA_EXCAVATION_SPEEDS = {
   FOOTHILLS: 3.2,
@@ -67,6 +76,141 @@ export interface RoverModuleConfig {
   bonusLabel: string;
   description: string;
 }
+
+export type WorkbenchModuleType =
+  | 'assembly_module_t1'
+  | 'assembly_module_t2'
+  | 'assembly_module_t3'
+  | 'overclock_module_t1'
+  | 'overclock_module_t2'
+  | 'overclock_module_t3'
+  | 'auto_fabrication_t1'
+  | 'auto_fabrication_t2'
+  | 'auto_fabrication_t3';
+
+export interface WorkbenchModuleConfig {
+  id: WorkbenchModuleType;
+  name: string;
+  category: 'assembly' | 'overclock' | 'automation';
+  tier: 1 | 2 | 3;
+  icon: string;
+  bonusValue: number;
+  bonusLabel: string;
+  description: string;
+  guideKey: string;
+  guideName: string;
+}
+
+export const WORKBENCH_MODULE_CONFIGS: Record<WorkbenchModuleType, WorkbenchModuleConfig> = {
+  assembly_module_t1: {
+    id: 'assembly_module_t1',
+    name: 'T1 Assembly Bench Module',
+    category: 'assembly',
+    tier: 1,
+    icon: '🦾',
+    bonusValue: 1,
+    bonusLabel: '+1 Queue Slot',
+    description: 'Precision mechanical assembly fixture. When installed, adds +1 Queue Slot to the Workbench (2 kW).',
+    guideKey: 'has_assembly_blueprint_1',
+    guideName: 'Assembly Blueprint I',
+  },
+  assembly_module_t2: {
+    id: 'assembly_module_t2',
+    name: 'T2 Assembly Bench Module',
+    category: 'assembly',
+    tier: 2,
+    icon: '🦾',
+    bonusValue: 2,
+    bonusLabel: '+2 Queue Slots',
+    description: 'Pneumatic dual-action assembly cradle. When installed, adds +2 Queue Slots to the Workbench (3 kW).',
+    guideKey: 'has_assembly_blueprint_2',
+    guideName: 'Assembly Blueprint II',
+  },
+  assembly_module_t3: {
+    id: 'assembly_module_t3',
+    name: 'T3 Assembly Bench Module',
+    category: 'assembly',
+    tier: 3,
+    icon: '🦾',
+    bonusValue: 3,
+    bonusLabel: '+3 Queue Slots',
+    description: 'Master multi-axis robotic assembly gantry. When installed, adds +3 Queue Slots to the Workbench (4 kW).',
+    guideKey: 'has_assembly_blueprint_3',
+    guideName: 'Assembly Blueprint III',
+  },
+  overclock_module_t1: {
+    id: 'overclock_module_t1',
+    name: 'T1 Overclock Workbench Module',
+    category: 'overclock',
+    tier: 1,
+    icon: '⚡',
+    bonusValue: 0.05,
+    bonusLabel: '+5% Craft Speed',
+    description: 'Supercharged power conduit busbar. When installed, accelerates craft speed by +5% (3 kW).',
+    guideKey: 'has_overclock_schematic_1',
+    guideName: 'Overclock Schematic I',
+  },
+  overclock_module_t2: {
+    id: 'overclock_module_t2',
+    name: 'T2 Overclock Workbench Module',
+    category: 'overclock',
+    tier: 2,
+    icon: '⚡',
+    bonusValue: 0.10,
+    bonusLabel: '+10% Craft Speed',
+    description: 'High-frequency harmonic resonance capacitor. When installed, accelerates craft speed by +10% (5 kW).',
+    guideKey: 'has_overclock_schematic_2',
+    guideName: 'Overclock Schematic II',
+  },
+  overclock_module_t3: {
+    id: 'overclock_module_t3',
+    name: 'T3 Overclock Workbench Module',
+    category: 'overclock',
+    tier: 3,
+    icon: '⚡',
+    bonusValue: 0.20,
+    bonusLabel: '+20% Craft Speed',
+    description: 'Quantum overclock synthesizer matrix. When installed, accelerates craft speed by +20% (7 kW).',
+    guideKey: 'has_overclock_schematic_3',
+    guideName: 'Overclock Schematic III',
+  },
+  auto_fabrication_t1: {
+    id: 'auto_fabrication_t1',
+    name: 'T1 Auto-Fabrication Module',
+    category: 'automation',
+    tier: 1,
+    icon: '🏭',
+    bonusValue: 0.5,
+    bonusLabel: '50% Craft Speed',
+    description: 'Dedicated automated production lane unit. Runs continuous crafting loop at 50% speed (half speed of workbench, 6 kW).',
+    guideKey: 'has_auto_fab_book_1',
+    guideName: 'Auto-Fabrication Schematic I',
+  },
+  auto_fabrication_t2: {
+    id: 'auto_fabrication_t2',
+    name: 'T2 Auto-Fabrication Module',
+    category: 'automation',
+    tier: 2,
+    icon: '🏭',
+    bonusValue: 1.0,
+    bonusLabel: '100% Craft Speed',
+    description: 'Dedicated automated production lane unit. Runs continuous crafting loop at 100% speed (standard workbench speed, 10 kW).',
+    guideKey: 'has_auto_fab_book_2',
+    guideName: 'Auto-Fabrication Schematic II',
+  },
+  auto_fabrication_t3: {
+    id: 'auto_fabrication_t3',
+    name: 'T3 Auto-Fabrication Module',
+    category: 'automation',
+    tier: 3,
+    icon: '🏭',
+    bonusValue: 1.5,
+    bonusLabel: '150% Craft Speed',
+    description: 'Advanced automated production lane unit. Runs continuous crafting loop at 150% speed (1.5x workbench speed, 14 kW).',
+    guideKey: 'has_auto_fab_book_3',
+    guideName: 'Auto-Fabrication Schematic III',
+  },
+};
 
 /**
  * Individual unique Seedling instance stored in inventory / haul.
@@ -593,6 +737,9 @@ export interface Bonsai {
   attributes?: BonsaiAttributes;
   geneticPotential?: BonsaiAttributes;
   cultivationPotential?: CultivationPotential;
+  basePriceBonus?: number;
+  lastLevelUpTime?: number;
+  isFavorite?: boolean;
   [key: string]: any;
 }
 

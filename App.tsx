@@ -122,6 +122,9 @@ import {
   RoverChassisTier,
   RoverModuleType,
   RoverModuleConfig,
+  WorkbenchModuleType,
+  WorkbenchModuleConfig,
+  WORKBENCH_MODULE_CONFIGS,
   Bonsai,
   BonsaiAttributes,
   DEFAULT_BONSAI_ATTRIBUTES,
@@ -297,7 +300,11 @@ export type AutomatonTier = 0 | 1 | 2 | 3;
 export type ExpeditionBiomeId = 'FOOTHILLS' | 'HIGHLANDS' | 'OVERGROWTH';
 export type DeployedStructureType =
   | 'solar_panel'
+  | 'solar_farm_2x2'
+  | 'solar_farm_3x3'
   | 'wind_turbine'
+  | 'wind_farm_2x2'
+  | 'wind_farm_3x3'
   | 'decor_pebble_path'
   | 'decor_rock_formation'
   | 'zen_rock_formation'
@@ -307,6 +314,8 @@ export type DeployedStructureType =
   | 'decor_woven_wall'
   | 'water_feature'
   | 'bamboo_fence'
+  | 'seven_lucky_gods'
+  | 'stone_lantern'
   | 'tool_compost_heap'
   | 'tool_garden_well'
   | 'fertilizer_station'
@@ -331,8 +340,11 @@ export interface DeployedStructure {
   y: number;
   gridX: number;
   gridY: number;
+  col?: number;
+  row?: number;
   rotation?: number;
   variant?: number;
+  godIndex?: number;
   orientation?: 'horizontal' | 'vertical';
   side?: 'top' | 'right' | 'bottom' | 'left';
   edgeKey?: string;
@@ -358,10 +370,13 @@ export interface DeployedStructure {
   sprayAngle?: number;
   // Pedestal Socketed Crystal state
   socketedCrystal?: CrystalItem | null;
+  totalBatchCount?: number;
+  currentBatchIndex?: number;
 }
 
 export interface AutoFabricatorLane {
   id: string;
+  tier: 1 | 2 | 3;
   targetRecipeId: CraftingRecipeId | 'none';
   progressSeconds: number;
 }
@@ -544,12 +559,25 @@ export function getExpeditionBiomeDef(id?: string): BiomeDefinition {
 
 export type CraftingRecipeId =
   | 'crafting_automaton'
+  | 'assembly_module_t1'
+  | 'assembly_module_t2'
+  | 'assembly_module_t3'
+  | 'overclock_module_t1'
+  | 'overclock_module_t2'
+  | 'overclock_module_t3'
+  | 'auto_fabrication_t1'
+  | 'auto_fabrication_t2'
+  | 'auto_fabrication_t3'
   | 'tier1_automaton'
   | 'tier2_automaton'
   | 'tier3_automaton'
   | 'auto_fabricator'
   | 'solar_panel'
+  | 'solar_farm_2x2'
+  | 'solar_farm_3x3'
   | 'wind_turbine'
+  | 'wind_farm_2x2'
+  | 'wind_farm_3x3'
   | 'craft_enriched_compost'
   | 'craft_biochemicals'
   | 'craft_copper_wire'
@@ -588,12 +616,16 @@ export interface CraftingRecipeDef {
   durationSeconds: number;
   description: string;
   icon: string;
+  kw?: number;
   requiresGuide?:
     | 'has_compost_guide'
     | 'has_tier1_guide'
     | 'has_tier2_guide'
     | 'has_tier3_guide'
     | 'has_auto_fabricator_guide'
+    | 'has_auto_fab_book_1'
+    | 'has_auto_fab_book_2'
+    | 'has_auto_fab_book_3'
     | 'has_workbench_t2_guide'
     | 'has_workbench_t3_guide'
     | 'has_rover_t2_blueprint'
@@ -606,90 +638,425 @@ export interface CraftingRecipeDef {
     | 'has_battery_module_3_guide'
     | 'has_radar_module_1_guide'
     | 'has_radar_module_2_guide'
-    | 'has_radar_module_3_guide';
+    | 'has_radar_module_3_guide'
+    | 'has_assembly_blueprint_1'
+    | 'has_assembly_blueprint_2'
+    | 'has_assembly_blueprint_3'
+    | 'has_overclock_schematic_1'
+    | 'has_overclock_schematic_2'
+    | 'has_overclock_schematic_3';
   guideName?: string;
   costs: {
+    license_t1?: number;
+    license_t2?: number;
+    license_t3?: number;
     scrap_metal?: number;
     copper_wire?: number;
     brass_gears?: number;
     circuit_boards?: number;
     electronic_chips?: number;
     organic_waste?: number;
+    biochemicals?: number;
   };
 }
 
 export const WORKBENCH_RECIPES: Record<CraftingRecipeId, CraftingRecipeDef> = {
-  crafting_automaton: {
-    id: 'crafting_automaton',
-    name: 'Crafting Assembly Automaton',
-    category: 'workbench',
-    durationSeconds: 8,
-    description: 'Modular assembly arm for Workbench. When attached, adds +1 Queue Slot and +25% craft speed (3 kW). Can be attached or detached in Manage Modules.',
-    icon: '🤖',
-    costs: {scrap_metal: 3, copper_wire: 2, brass_gears: 1},
-  },
+  // Sprinklers
   tier1_automaton: {
     id: 'tier1_automaton',
     name: 'T1 Hydration Sprinkler',
     category: 'bonsai_automatons',
     durationSeconds: 12,
-    description: 'Deployable 1x1 infrastructure sprinkler. Sprays Left & Right adjacent plots with continuous hydration at 1.0x baseline speed (2 kW).',
+    kw: 4,
+    description: 'Deployable 1x1 infrastructure sprinkler. Sprays Left & Right adjacent plots with continuous hydration at 1.0x baseline speed (4 kW).',
     icon: '💧',
     requiresGuide: 'has_tier1_guide',
     guideName: 'Tier 1 Mist Irrigation Guidebook',
-    costs: {scrap_metal: 5, copper_wire: 4, brass_gears: 2},
+    costs: {license_t1: 1, scrap_metal: 8, copper_wire: 4},
   },
   tier2_automaton: {
     id: 'tier2_automaton',
     name: 'T2 Hydration Sprinkler',
     category: 'bonsai_automatons',
-    durationSeconds: 18,
-    description: 'Deployable 1x1 infrastructure sprinkler. 4-way cross nozzles spray Up, Down, Left, Right adjacent plots at 2.5x speed (4 kW).',
+    durationSeconds: 25,
+    kw: 7,
+    description: 'Deployable 1x1 infrastructure sprinkler. 4-way cross nozzles spray Up, Down, Left, Right adjacent plots at 2.5x speed (7 kW).',
     icon: '⚡',
     requiresGuide: 'has_tier2_guide',
     guideName: 'Tier 2 Pulsar Irrigation Guidebook',
-    costs: {scrap_metal: 6, copper_wire: 4, brass_gears: 3, circuit_boards: 1},
+    costs: {license_t2: 1, scrap_metal: 6, copper_wire: 3, brass_gears: 2},
   },
   tier3_automaton: {
     id: 'tier3_automaton',
     name: 'T3 Hydration Sprinkler',
     category: 'bonsai_automatons',
-    durationSeconds: 25,
-    description: 'Deployable 1x1 infrastructure sprinkler. Rotating pulse impact head sprays all 8 surrounding plots in 3x3 at 5.0x ultra speed (7 kW).',
+    durationSeconds: 60,
+    kw: 12,
+    description: 'Deployable 1x1 infrastructure sprinkler. Rotating pulse impact head sprays all 8 surrounding plots in 3x3 at 5.0x ultra speed (12 kW).',
     icon: '✨',
     requiresGuide: 'has_tier3_guide',
     guideName: 'Tier 3 Hydro Irrigation Guidebook',
-    costs: {scrap_metal: 8, copper_wire: 6, brass_gears: 4, circuit_boards: 2, electronic_chips: 1},
+    costs: {license_t3: 1, scrap_metal: 8, copper_wire: 4, brass_gears: 2, circuit_boards: 1},
+  },
+
+  // Workbench Upgrades
+  workbench_t2_upgrade: {
+    id: 'workbench_t2_upgrade',
+    name: 'T2 Precision Workbench Upgrade',
+    category: 'workbench',
+    durationSeconds: 130,
+    description: 'Reinforces workbench frame with precision brass rails & dual conduit feeds. Expands automaton capacity from 3 to 5 units.',
+    icon: '🛠️',
+    requiresGuide: 'has_workbench_t2_guide',
+    guideName: 'T2 Precision Workbench Blueprint',
+    costs: {license_t2: 1, scrap_metal: 12, copper_wire: 6, brass_gears: 6, circuit_boards: 2},
+  },
+  workbench_t3_upgrade: {
+    id: 'workbench_t3_upgrade',
+    name: 'T3 Master Foundry Upgrade',
+    category: 'workbench',
+    durationSeconds: 400,
+    description: 'Masterwork gilded forge & nanite assembly core. Expands automaton capacity from 5 to 10 units with majestic gold/brass styling.',
+    icon: '👑',
+    requiresGuide: 'has_workbench_t3_guide',
+    guideName: 'T3 Master Foundry Blueprint',
+    costs: {license_t3: 1, scrap_metal: 8, copper_wire: 6, brass_gears: 4, circuit_boards: 3, electronic_chips: 2},
+  },
+
+  // Assembly Bench Modules
+  assembly_module_t1: {
+    id: 'assembly_module_t1',
+    name: 'T1 Assembly Bench Module',
+    category: 'workbench',
+    durationSeconds: 4,
+    kw: 2,
+    description: 'Precision mechanical assembly fixture. When installed, adds +1 Queue Slot to the Workbench (2 kW).',
+    icon: '🦾',
+    requiresGuide: 'has_assembly_blueprint_1',
+    guideName: 'Assembly Blueprint I',
+    costs: {license_t1: 1, scrap_metal: 4, copper_wire: 1},
+  },
+  assembly_module_t2: {
+    id: 'assembly_module_t2',
+    name: 'T2 Assembly Bench Module',
+    category: 'workbench',
+    durationSeconds: 9,
+    kw: 3,
+    description: 'Pneumatic dual-action assembly cradle. When installed, adds +2 Queue Slots to the Workbench (3 kW).',
+    icon: '🦾',
+    requiresGuide: 'has_assembly_blueprint_2',
+    guideName: 'Assembly Blueprint II',
+    costs: {license_t2: 1, scrap_metal: 6, copper_wire: 3},
+  },
+  assembly_module_t3: {
+    id: 'assembly_module_t3',
+    name: 'T3 Assembly Bench Module',
+    category: 'workbench',
+    durationSeconds: 15,
+    kw: 4,
+    description: 'Master multi-axis robotic assembly gantry. When installed, adds +3 Queue Slots to the Workbench (4 kW).',
+    icon: '🦾',
+    requiresGuide: 'has_assembly_blueprint_3',
+    guideName: 'Assembly Blueprint III',
+    costs: {license_t3: 1, scrap_metal: 6, copper_wire: 2, brass_gears: 1},
+  },
+
+  // Overclock Modules
+  overclock_module_t1: {
+    id: 'overclock_module_t1',
+    name: 'T1 Overclock Workbench Module',
+    category: 'workbench',
+    durationSeconds: 7,
+    kw: 3,
+    description: 'Supercharged power conduit busbar. When installed, accelerates craft speed by +5% (3 kW).',
+    icon: '⚡',
+    requiresGuide: 'has_overclock_schematic_1',
+    guideName: 'Overclock Schematic I',
+    costs: {license_t1: 1, scrap_metal: 6, copper_wire: 2},
+  },
+  overclock_module_t2: {
+    id: 'overclock_module_t2',
+    name: 'T2 Overclock Workbench Module',
+    category: 'workbench',
+    durationSeconds: 15,
+    kw: 5,
+    description: 'High-frequency harmonic resonance capacitor. When installed, accelerates craft speed by +10% (5 kW).',
+    icon: '⚡',
+    requiresGuide: 'has_overclock_schematic_2',
+    guideName: 'Overclock Schematic II',
+    costs: {license_t2: 1, scrap_metal: 6, copper_wire: 2, brass_gears: 1},
+  },
+  overclock_module_t3: {
+    id: 'overclock_module_t3',
+    name: 'T3 Overclock Workbench Module',
+    category: 'workbench',
+    durationSeconds: 25,
+    kw: 7,
+    description: 'Quantum overclock synthesizer matrix. When installed, accelerates craft speed by +20% (7 kW).',
+    icon: '⚡',
+    requiresGuide: 'has_overclock_schematic_3',
+    guideName: 'Overclock Schematic III',
+    costs: {license_t3: 1, scrap_metal: 6, copper_wire: 3, brass_gears: 2},
+  },
+
+  // Auto-Fabrication Modules
+  auto_fabrication_t1: {
+    id: 'auto_fabrication_t1',
+    name: 'T1 Auto-Fabrication Module',
+    category: 'workbench',
+    durationSeconds: 20,
+    kw: 6,
+    description: 'Dedicated automated production lane unit. Runs continuous crafting loop at 50% speed (half speed of workbench, 6 kW).',
+    icon: '🏭',
+    requiresGuide: 'has_auto_fab_book_1',
+    guideName: 'Auto-Fabrication Schematic I',
+    costs: {license_t1: 1, scrap_metal: 8, copper_wire: 4, brass_gears: 1},
+  },
+  auto_fabrication_t2: {
+    id: 'auto_fabrication_t2',
+    name: 'T2 Auto-Fabrication Module',
+    category: 'workbench',
+    durationSeconds: 44,
+    kw: 10,
+    description: 'Dedicated automated production lane unit. Runs continuous crafting loop at 100% speed (standard workbench speed, 10 kW).',
+    icon: '🏭',
+    requiresGuide: 'has_auto_fab_book_2',
+    guideName: 'Auto-Fabrication Schematic II',
+    costs: {license_t2: 1, scrap_metal: 8, copper_wire: 4, brass_gears: 4},
   },
   auto_fabricator: {
     id: 'auto_fabricator',
-    name: 'Auto-Fabrication Automaton',
+    name: 'T2 Auto-Fabrication Module',
     category: 'workbench',
-    durationSeconds: 30,
-    description: 'Dedicated automated production lane unit. When attached to Workbench, runs its own independent continuous crafting loop (10 kW).',
+    durationSeconds: 44,
+    kw: 10,
+    description: 'Dedicated automated production lane unit. Runs continuous crafting loop at 100% speed (standard workbench speed, 10 kW).',
     icon: '🏭',
-    requiresGuide: 'has_auto_fabricator_guide',
-    guideName: 'Auto-Fabrication Blueprint Guidebook',
-    costs: {scrap_metal: 12, copper_wire: 10, brass_gears: 6, circuit_boards: 4, electronic_chips: 2},
+    requiresGuide: 'has_auto_fab_book_2',
+    guideName: 'Auto-Fabrication Schematic II',
+    costs: {license_t2: 1, scrap_metal: 8, copper_wire: 4, brass_gears: 4},
   },
+  auto_fabrication_t3: {
+    id: 'auto_fabrication_t3',
+    name: 'T3 Auto-Fabrication Module',
+    category: 'workbench',
+    durationSeconds: 70,
+    kw: 14,
+    description: 'Advanced automated production lane unit. Runs continuous crafting loop at 150% speed (1.5x workbench speed, 14 kW).',
+    icon: '🏭',
+    requiresGuide: 'has_auto_fab_book_3',
+    guideName: 'Auto-Fabrication Schematic III',
+    costs: {license_t3: 1, scrap_metal: 8, copper_wire: 5, brass_gears: 3, circuit_boards: 1},
+  },
+
+  // Legacy Arm
+  crafting_automaton: {
+    id: 'crafting_automaton',
+    name: 'Crafting Assembly Automaton',
+    category: 'workbench',
+    durationSeconds: 8,
+    description: 'Modular assembly arm for Workbench. When attached, adds +1 Queue Slot and +25% craft speed (3 kW).',
+    icon: '🤖',
+    costs: {scrap_metal: 3, copper_wire: 2, brass_gears: 1},
+  },
+
+  // Rover Chassis Upgrades
+  rover_chassis_t2: {
+    id: 'rover_chassis_t2',
+    name: 'T2 Surveyor Chassis Upgrade',
+    category: 'rover',
+    durationSeconds: 60,
+    description: 'Reinforces Rover chassis with surveyor brackets. Expands outfitting module capacity from 3 to 5 slots.',
+    icon: '🚜',
+    requiresGuide: 'has_rover_t2_blueprint',
+    guideName: 'Rover T2 Blueprint',
+    costs: {license_t2: 1, scrap_metal: 8, copper_wire: 4, brass_gears: 2, circuit_boards: 1},
+  },
+  rover_chassis_t3: {
+    id: 'rover_chassis_t3',
+    name: 'T3 Vanguard Heavy Chassis Upgrade',
+    category: 'rover',
+    durationSeconds: 240,
+    description: 'Masterwork titanium chassis structure with heavy power busbars. Expands outfitting module capacity to 10 slots.',
+    icon: '👑',
+    requiresGuide: 'has_rover_t3_blueprint',
+    guideName: 'Rover T3 Blueprint',
+    costs: {license_t3: 1, scrap_metal: 8, copper_wire: 6, brass_gears: 4, circuit_boards: 2, electronic_chips: 1},
+  },
+
+  // Rover Storage Modules
+  rover_storage_module_1: {
+    id: 'rover_storage_module_1',
+    name: 'T1 Storage Module',
+    category: 'rover',
+    durationSeconds: 12,
+    kw: 4,
+    description: 'Modular cargo bin outfitting (+2.5 kg). Consumes 4 kW when active.',
+    icon: '📦',
+    requiresGuide: 'has_storage_module_1_guide',
+    guideName: 'Storage Module I Guidebook',
+    costs: {license_t1: 1, scrap_metal: 8, copper_wire: 4},
+  },
+  rover_storage_module_2: {
+    id: 'rover_storage_module_2',
+    name: 'T2 Storage Module',
+    category: 'rover',
+    durationSeconds: 25,
+    kw: 7,
+    description: 'Reinforced pneumatic cargo module (+5.0 kg). Consumes 7 kW when active.',
+    icon: '📦',
+    requiresGuide: 'has_storage_module_2_guide',
+    guideName: 'Storage Module II Guidebook',
+    costs: {license_t2: 1, scrap_metal: 6, copper_wire: 3, brass_gears: 2},
+  },
+  rover_storage_module_3: {
+    id: 'rover_storage_module_3',
+    name: 'T3 Storage Module',
+    category: 'rover',
+    durationSeconds: 40,
+    kw: 10,
+    description: 'Titanium-alloy high-capacity cargo rack (+7.5 kg). Consumes 10 kW when active.',
+    icon: '🚜',
+    requiresGuide: 'has_storage_module_3_guide',
+    guideName: 'Storage Module III Guidebook',
+    costs: {license_t3: 1, scrap_metal: 8, copper_wire: 6, brass_gears: 3},
+  },
+
+  // Rover Battery Modules
+  rover_battery_module_1: {
+    id: 'rover_battery_module_1',
+    name: 'T1 Battery Module',
+    category: 'rover',
+    durationSeconds: 7,
+    kw: 3,
+    description: 'Auxiliary lead-acid battery cell (+25 kWh). Consumes 3 kW when active.',
+    icon: '🔋',
+    requiresGuide: 'has_battery_module_1_guide',
+    guideName: 'Battery Module I Guidebook',
+    costs: {license_t1: 1, scrap_metal: 6, copper_wire: 2},
+  },
+  rover_battery_module_2: {
+    id: 'rover_battery_module_2',
+    name: 'T2 Battery Module',
+    category: 'rover',
+    durationSeconds: 15,
+    kw: 5,
+    description: 'Reinforced nickel-iron regenerative battery pack (+50 kWh). Consumes 5 kW when active.',
+    icon: '⚡',
+    requiresGuide: 'has_battery_module_2_guide',
+    guideName: 'Battery Module II Guidebook',
+    costs: {license_t2: 1, scrap_metal: 6, copper_wire: 2, brass_gears: 1},
+  },
+  rover_battery_module_3: {
+    id: 'rover_battery_module_3',
+    name: 'T3 Battery Module',
+    category: 'rover',
+    durationSeconds: 25,
+    kw: 7,
+    description: 'Solid-state high-density lithium matrix (+75 kWh). Consumes 7 kW when active.',
+    icon: '✨',
+    requiresGuide: 'has_battery_module_3_guide',
+    guideName: 'Battery Module III Guidebook',
+    costs: {license_t3: 1, scrap_metal: 6, copper_wire: 3, brass_gears: 2},
+  },
+
+  // Rover Radar Modules
+  rover_radar_module_1: {
+    id: 'rover_radar_module_1',
+    name: 'T1 Radar Module',
+    category: 'rover',
+    durationSeconds: 15,
+    kw: 5,
+    description: 'Modular high-frequency scanner (+1 Step Vision). Consumes 5 kW when active.',
+    icon: '📡',
+    requiresGuide: 'has_radar_module_1_guide',
+    guideName: 'Radar Module I Guidebook',
+    costs: {license_t1: 1, scrap_metal: 6, copper_wire: 2, brass_gears: 1},
+  },
+  rover_radar_module_2: {
+    id: 'rover_radar_module_2',
+    name: 'T2 Radar Module',
+    category: 'rover',
+    durationSeconds: 32,
+    kw: 8,
+    description: 'Pulsed radar antenna array (+2 Steps Vision). Consumes 8 kW when active.',
+    icon: '📡',
+    requiresGuide: 'has_radar_module_2_guide',
+    guideName: 'Radar Module II Guidebook',
+    costs: {license_t2: 1, scrap_metal: 8, copper_wire: 5, brass_gears: 2},
+  },
+  rover_radar_module_3: {
+    id: 'rover_radar_module_3',
+    name: 'T3 Radar Module',
+    category: 'rover',
+    durationSeconds: 50,
+    kw: 12,
+    description: 'Quantum bio-resonance radar core (+3 Steps Vision). Consumes 12 kW when active.',
+    icon: '📡',
+    requiresGuide: 'has_radar_module_3_guide',
+    guideName: 'Radar Module III Guidebook',
+    costs: {license_t3: 1, scrap_metal: 12, copper_wire: 6, brass_gears: 4},
+  },
+
+  // Solar Generators
   solar_panel: {
     id: 'solar_panel',
     name: 'Solar Panel Generator (+3 kW)',
     category: 'electricity',
-    durationSeconds: 10,
-    description: 'Portable solar array. Deploy onto any open grid plot to generate 3 kW (+0.5 kW per adjacent solar panel). Can be dismantled anytime.',
+    durationSeconds: 7,
+    description: 'Portable solar array. Deploy onto any open grid plot to generate 3 kW (+0.5 kW per adjacent solar panel).',
     icon: '☀️',
-    costs: {scrap_metal: 4, copper_wire: 3},
+    costs: {scrap_metal: 6, copper_wire: 2},
   },
+  solar_farm_2x2: {
+    id: 'solar_farm_2x2',
+    name: 'Solar Panel Farm (2x2)',
+    category: 'electricity',
+    durationSeconds: 60,
+    description: 'Interconnected 2x2 cluster of 4 high-tech solar panels. Generates +24 kW (+1.0 kW per adjacent solar panel unit). Radiates Disrupted Zen 1 tile outwards unless fenced.',
+    icon: '☀️',
+    costs: {scrap_metal: 8, copper_wire: 4, brass_gears: 2, circuit_boards: 1},
+  },
+  solar_farm_3x3: {
+    id: 'solar_farm_3x3',
+    name: 'Big Solar Panel Farm (3x3)',
+    category: 'electricity',
+    durationSeconds: 240,
+    description: 'Interconnected 3x3 mega cluster of 9 high-tech solar panels. Generates +87 kW (+1.5 kW per adjacent solar panel unit). Radiates Disrupted Zen 1 tile outwards unless fenced.',
+    icon: '☀️',
+    costs: {scrap_metal: 8, copper_wire: 6, brass_gears: 4, circuit_boards: 2, electronic_chips: 1},
+  },
+
+  // Wind Turbines
   wind_turbine: {
     id: 'wind_turbine',
     name: 'Wind Turbine Generator (+6 kW)',
     category: 'electricity',
-    durationSeconds: 15,
-    description: 'Portable aero-helix turbine. Deploy onto any open grid plot to generate 6 kW (+1.0 kW per adjacent wind turbine). Can be dismantled anytime.',
+    durationSeconds: 17,
+    description: 'Portable aero-helix turbine. Deploy onto any open grid plot to generate 6 kW (+1.0 kW per adjacent wind turbine).',
     icon: '💨',
-    costs: {scrap_metal: 5, copper_wire: 2, brass_gears: 3},
+    costs: {scrap_metal: 6, copper_wire: 3, brass_gears: 1},
   },
+  wind_farm_2x2: {
+    id: 'wind_farm_2x2',
+    name: 'Wind Turbine Farm (2x2)',
+    category: 'electricity',
+    durationSeconds: 130,
+    description: 'Interconnected 2x2 cluster of 4 aero-helix turbines. Generates +42 kW (+1.5 kW per adjacent wind turbine unit). Radiates Disrupted Zen 1 tile outwards unless fenced.',
+    icon: '💨',
+    costs: {scrap_metal: 12, copper_wire: 6, brass_gears: 6, circuit_boards: 2},
+  },
+  wind_farm_3x3: {
+    id: 'wind_farm_3x3',
+    name: 'Big Wind Turbine Farm (3x3)',
+    category: 'electricity',
+    durationSeconds: 400,
+    description: 'Interconnected 3x3 mega cluster of 9 aero-helix turbines. Generates +134 kW (+2.0 kW per adjacent wind turbine unit). Radiates Disrupted Zen 1 tile outwards unless fenced.',
+    icon: '💨',
+    costs: {scrap_metal: 8, copper_wire: 6, brass_gears: 4, circuit_boards: 3, electronic_chips: 2},
+  },
+
+  // Resources
   craft_enriched_compost: {
     id: 'craft_enriched_compost',
     name: 'Enriched Compost',
@@ -746,149 +1113,6 @@ export const WORKBENCH_RECIPES: Record<CraftingRecipeId, CraftingRecipeDef> = {
     icon: '💎',
     costs: {circuit_boards: 4},
   },
-  rover_chassis_t2: {
-    id: 'rover_chassis_t2',
-    name: 'Surveyor Chassis (Tier 2 Upgrade)',
-    category: 'rover',
-    durationSeconds: 20,
-    description: 'Reinforces Rover chassis with surveyor brackets. Expands outfitting module capacity from 3 to 5 slots.',
-    icon: '🚜',
-    requiresGuide: 'has_rover_t2_blueprint',
-    guideName: 'Rover T2 Blueprint',
-    costs: {scrap_metal: 12, copper_wire: 8, brass_gears: 4},
-  },
-  rover_chassis_t3: {
-    id: 'rover_chassis_t3',
-    name: 'Vanguard Heavy Chassis (Tier 3 Upgrade)',
-    category: 'rover',
-    durationSeconds: 35,
-    description: 'Masterwork titanium chassis structure with heavy power busbars. Expands outfitting module capacity to 10 slots.',
-    icon: '👑',
-    requiresGuide: 'has_rover_t3_blueprint',
-    guideName: 'Rover T3 Blueprint',
-    costs: {scrap_metal: 24, copper_wire: 16, brass_gears: 8, circuit_boards: 4},
-  },
-  rover_storage_module_1: {
-    id: 'rover_storage_module_1',
-    name: 'Storage Module I (+2.5 kg)',
-    category: 'rover',
-    durationSeconds: 10,
-    description: 'Modular cargo bin outfitting. Expands Rover carrying capacity by +2.5 kg when attached.',
-    icon: '📦',
-    requiresGuide: 'has_storage_module_1_guide',
-    guideName: 'Storage Module I Guidebook',
-    costs: {scrap_metal: 6, copper_wire: 4},
-  },
-  rover_storage_module_2: {
-    id: 'rover_storage_module_2',
-    name: 'Storage Module II (+5.0 kg)',
-    category: 'rover',
-    durationSeconds: 16,
-    description: 'Reinforced pneumatic cargo module. Expands Rover carrying capacity by +5.0 kg when attached.',
-    icon: '📦',
-    requiresGuide: 'has_storage_module_2_guide',
-    guideName: 'Storage Module II Guidebook',
-    costs: {copper_wire: 10, brass_gears: 6},
-  },
-  rover_storage_module_3: {
-    id: 'rover_storage_module_3',
-    name: 'Storage Module III (+7.5 kg)',
-    category: 'rover',
-    durationSeconds: 24,
-    description: 'Titanium-alloy high-capacity cargo rack. Expands Rover carrying capacity by +7.5 kg when attached.',
-    icon: '🚜',
-    requiresGuide: 'has_storage_module_3_guide',
-    guideName: 'Storage Module III Guidebook',
-    costs: {brass_gears: 10, circuit_boards: 6},
-  },
-  rover_battery_module_1: {
-    id: 'rover_battery_module_1',
-    name: 'Battery Module I (+25 kWh)',
-    category: 'rover',
-    durationSeconds: 10,
-    description: 'Auxiliary lead-acid battery cell. Increases Rover battery energy by +25 kWh when attached.',
-    icon: '🔋',
-    requiresGuide: 'has_battery_module_1_guide',
-    guideName: 'Battery Module I Guidebook',
-    costs: {scrap_metal: 6, copper_wire: 6},
-  },
-  rover_battery_module_2: {
-    id: 'rover_battery_module_2',
-    name: 'Battery Module II (+50 kWh)',
-    category: 'rover',
-    durationSeconds: 16,
-    description: 'Reinforced nickel-iron regenerative battery pack. Increases Rover battery energy by +50 kWh when attached.',
-    icon: '⚡',
-    requiresGuide: 'has_battery_module_2_guide',
-    guideName: 'Battery Module II Guidebook',
-    costs: {copper_wire: 8, brass_gears: 6},
-  },
-  rover_battery_module_3: {
-    id: 'rover_battery_module_3',
-    name: 'Battery Module III (+75 kWh)',
-    category: 'rover',
-    durationSeconds: 24,
-    description: 'Solid-state high-density lithium matrix. Increases Rover battery energy by +75 kWh when attached.',
-    icon: '✨',
-    requiresGuide: 'has_battery_module_3_guide',
-    guideName: 'Battery Module III Guidebook',
-    costs: {brass_gears: 8, circuit_boards: 6},
-  },
-  rover_radar_module_1: {
-    id: 'rover_radar_module_1',
-    name: 'Radar Module I (+1 Step)',
-    category: 'rover',
-    durationSeconds: 10,
-    description: 'Modular high-frequency scanner. Expands expedition Fog of War vision by +1 step when attached (Radius 2 + 1 = 3).',
-    icon: '📡',
-    requiresGuide: 'has_radar_module_1_guide',
-    guideName: 'Radar Module I Guidebook',
-    costs: {scrap_metal: 6, copper_wire: 4},
-  },
-  rover_radar_module_2: {
-    id: 'rover_radar_module_2',
-    name: 'Radar Module II (+2 Steps)',
-    category: 'rover',
-    durationSeconds: 16,
-    description: 'Pulsed radar antenna array. Expands expedition Fog of War vision by +2 steps when attached (Radius 2 + 2 = 4).',
-    icon: '📡',
-    requiresGuide: 'has_radar_module_2_guide',
-    guideName: 'Radar Module II Guidebook',
-    costs: {copper_wire: 8, brass_gears: 4, circuit_boards: 1},
-  },
-  rover_radar_module_3: {
-    id: 'rover_radar_module_3',
-    name: 'Radar Module III (+3 Steps)',
-    category: 'rover',
-    durationSeconds: 24,
-    description: 'Quantum bio-resonance radar core. Expands expedition Fog of War vision by +3 steps when attached (Radius 2 + 3 = 5).',
-    icon: '📡',
-    requiresGuide: 'has_radar_module_3_guide',
-    guideName: 'Radar Module III Guidebook',
-    costs: {brass_gears: 8, circuit_boards: 4, electronic_chips: 1},
-  },
-  workbench_t2_upgrade: {
-    id: 'workbench_t2_upgrade',
-    name: 'Tier 2 Precision Workbench Upgrade',
-    category: 'workbench',
-    durationSeconds: 20,
-    description: 'Reinforces workbench frame with precision brass rails & dual conduit feeds. Expands automaton capacity from 3 to 5 units.',
-    icon: '🛠️',
-    requiresGuide: 'has_workbench_t2_guide',
-    guideName: 'T2 Precision Workbench Blueprint',
-    costs: {scrap_metal: 8, copper_wire: 6, brass_gears: 4, circuit_boards: 1},
-  },
-  workbench_t3_upgrade: {
-    id: 'workbench_t3_upgrade',
-    name: 'Tier 3 Master Foundry Upgrade',
-    category: 'workbench',
-    durationSeconds: 35,
-    description: 'Masterwork gilded forge & nanite assembly core. Expands automaton capacity from 5 to 10 units with majestic gold/brass styling.',
-    icon: '👑',
-    requiresGuide: 'has_workbench_t3_guide',
-    guideName: 'T3 Master Foundry Blueprint',
-    costs: {scrap_metal: 15, copper_wire: 10, brass_gears: 8, circuit_boards: 4, electronic_chips: 2},
-  },
 };
 
 export interface CraftingQueueItem {
@@ -918,44 +1142,44 @@ export interface AutomatonConfig {
 export const AUTOMATON_TIERS: Record<number, AutomatonConfig> = {
   1: {
     tier: 1,
-    name: 'Basic Mist Automaton',
+    name: 'T1 Hydration Sprinkler',
     speedMultiplier: 1.0,
-    kwDrain: 2,
-    description: 'Gentle mist nozzles water bonsai at 1.0x baseline speed.',
+    kwDrain: 4,
+    description: 'Gentle mist nozzles water bonsai at 1.0x baseline speed (4 kW).',
     cost: {
-      scrap_metal: 5,
+      scrap_metal: 8,
       copper_wire: 4,
-      brass_gears: 2,
+      brass_gears: 0,
       circuit_boards: 0,
       electronic_chips: 0,
     },
   },
   2: {
     tier: 2,
-    name: 'Advanced Pulsar Automaton',
+    name: 'T2 Hydration Sprinkler',
     speedMultiplier: 2.5,
-    kwDrain: 4,
-    description: 'Pressurized micro-pulsars water bonsai at 2.5x speed.',
+    kwDrain: 7,
+    description: 'Pressurized micro-pulsars water bonsai at 2.5x speed (7 kW).',
     cost: {
       scrap_metal: 6,
-      copper_wire: 4,
-      brass_gears: 3,
-      circuit_boards: 1,
+      copper_wire: 3,
+      brass_gears: 2,
+      circuit_boards: 0,
       electronic_chips: 0,
     },
   },
   3: {
     tier: 3,
-    name: 'Master Hydro-Automaton',
+    name: 'T3 Hydration Sprinkler',
     speedMultiplier: 5.0,
-    kwDrain: 7,
-    description: 'Supercharged hydro-nanite sprayers water bonsai at 5.0x ultra speed.',
+    kwDrain: 12,
+    description: 'Supercharged hydro-nanite sprayers water bonsai at 5.0x ultra speed (12 kW).',
     cost: {
       scrap_metal: 8,
-      copper_wire: 6,
-      brass_gears: 4,
-      circuit_boards: 2,
-      electronic_chips: 1,
+      copper_wire: 4,
+      brass_gears: 2,
+      circuit_boards: 1,
+      electronic_chips: 0,
     },
   },
 };
@@ -963,99 +1187,99 @@ export const AUTOMATON_TIERS: Record<number, AutomatonConfig> = {
 export const ROVER_MODULE_CONFIGS: Record<RoverModuleType, RoverModuleConfig> = {
   storage_1: {
     id: 'storage_1',
-    name: 'Storage Module I',
+    name: 'T1 Storage Module',
     category: 'storage',
     tier: 1,
     icon: '📦',
     bonusValue: 2.5,
     bonusLabel: '+2.5 kg Cargo',
-    description: 'Welded alloy cargo bin outfitting. Expands Rover carrying capacity by +2.5 kg.',
+    description: 'Modular cargo bin outfitting. Expands Rover carrying capacity by +2.5 kg (4 kW).',
   },
   storage_2: {
     id: 'storage_2',
-    name: 'Storage Module II',
+    name: 'T2 Storage Module',
     category: 'storage',
     tier: 2,
     icon: '📦',
     bonusValue: 5.0,
     bonusLabel: '+5.0 kg Cargo',
-    description: 'Reinforced pneumatic cargo module. Expands Rover carrying capacity by +5.0 kg.',
+    description: 'Reinforced pneumatic cargo module. Expands Rover carrying capacity by +5.0 kg (7 kW).',
   },
   storage_3: {
     id: 'storage_3',
-    name: 'Storage Module III',
+    name: 'T3 Storage Module',
     category: 'storage',
     tier: 3,
     icon: '🚜',
     bonusValue: 7.5,
     bonusLabel: '+7.5 kg Cargo',
-    description: 'Titanium-alloy high-capacity cargo rack. Expands Rover carrying capacity by +7.5 kg.',
+    description: 'Titanium-alloy high-capacity cargo rack. Expands Rover carrying capacity by +7.5 kg (10 kW).',
   },
   battery_1: {
     id: 'battery_1',
-    name: 'Battery Module I',
+    name: 'T1 Battery Module',
     category: 'battery',
     tier: 1,
     icon: '🔋',
     bonusValue: 25,
     bonusLabel: '+25 kWh Battery',
-    description: 'Auxiliary lead-acid battery cell. Increases Rover battery energy by +25 kWh.',
+    description: 'Auxiliary lead-acid battery cell. Increases Rover battery energy by +25 kWh (3 kW).',
   },
   battery_2: {
     id: 'battery_2',
-    name: 'Battery Module II',
+    name: 'T2 Battery Module',
     category: 'battery',
     tier: 2,
     icon: '⚡',
     bonusValue: 50,
     bonusLabel: '+50 kWh Battery',
-    description: 'Reinforced nickel-iron regenerative battery pack. Increases Rover battery energy by +50 kWh.',
+    description: 'Reinforced nickel-iron regenerative battery pack. Increases Rover battery energy by +50 kWh (5 kW).',
   },
   battery_3: {
     id: 'battery_3',
-    name: 'Battery Module III',
+    name: 'T3 Battery Module',
     category: 'battery',
     tier: 3,
     icon: '✨',
     bonusValue: 75,
     bonusLabel: '+75 kWh Battery',
-    description: 'Solid-state high-density lithium matrix. Increases Rover battery energy by +75 kWh.',
+    description: 'Solid-state high-density lithium matrix. Increases Rover battery energy by +75 kWh (7 kW).',
   },
   radar_1: {
     id: 'radar_1',
-    name: 'Radar Module I',
+    name: 'T1 Radar Module',
     category: 'radar',
     tier: 1,
     icon: '📡',
     bonusValue: 1,
     bonusLabel: '+1 Step Vision',
-    description: 'High-frequency radar scanner outfitting. Expands Rover Fog of War vision by +1 step when attached.',
+    description: 'High-frequency radar scanner outfitting. Expands Rover Fog of War vision by +1 step (5 kW).',
   },
   radar_2: {
     id: 'radar_2',
-    name: 'Radar Module II',
+    name: 'T2 Radar Module',
     category: 'radar',
     tier: 2,
     icon: '📡',
     bonusValue: 2,
     bonusLabel: '+2 Steps Vision',
-    description: 'Pulsed radar antenna array outfitting. Expands Rover Fog of War vision by +2 steps when attached.',
+    description: 'Pulsed radar antenna array outfitting. Expands Rover Fog of War vision by +2 steps (8 kW).',
   },
   radar_3: {
     id: 'radar_3',
-    name: 'Radar Module III',
+    name: 'T3 Radar Module',
     category: 'radar',
     tier: 3,
     icon: '📡',
     bonusValue: 3,
     bonusLabel: '+3 Steps Vision',
-    description: 'Quantum bio-resonance radar core outfitting. Expands Rover Fog of War vision by +3 steps when attached.',
+    description: 'Quantum bio-resonance radar core outfitting. Expands Rover Fog of War vision by +3 steps (12 kW).',
   },
 };
 
 export function getRoverChassisName(tier: RoverChassisTier): string {
-  if (tier === 3) return 'Vanguard Heavy Chassis';
-  if (tier === 2) return 'Surveyor Chassis';
+  if (tier === 3) return 'T3 Vanguard Heavy Chassis';
+  if (tier === 2) return 'T2 Surveyor Chassis';
   return 'Scout Chassis';
 }
 
@@ -1117,32 +1341,49 @@ export function QuickBonsaiRadialMenu({
 
         {/* UP QUADRANT: Quick Sell / Donate */}
         <button
+          disabled={bonsai.isFavorite}
           onClick={() => {
+            if (bonsai.isFavorite) {
+              gameAudio?.playErrorBuzz?.();
+              return;
+            }
             onSell(bonsai.id);
             onClose();
           }}
-          className={`absolute top-0 left-1/2 -translate-x-1/2 w-40 sm:w-48 py-2 sm:py-2.5 px-2 rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all flex flex-col items-center gap-0.5 group cursor-pointer ${
-            isEcoMatch
-              ? 'bg-gradient-to-b from-amber-900 via-emerald-950 to-slate-950 border-2 border-amber-300 ring-2 ring-emerald-400 shadow-[0_0_25px_rgba(250,204,21,0.6)] text-amber-100'
-              : 'bg-gradient-to-b from-amber-950 via-slate-900 to-slate-950 border-2 border-amber-400 text-amber-200'
+          className={`absolute top-0 left-1/2 -translate-x-1/2 w-40 sm:w-48 py-2 sm:py-2.5 px-2 rounded-2xl shadow-xl transition-all flex flex-col items-center gap-0.5 group ${
+            bonsai.isFavorite
+              ? 'bg-slate-950/90 border-2 border-slate-700 text-slate-500 opacity-75 cursor-not-allowed'
+              : isEcoMatch
+              ? 'bg-gradient-to-b from-amber-900 via-emerald-950 to-slate-950 border-2 border-amber-300 ring-2 ring-emerald-400 shadow-[0_0_25px_rgba(250,204,21,0.6)] text-amber-100 hover:scale-105 active:scale-95 cursor-pointer'
+              : 'bg-gradient-to-b from-amber-950 via-slate-900 to-slate-950 border-2 border-amber-400 text-amber-200 hover:scale-105 active:scale-95 cursor-pointer'
           }`}>
           <span className="text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1">
-            <span className={isEcoMatch ? 'text-amber-300 font-black' : 'text-amber-400'}>
+            <span className={bonsai.isFavorite ? 'text-slate-500' : isEcoMatch ? 'text-amber-300 font-black' : 'text-amber-400'}>
               ⬆ [W / ↑ / D-Pad Up]
             </span>
-            {isEcoMatch && (
+            {bonsai.isFavorite ? (
+              <span className="bg-amber-950/90 text-amber-300 border border-amber-500/50 px-1.5 py-0.2 rounded font-bold text-[8px] sm:text-[9px]">
+                ⭐ Locked (Favorited)
+              </span>
+            ) : isEcoMatch && (
               <span className="bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded font-black text-[8px] sm:text-[9px]">
                 🌟 2x Request Match!
               </span>
             )}
           </span>
-          <span className="text-xs sm:text-sm font-black text-amber-300 flex items-center gap-1">
-            <VerdureIcon className="w-3.5 h-3.5" />
-            <span>
-              {isEcoMatch
-                ? `Donate (🌟 2x Bonus: +${sellPrice.toFixed(2)} Verdure)`
-                : `Sell (+${sellPrice.toFixed(2)} Verdure)`}
-            </span>
+          <span className="text-xs sm:text-sm font-black flex items-center gap-1">
+            {bonsai.isFavorite ? (
+              <span className="text-amber-300/80">Locked from Donation</span>
+            ) : (
+              <>
+                <VerdureIcon className="w-3.5 h-3.5" />
+                <span className={isEcoMatch ? 'text-amber-300' : 'text-amber-200'}>
+                  {isEcoMatch
+                    ? `Donate (🌟 2x Bonus: +${sellPrice.toFixed(2)} Verdure)`
+                    : `Sell (+${sellPrice.toFixed(2)} Verdure)`}
+                </span>
+              </>
+            )}
           </span>
         </button>
 
@@ -1620,6 +1861,13 @@ function CodexMaturityBox({
   );
 }
 
+export function formatCraftDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s > 0 ? `${seconds}s (${m}m ${s}s)` : `${seconds}s (${m}m)`;
+}
+
 export function getAutomatonConfig(tier?: number): AutomatonConfig | undefined {
   if (!tier || tier <= 0) return undefined;
   return AUTOMATON_TIERS[tier];
@@ -1669,6 +1917,9 @@ export interface PlantedBonsai {
   attributes?: BonsaiAttributes;
   cultivationPotential?: CultivationPotential;
   baseAesthetic?: number;
+  basePriceBonus?: number;
+  lastLevelUpTime?: number;
+  isFavorite?: boolean;
 }
 
 export interface StoredPottedBonsai {
@@ -1694,6 +1945,8 @@ export interface StoredPottedBonsai {
   cultivationPotential?: CultivationPotential;
   width?: number;
   height?: number;
+  basePriceBonus?: number;
+  isFavorite?: boolean;
 }
 
 export interface StoredSapling {
@@ -1720,6 +1973,12 @@ export interface StoredSapling {
 export interface SanctuaryInventory {
   [key: string]: any;
   coins: number;
+  license_t1: number;
+  license_t2: number;
+  license_t3: number;
+  licenseT1: number;
+  licenseT2: number;
+  licenseT3: number;
   player_level: number;
   player_exp: number;
   scrap_metal: number;
@@ -1739,17 +1998,40 @@ export interface SanctuaryInventory {
   has_tier2_guide: boolean;
   has_tier3_guide: boolean;
   has_auto_fabricator_guide: boolean;
+  has_auto_fab_book_1: boolean;
+  has_auto_fab_book_2: boolean;
+  has_auto_fab_book_3: boolean;
   has_workbench_t2_guide: boolean;
   has_workbench_t3_guide: boolean;
+  has_assembly_blueprint_1: boolean;
+  has_assembly_blueprint_2: boolean;
+  has_assembly_blueprint_3: boolean;
+  has_overclock_schematic_1: boolean;
+  has_overclock_schematic_2: boolean;
+  has_overclock_schematic_3: boolean;
   workbench_tier: 1 | 2 | 3;
   crafting_automatons_inv: number; // uninstalled portable items in inventory
+  assembly_module_t1_inv: number;
+  assembly_module_t2_inv: number;
+  assembly_module_t3_inv: number;
+  overclock_module_t1_inv: number;
+  overclock_module_t2_inv: number;
+  overclock_module_t3_inv: number;
+  attached_workbench_modules: WorkbenchModuleType[];
   auto_fabricators_inv: number;    // uninstalled portable items in inventory
+  auto_fabrication_t1_inv: number;
+  auto_fabrication_t2_inv: number;
+  auto_fabrication_t3_inv: number;
   solar_panels_inv: number;        // portable deployables in inventory
   solar_panel_inv?: number;
   solarPanels?: number;
+  solar_farm_2x2_inv?: number;
+  solar_farm_3x3_inv?: number;
   wind_turbines_inv: number;       // portable deployables in inventory
   wind_turbine_inv?: number;
   windTurbines?: number;
+  wind_farm_2x2_inv?: number;
+  wind_farm_3x3_inv?: number;
   decor_pebble_path_inv: number;   // decorative deployables
   decor_rock_formation_inv: number;
   zen_rock_formation_inv?: number;
@@ -1759,6 +2041,8 @@ export interface SanctuaryInventory {
   decor_woven_wall_inv: number;
   water_feature_inv?: number;
   bamboo_fence_inv?: number;
+  seven_lucky_gods_inv?: number;
+  stone_lantern_inv?: number;
   torii_gate_inv?: number;
   crystal_pedestal_foliage_inv: number;
   crystal_pedestal_branches_inv: number;
@@ -1779,6 +2063,10 @@ export interface SanctuaryInventory {
     wovenWall: number;
     waterFeature?: number;
     bambooFence?: number;
+    sevenLuckyGods?: number;
+    seven_lucky_gods?: number;
+    stoneLantern?: number;
+    stone_lantern?: number;
     toriiGate?: number;
     torii_gate?: number;
     [key: string]: any;
@@ -1820,8 +2108,14 @@ export interface SanctuaryInventory {
 
 export function getInventoryStructureKey(type: DeployedStructureType): string {
   if (type === 'solar_panel') return 'solar_panels_inv';
+  if (type === 'solar_farm_2x2') return 'solar_farm_2x2_inv';
+  if (type === 'solar_farm_3x3') return 'solar_farm_3x3_inv';
   if (type === 'wind_turbine') return 'wind_turbines_inv';
+  if (type === 'wind_farm_2x2') return 'wind_farm_2x2_inv';
+  if (type === 'wind_farm_3x3') return 'wind_farm_3x3_inv';
   if (type === 'torii_gate') return 'torii_gate_inv';
+  if (type === 'seven_lucky_gods') return 'seven_lucky_gods_inv';
+  if (type === 'stone_lantern') return 'stone_lantern_inv';
   if (type === 'automaton_t1') return 'automaton_t1_inv';
   if (type === 'automaton_t2') return 'automaton_t2_inv';
   if (type === 'automaton_t3') return 'automaton_t3_inv';
@@ -1839,8 +2133,20 @@ export function getStructureInventoryCount(inv: SanctuaryInventory, type: Deploy
   if (type === 'solar_panel') {
     return inv.solar_panels_inv ?? inv.solar_panel_inv ?? inv.solarPanels ?? 0;
   }
+  if (type === 'solar_farm_2x2') {
+    return inv.solar_farm_2x2_inv ?? inv.infrastructure?.['solar_farm_2x2'] ?? inv.deployables?.['solar_farm_2x2'] ?? 0;
+  }
+  if (type === 'solar_farm_3x3') {
+    return inv.solar_farm_3x3_inv ?? inv.infrastructure?.['solar_farm_3x3'] ?? inv.deployables?.['solar_farm_3x3'] ?? 0;
+  }
   if (type === 'wind_turbine') {
     return inv.wind_turbines_inv ?? inv.wind_turbine_inv ?? inv.windTurbines ?? 0;
+  }
+  if (type === 'wind_farm_2x2') {
+    return inv.wind_farm_2x2_inv ?? inv.infrastructure?.['wind_farm_2x2'] ?? inv.deployables?.['wind_farm_2x2'] ?? 0;
+  }
+  if (type === 'wind_farm_3x3') {
+    return inv.wind_farm_3x3_inv ?? inv.infrastructure?.['wind_farm_3x3'] ?? inv.deployables?.['wind_farm_3x3'] ?? 0;
   }
   if (type === 'tool_compost_heap') {
     return inv.tool_compost_heap_inv ?? inv.tools?.compostHeap ?? 0;
@@ -1853,6 +2159,22 @@ export function getStructureInventoryCount(inv: SanctuaryInventory, type: Deploy
   }
   if (type === 'torii_gate') {
     return inv.torii_gate_inv ?? inv.decorations?.toriiGate ?? inv.decorations?.['torii_gate'] ?? 0;
+  }
+  if (type === 'seven_lucky_gods') {
+    return (
+      inv.seven_lucky_gods_inv ??
+      inv.decorations?.['seven_lucky_gods'] ??
+      inv.decorations?.sevenLuckyGods ??
+      0
+    );
+  }
+  if (type === 'stone_lantern') {
+    return (
+      inv.stone_lantern_inv ??
+      inv.decorations?.['stone_lantern'] ??
+      inv.decorations?.stoneLantern ??
+      0
+    );
   }
   if (type === 'automaton_t1') {
     return inv.automaton_t1_inv ?? inv.automatons_tier1 ?? 0;
@@ -2536,15 +2858,21 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
   {
     id: 'auto_workbench_arms',
     category: 'AUTOMATION',
-    title: 'Modular Assembly Arm',
-    subtitle: 'Install 2+ Crafting Assembly Arms on Workbench',
-    description: 'Upgrade workbench throughput with modular automated robotic assembly arms.',
+    title: 'Modular Workbench Modules',
+    subtitle: 'Install 2+ Modules on Workbench',
+    description: 'Upgrade workbench throughput with modular automated assembly or overclock modules.',
     icon: '🤖',
     rewardZen: 2,
     targetValue: 2,
-    unit: 'Arms',
-    currentValue: (stats, planted, stored, disc, inv, deployed, arms) => arms || 0,
-    isUnlocked: (stats, planted, stored, disc, inv, deployed, arms) => (arms || 0) >= 2,
+    unit: 'Modules',
+    currentValue: (stats, planted, stored, disc, inv, deployed, arms) => {
+      const attached = inv?.attached_workbench_modules?.length || 0;
+      return (arms || 0) + attached;
+    },
+    isUnlocked: (stats, planted, stored, disc, inv, deployed, arms) => {
+      const attached = inv?.attached_workbench_modules?.length || 0;
+      return ((arms || 0) + attached) >= 2;
+    },
   },
 
   // ==========================================
@@ -2876,55 +3204,394 @@ export const POWER_METRICS = {
 };
 
 /**
- * Count how many matching structures are in a structure's surrounding 3x3 neighboring plots.
+ * Returns constituent grid plot coordinates occupied by a deployed structure.
+ * Handles 1x1, 2x2 farms, 3x3 farms, and multi-tile items.
  */
+export function getStructureConstituentPlots(struct: DeployedStructure): { col: number; row: number }[] {
+  const is2x2 = struct.type === 'solar_farm_2x2' || struct.type === 'wind_farm_2x2';
+  const is3x3 = struct.type === 'solar_farm_3x3' || struct.type === 'wind_farm_3x3';
+  const width = is3x3 ? 3 : is2x2 ? 2 : (struct.width || 1);
+  const height = is3x3 ? 3 : is2x2 ? 2 : (struct.height || 1);
+
+  let baseCol = struct.col;
+  let baseRow = struct.row;
+
+  if (baseCol === undefined || baseRow === undefined) {
+    if (is2x2) {
+      baseCol = Math.round((struct.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW - 0.5);
+      baseRow = Math.round((struct.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH - 0.5);
+    } else if (is3x3) {
+      baseCol = Math.round((struct.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW - 1);
+      baseRow = Math.round((struct.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH - 1);
+    } else {
+      baseCol = Math.round((struct.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
+      baseRow = Math.round((struct.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+    }
+  }
+
+  const plots: { col: number; row: number }[] = [];
+  for (let dc = 0; dc < width; dc++) {
+    for (let dr = 0; dr < height; dr++) {
+      plots.push({ col: baseCol + dc, row: baseRow + dr });
+    }
+  }
+  return plots;
+}
+
+/**
+ * Calculates adjacent energy units for synergy bonuses.
+ * Each constituent plot of a 2x2 or 3x3 farm counts as an individual unit.
+ * Respects fence containment barriers!
+ */
+export function countAdjacentEnergyUnits(
+  struct: DeployedStructure,
+  structures: DeployedStructure[],
+  category: 'solar' | 'wind',
+): number {
+  const isTargetCategory = (type: DeployedStructureType) => {
+    if (category === 'solar') {
+      return type === 'solar_panel' || type === 'solar_farm_2x2' || type === 'solar_farm_3x3';
+    } else {
+      return type === 'wind_turbine' || type === 'wind_farm_2x2' || type === 'wind_farm_3x3';
+    }
+  };
+
+  const myPlots = getStructureConstituentPlots(struct);
+  const fenceSet = new Set<string>();
+  structures.forEach((s) => {
+    if (s.type === 'bamboo_fence' && s.edgeKey) {
+      fenceSet.add(s.edgeKey);
+    }
+  });
+
+  let adjacentUnitsCount = 0;
+  structures.forEach((other) => {
+    if (other.id === struct.id) return;
+    if (!isTargetCategory(other.type)) return;
+    const otherPlots = getStructureConstituentPlots(other);
+
+    otherPlots.forEach((op) => {
+      let isAdjacentToMe = false;
+      for (const mp of myPlots) {
+        if (Math.abs(op.col - mp.col) <= 1 && Math.abs(op.row - mp.row) <= 1) {
+          if (!isHaloBlockedByFence(mp.col, mp.row, op.col, op.row, fenceSet)) {
+            isAdjacentToMe = true;
+            break;
+          }
+        }
+      }
+      if (isAdjacentToMe) {
+        adjacentUnitsCount++;
+      }
+    });
+  });
+
+  return adjacentUnitsCount;
+}
+
 export function countAdjacentMatching(
   struct: DeployedStructure,
   structures: DeployedStructure[],
   targetType: DeployedStructureType,
 ): number {
-  const c1 = Math.round((struct.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-  const r1 = Math.round((struct.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
-  let count = 0;
-  structures.forEach((other) => {
-    if (other.id === struct.id) return;
-    if (other.type !== targetType) return;
-    const c2 = Math.round((other.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-    const r2 = Math.round((other.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
-    if (Math.abs(c1 - c2) <= 1 && Math.abs(r1 - r2) <= 1) {
-      count++;
-    }
-  });
-  return count;
+  const isSolar = targetType.startsWith('solar');
+  return countAdjacentEnergyUnits(struct, structures, isSolar ? 'solar' : 'wind');
 }
 
-/**
- * Check if a deployed structure has at least one other matching structure
- * in any of its 8 surrounding neighboring grid plots (3x3 area).
- */
 export function checkAdjacentGenerator(
   struct: DeployedStructure,
   structures: DeployedStructure[],
   targetType: DeployedStructureType,
 ): boolean {
-  return countAdjacentMatching(struct, structures, targetType) > 0;
+  const isSolar = targetType.startsWith('solar');
+  return countAdjacentEnergyUnits(struct, structures, isSolar ? 'solar' : 'wind') > 0;
 }
 
 /**
- * Clean Energy Output with Stackable Proximity Resonance:
- * Solar: 3 kW base + 0.5 kW per adjacent Solar Panel in 3x3 zone.
- * Wind: 6 kW base + 1.0 kW per adjacent Wind Turbine in 3x3 zone.
+ * Solar Power Output with Stackable Proximity Resonance:
+ * - 1x1 Panel: +3 kW base (+0.5 kW per adjacent solar panel unit).
+ * - 2x2 Farm: +24 kW base (+1.0 kW per adjacent solar panel unit).
+ * - 3x3 Farm: +87 kW base (+1.5 kW per adjacent solar panel unit).
  */
+export function getSolarStructureOutput(
+  struct: DeployedStructure,
+  structures: DeployedStructure[],
+): { base: number; resonance: number; total: number; count: number } {
+  const count = countAdjacentEnergyUnits(struct, structures, 'solar');
+  let base = 3;
+  let bonusRate = 0.5;
+
+  if (struct.type === 'solar_farm_2x2') {
+    base = 24;
+    bonusRate = 1.0;
+  } else if (struct.type === 'solar_farm_3x3') {
+    base = 87;
+    bonusRate = 1.5;
+  }
+
+  const resonance = count * bonusRate;
+  return { base, resonance, total: base + resonance, count };
+}
+
 export function getSolarPanelOutput(struct: DeployedStructure, structures: DeployedStructure[]) {
-  const count = countAdjacentMatching(struct, structures, 'solar_panel');
-  const resonance = count * 0.5;
-  return {base: 3, resonance, total: 3 + resonance, count};
+  return getSolarStructureOutput(struct, structures);
+}
+
+/**
+ * Wind Power Output with Stackable Proximity Resonance:
+ * - 1x1 Turbine: +6 kW base (+1.0 kW per adjacent wind turbine unit).
+ * - 2x2 Farm: +42 kW base (+1.5 kW per adjacent wind turbine unit).
+ * - 3x3 Farm: +134 kW base (+2.0 kW per adjacent wind turbine unit).
+ */
+export function getWindStructureOutput(
+  struct: DeployedStructure,
+  structures: DeployedStructure[],
+): { base: number; resonance: number; total: number; count: number } {
+  const count = countAdjacentEnergyUnits(struct, structures, 'wind');
+  let base = 6;
+  let bonusRate = 1.0;
+
+  if (struct.type === 'wind_farm_2x2') {
+    base = 42;
+    bonusRate = 1.5;
+  } else if (struct.type === 'wind_farm_3x3') {
+    base = 134;
+    bonusRate = 2.0;
+  }
+
+  const resonance = count * bonusRate;
+  return { base, resonance, total: base + resonance, count };
 }
 
 export function getWindTurbineOutput(struct: DeployedStructure, structures: DeployedStructure[]) {
-  const count = countAdjacentMatching(struct, structures, 'wind_turbine');
-  const resonance = count * 1.0;
-  return {base: 6, resonance, total: 6 + resonance, count};
+  return getWindStructureOutput(struct, structures);
+}
+
+export function hasEdgeFence(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  fenceSet: Set<string>,
+): boolean {
+  if (x1 === x2) {
+    const minY = Math.min(y1, y2);
+    const maxY = Math.max(y1, y2);
+    if (maxY - minY === 1) {
+      return fenceSet.has(`H_${x1}_${maxY}`);
+    }
+  } else if (y1 === y2) {
+    const minX = Math.min(x1, x2);
+    const maxX = Math.max(x1, x2);
+    if (maxX - minX === 1) {
+      return fenceSet.has(`V_${maxX}_${y1}`);
+    }
+  }
+  return false;
+}
+
+export function isFarmDisruptedPlotBlocked(
+  minX: number,
+  maxX: number,
+  minY: number,
+  maxY: number,
+  nx: number,
+  ny: number,
+  fenceSet: Set<string>,
+): boolean {
+  // Pure left neighbor
+  if (nx < minX && ny >= minY && ny <= maxY) {
+    return fenceSet.has(`V_${minX}_${ny}`);
+  }
+  // Pure right neighbor
+  if (nx > maxX && ny >= minY && ny <= maxY) {
+    return fenceSet.has(`V_${maxX + 1}_${ny}`);
+  }
+  // Pure top neighbor
+  if (ny < minY && nx >= minX && nx <= maxX) {
+    return fenceSet.has(`H_${nx}_${minY}`);
+  }
+  // Pure bottom neighbor
+  if (ny > maxY && nx >= minX && nx <= maxX) {
+    return fenceSet.has(`H_${nx}_${maxY + 1}`);
+  }
+
+  // Diagonal Corners:
+  // Top-Left (nx < minX && ny < minY)
+  if (nx < minX && ny < minY) {
+    return (
+      (fenceSet.has(`V_${minX}_${minY}`) || fenceSet.has(`H_${nx}_${minY}`)) &&
+      (fenceSet.has(`H_${minX}_${minY}`) || fenceSet.has(`V_${minX}_${ny}`))
+    );
+  }
+
+  // Top-Right (nx > maxX && ny < minY)
+  if (nx > maxX && ny < minY) {
+    return (
+      (fenceSet.has(`V_${maxX + 1}_${minY}`) || fenceSet.has(`H_${nx}_${minY}`)) &&
+      (fenceSet.has(`H_${maxX}_${minY}`) || fenceSet.has(`V_${maxX + 1}_${ny}`))
+    );
+  }
+
+  // Bottom-Left (nx < minX && ny > maxY)
+  if (nx < minX && ny > maxY) {
+    return (
+      (fenceSet.has(`V_${minX}_${maxY}`) || fenceSet.has(`H_${nx}_${maxY + 1}`)) &&
+      (fenceSet.has(`H_${minX}_${maxY + 1}`) || fenceSet.has(`V_${minX}_${ny}`))
+    );
+  }
+
+  // Bottom-Right (nx > maxX && ny > maxY)
+  if (nx > maxX && ny > maxY) {
+    return (
+      (fenceSet.has(`V_${maxX + 1}_${maxY}`) || fenceSet.has(`H_${nx}_${maxY + 1}`)) &&
+      (fenceSet.has(`H_${maxX}_${maxY + 1}`) || fenceSet.has(`V_${maxX + 1}_${ny}`))
+    );
+  }
+
+  return false;
+}
+
+/**
+ * Returns set of plot keys ('col,row') that suffer from or emit Disrupted Zen:
+ * - 1x1 Solar Panel, Wind Turbine, Compost Heap, Fertilizer Station: own plot only.
+ * - 2x2 and 3x3 Farms: own core plots plus 1-tile outer perimeter (unless edge-fenced).
+ * 
+ * Strict Edge-Containment Physics:
+ * For any candidate plot C in the 1-tile outer perimeter of an industrial farm (2x2 / 3x3) to be cleared
+ * and return to normal green turf, EVERY single edge that C shares with ANY Disrupted Zen plot MUST be sealed with a fence.
+ * If C shares an edge with any Disrupted Zen plot and there is NO fence between them, contamination bleeds across and C becomes Disrupted Zen.
+ */
+export function getDisruptedZenPlots(
+  structures: DeployedStructure[],
+  cols = SANCTUARY_GRID.cols,
+  rows = SANCTUARY_GRID.rows,
+): Set<string> {
+  const fenceSet = new Set<string>();
+  structures.forEach((s) => {
+    if (s.type === 'bamboo_fence' && s.edgeKey) {
+      fenceSet.add(s.edgeKey);
+    }
+  });
+
+  const coreDisrupted = new Set<string>();
+  const candidatePerimeterPlots = new Set<string>();
+
+  structures.forEach((s) => {
+    const isSingleEmitter =
+      s.type === 'solar_panel' ||
+      s.type === 'wind_turbine' ||
+      s.type === 'tool_compost_heap' ||
+      s.type === 'fertilizer_station';
+    const is2x2Farm = s.type === 'solar_farm_2x2' || s.type === 'wind_farm_2x2';
+    const is3x3Farm = s.type === 'solar_farm_3x3' || s.type === 'wind_farm_3x3';
+
+    if (isSingleEmitter) {
+      // 1x1 items ONLY mark their own plot right below them; surrounding plots remain lush green!
+      const sc = s.col ?? Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
+      const sr = s.row ?? Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+      if (sc >= 0 && sc < cols && sr >= 0 && sr < rows) {
+        coreDisrupted.add(`${sc},${sr}`);
+      }
+    } else if (is2x2Farm) {
+      const sc = s.col ?? Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW - 0.5);
+      const sr = s.row ?? Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH - 0.5);
+      const minX = sc;
+      const maxX = sc + 1;
+      const minY = sr;
+      const maxY = sr + 1;
+
+      // The interior plots of the farm are ALWAYS Disrupted Zen
+      for (let dc = 0; dc <= 1; dc++) {
+        for (let dr = 0; dr <= 1; dr++) {
+          const c = sc + dc;
+          const r = sr + dr;
+          if (c >= 0 && c < cols && r >= 0 && r < rows) {
+            coreDisrupted.add(`${c},${r}`);
+          }
+        }
+      }
+
+      // Outer 1-tile perimeter (affects unlocked AND locked tiles unless fenced)
+      for (let c = minX - 1; c <= maxX + 1; c++) {
+        for (let r = minY - 1; r <= maxY + 1; r++) {
+          if (c >= 0 && c < cols && r >= 0 && r < rows) {
+            if (c >= minX && c <= maxX && r >= minY && r <= maxY) continue;
+            candidatePerimeterPlots.add(`${c},${r}`);
+          }
+        }
+      }
+    } else if (is3x3Farm) {
+      const sc = s.col ?? Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW - 1);
+      const sr = s.row ?? Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH - 1);
+      const minX = sc;
+      const maxX = sc + 2;
+      const minY = sr;
+      const maxY = sr + 2;
+
+      // The interior plots of the farm are ALWAYS Disrupted Zen
+      for (let dc = 0; dc <= 2; dc++) {
+        for (let dr = 0; dr <= 2; dr++) {
+          const c = sc + dc;
+          const r = sr + dr;
+          if (c >= 0 && c < cols && r >= 0 && r < rows) {
+            coreDisrupted.add(`${c},${r}`);
+          }
+        }
+      }
+
+      // Outer 1-tile perimeter (affects unlocked AND locked tiles unless fenced)
+      for (let c = minX - 1; c <= maxX + 1; c++) {
+        for (let r = minY - 1; r <= maxY + 1; r++) {
+          if (c >= 0 && c < cols && r >= 0 && r < rows) {
+            if (c >= minX && c <= maxX && r >= minY && r <= maxY) continue;
+            candidatePerimeterPlots.add(`${c},${r}`);
+          }
+        }
+      }
+    }
+  });
+
+  // Candidate plots that are already in coreDisrupted are permanently disrupted
+  coreDisrupted.forEach((key) => {
+    candidatePerimeterPlots.delete(key);
+  });
+
+  const disrupted = new Set<string>(coreDisrupted);
+  const queue: { c: number; r: number }[] = [];
+
+  coreDisrupted.forEach((key) => {
+    const [cStr, rStr] = key.split(',');
+    queue.push({ c: Number(cStr), r: Number(rStr) });
+  });
+
+  // BFS propagation: any candidate perimeter plot C with an unsealed edge to ANY Disrupted Zen plot gets contaminated
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    const neighbors = [
+      { c: cur.c, r: cur.r - 1 }, // Up
+      { c: cur.c, r: cur.r + 1 }, // Down
+      { c: cur.c - 1, r: cur.r }, // Left
+      { c: cur.c + 1, r: cur.r }, // Right
+    ];
+
+    for (const nb of neighbors) {
+      if (nb.c < 0 || nb.c >= cols || nb.r < 0 || nb.r >= rows) continue;
+      const key = `${nb.c},${nb.r}`;
+
+      // Contamination only attempts to spread into candidate perimeter plots
+      if (!candidatePerimeterPlots.has(key)) continue;
+      if (disrupted.has(key)) continue;
+
+      // If no fence between cur and nb, contamination bleeds across
+      if (!hasEdgeFence(cur.c, cur.r, nb.c, nb.r, fenceSet)) {
+        disrupted.add(key);
+        queue.push(nb);
+      }
+    }
+  }
+
+  return disrupted;
 }
 
 export interface BonsaiSynergies {
@@ -2933,6 +3600,12 @@ export interface BonsaiSynergies {
   rockCount: number;
   bambooCount: number;
   fernBallCount: number;
+  sevenLuckyGodsCount: number;
+  stoneLanternCount: number;
+  hasToriiGate: boolean;
+  haloMultiplier: number;
+  basePriceBonusRate: number;
+  zenPointChance: number;
   bushCount: number;
   decorCount: number;
   pebbleCount: number;
@@ -2942,10 +3615,15 @@ export interface BonsaiSynergies {
   hasAdjacentRock: boolean;
   hasAdjacentBamboo: boolean;
   hasAdjacentFernBall: boolean;
+  hasAdjacentSevenLuckyGods: boolean;
+  hasAdjacentStoneLantern: boolean;
   hasAdjacentBush: boolean;
   hasAdjacentDecor: boolean;
   hasAdjacentPebbles: boolean;
   hasAdjacentEnergy: boolean;
+  isDisruptedZen: boolean;
+  totalDisruptedZenPenalty: number;
+  degradedTileCount: number;
   growthMultiplier: number;
   expMultiplier: number;
   quickPruneBonus: number;
@@ -2956,6 +3634,7 @@ export interface BonsaiSynergies {
   stalledEntityLabel?: string;
   stalledEntityKey?: string;
   maxIdenticalCount: number;
+  isOnDisruptedZenGround?: boolean;
   crystalPedestals?: {
     foliage: number;
     branches: number;
@@ -2971,6 +3650,12 @@ export const DEFAULT_BONSAI_SYNERGIES: BonsaiSynergies = {
   rockCount: 0,
   bambooCount: 0,
   fernBallCount: 0,
+  sevenLuckyGodsCount: 0,
+  stoneLanternCount: 0,
+  hasToriiGate: false,
+  haloMultiplier: 1,
+  basePriceBonusRate: 0,
+  zenPointChance: 0,
   bushCount: 0,
   decorCount: 0,
   pebbleCount: 0,
@@ -2980,10 +3665,15 @@ export const DEFAULT_BONSAI_SYNERGIES: BonsaiSynergies = {
   hasAdjacentRock: false,
   hasAdjacentBamboo: false,
   hasAdjacentFernBall: false,
+  hasAdjacentSevenLuckyGods: false,
+  hasAdjacentStoneLantern: false,
   hasAdjacentBush: false,
   hasAdjacentDecor: false,
   hasAdjacentPebbles: false,
   hasAdjacentEnergy: false,
+  isDisruptedZen: false,
+  totalDisruptedZenPenalty: 0,
+  degradedTileCount: 0,
   growthMultiplier: 1,
   expMultiplier: 1,
   quickPruneBonus: 0,
@@ -2992,6 +3682,7 @@ export const DEFAULT_BONSAI_SYNERGIES: BonsaiSynergies = {
   privateGrowingBonus: 0,
   isStalled: false,
   maxIdenticalCount: 0,
+  isOnDisruptedZenGround: false,
 };
 
 export function getFenceEdgeGeometry(
@@ -3053,7 +3744,7 @@ export function getFenceEdgeGeometry(
  * 🎋 "Quick Prune": Each neighboring Growing Bamboo Formation in halo grants +0.25s Pruning Effect to manual care (stackable)
  * 🪴 "Efficient Pruning": Each neighboring Asparagus Fern Ball in halo grants +15% Chance for Extra Organic Waste on Level Up (stackable)
  * 🔮 "Cultivating Potential": Pedestals in halo provide +1 Cultivation Potential per level to their corresponding attribute
- * ⚠️ "Disrupted Zen": Each neighboring Solar/Turbine in halo inflicts -10% Growth Speed penalty (stackable)
+ * ⚠️ "Disrupted Zen": Neighboring industrial generator in halo or standing on disrupted soil inflicts -10% Growth Speed penalty.
  * ⛔ "Stalling Surroundings": 5 or more adjacent identical entities triggers Total Growth Stagnation (0% Growth Rate).
  * 🎋 "Bamboo Fence": Physically separates and blocks halo connections across borders!
  */
@@ -3120,6 +3811,9 @@ export function getBonsaiSynergies(
   let rockCount = 0;
   let bambooCount = 0;
   let fernBallCount = 0;
+  let sevenLuckyGodsCount = 0;
+  let stoneLanternCount = 0;
+  let toriiCount = 0;
   let energyCount = 0;
   const crystalPedestals = {
     foliage: 0,
@@ -3131,6 +3825,8 @@ export function getBonsaiSynergies(
 
   const countsByType: Record<string, number> = {};
   countsByType['bonsai'] = bonsaiCount;
+
+  const disruptedPlots = getDisruptedZenPlots(structures, SANCTUARY_GRID.cols, SANCTUARY_GRID.rows);
 
   structures.forEach((s) => {
     if (s.type === 'bamboo_fence') {
@@ -3162,6 +3858,14 @@ export function getBonsaiSynergies(
       if (s.type === 'decor_pebble_path') {
         // Zen Pebble Path is purely a pathway/flooring
         return;
+      } else if (s.type === 'torii_gate') {
+        toriiCount++;
+      } else if (s.type === 'seven_lucky_gods') {
+        sevenLuckyGodsCount++;
+        countsByType['seven_lucky_gods'] = (countsByType['seven_lucky_gods'] || 0) + 1;
+      } else if (s.type === 'stone_lantern') {
+        stoneLanternCount++;
+        countsByType['stone_lantern'] = (countsByType['stone_lantern'] || 0) + 1;
       } else if (s.type.startsWith('crystal_pedestal') || s.type === 'empty_crystal_pedestal') {
         countsByType['crystal_pedestal'] = (countsByType['crystal_pedestal'] || 0) + 1;
         if (s.socketedCrystal) {
@@ -3201,12 +3905,81 @@ export function getBonsaiSynergies(
           bambooCount++;
         } else if (typeKey === 'asparagus_fern_ball') {
           fernBallCount++;
-        } else if (s.type === 'solar_panel' || s.type === 'wind_turbine') {
+        } else if (
+          s.type === 'solar_panel' ||
+          s.type === 'wind_turbine' ||
+          s.type === 'tool_compost_heap' ||
+          s.type === 'fertilizer_station'
+        ) {
           energyCount++;
         }
       }
+    } else if (s.type === 'solar_farm_2x2' || s.type === 'wind_farm_2x2') {
+      const fsc = s.col ?? Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW - 0.5);
+      const fsr = s.row ?? Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH - 0.5);
+      let farmAffectsBonsai = false;
+      for (let bc = bCol; bc < bCol + (bonsai.width || 1); bc++) {
+        for (let br = bRow; br < bRow + (bonsai.height || 1); br++) {
+          if (bc >= fsc - 1 && bc <= fsc + 2 && br >= fsr - 1 && br <= fsr + 2) {
+            if (disruptedPlots.has(`${bc},${br}`)) {
+              farmAffectsBonsai = true;
+              break;
+            }
+          }
+        }
+        if (farmAffectsBonsai) break;
+      }
+      if (farmAffectsBonsai) {
+        energyCount += 2;
+        countsByType['solar_farm_2x2'] = (countsByType['solar_farm_2x2'] || 0) + 1;
+      }
+    } else if (s.type === 'solar_farm_3x3' || s.type === 'wind_farm_3x3') {
+      const fsc = s.col ?? Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW - 1);
+      const fsr = s.row ?? Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH - 1);
+      let farmAffectsBonsai = false;
+      for (let bc = bCol; bc < bCol + (bonsai.width || 1); bc++) {
+        for (let br = bRow; br < bRow + (bonsai.height || 1); br++) {
+          if (bc >= fsc - 1 && bc <= fsc + 3 && br >= fsr - 1 && br <= fsr + 3) {
+            if (disruptedPlots.has(`${bc},${br}`)) {
+              farmAffectsBonsai = true;
+              break;
+            }
+          }
+        }
+        if (farmAffectsBonsai) break;
+      }
+      if (farmAffectsBonsai) {
+        energyCount += 3;
+        countsByType['solar_farm_3x3'] = (countsByType['solar_farm_3x3'] || 0) + 1;
+      }
     }
   });
+
+  // Check if bonsai itself is placed on a tile affected by Disrupted Zen
+  let isOnDisruptedZenGround = false;
+  for (let bc = bCol; bc < bCol + (bonsai.width || 1); bc++) {
+    for (let br = bRow; br < bRow + (bonsai.height || 1); br++) {
+      if (disruptedPlots.has(`${bc},${br}`)) {
+        isOnDisruptedZenGround = true;
+        break;
+      }
+    }
+    if (isOnDisruptedZenGround) break;
+  }
+
+  // Cumulative "Disrupted Zen" Calculation:
+  // - If placed on degraded soil: -10% Growth Speed
+  // - For EACH degraded soil tile within the 3x3 halo not cut off by fences: -10% Growth Speed per tile!
+  let degradedHaloTilesCount = 0;
+  haloPlots.forEach((p) => {
+    if (disruptedPlots.has(`${p.col},${p.row}`) && !isBlocked(p.col, p.row)) {
+      degradedHaloTilesCount++;
+    }
+  });
+
+  const degradedTileCount = (isOnDisruptedZenGround ? 1 : 0) + degradedHaloTilesCount;
+  const totalDisruptedZenPenalty = 10 * degradedTileCount;
+  const isDisruptedZen = totalDisruptedZenPenalty > 0;
 
   let maxIdenticalCount = 0;
   let stalledEntityKey = '';
@@ -3232,6 +4005,10 @@ export function getBonsaiSynergies(
       stalledEntityLabel = 'Bamboo Formations';
     } else if (stalledEntityKey === 'asparagus_fern_ball') {
       stalledEntityLabel = 'Asparagus Fern Balls';
+    } else if (stalledEntityKey === 'seven_lucky_gods') {
+      stalledEntityLabel = 'Seven Lucky Gods Statues';
+    } else if (stalledEntityKey === 'stone_lantern') {
+      stalledEntityLabel = 'Stone Lanterns';
     } else if (stalledEntityKey === 'crystal_pedestal') {
       stalledEntityLabel = 'Crystal Pedestals';
     } else if (stalledEntityKey === 'tool_compost_heap') {
@@ -3247,32 +4024,56 @@ export function getBonsaiSynergies(
     }
   }
 
+  const hasToriiGate = toriiCount > 0;
+  const haloMultiplier = hasToriiGate ? 2 : 1;
+
   const hasAdjacentBonsai = bonsaiCount > 0;
   const hasAdjacentWall = wallCount > 0;
   const hasAdjacentRock = rockCount > 0;
   const hasAdjacentBamboo = bambooCount > 0;
   const hasAdjacentFernBall = fernBallCount > 0;
+  const hasAdjacentSevenLuckyGods = sevenLuckyGodsCount > 0;
+  const hasAdjacentStoneLantern = stoneLanternCount > 0;
   const hasAdjacentBush = bambooCount > 0;
   const hasAdjacentEnergy = energyCount > 0;
-  const hasAdjacentDecor = wallCount > 0 || rockCount > 0 || bambooCount > 0 || fernBallCount > 0;
+  const hasAdjacentDecor =
+    wallCount > 0 ||
+    rockCount > 0 ||
+    bambooCount > 0 ||
+    fernBallCount > 0 ||
+    sevenLuckyGodsCount > 0 ||
+    stoneLanternCount > 0;
 
-  // Hydration Growth Speed calculation:
-  // Growing Together: +10% per bonsai
-  // Water Feature: +10% per water feature
-  // Disrupted Zen: -10% per solar/wind
-  const growingTogetherBonus = bonsaiCount * 0.10;
-  const privateGrowingBonus = wallCount * 0.10;
-  const rawGrowthMultiplier = Math.max(
-    0.2,
-    1.0 + growingTogetherBonus + privateGrowingBonus - energyCount * 0.10,
-  );
+  // Hydration Growth Speed calculation (doubled if in halo of Torii Gate)
+  const growingTogetherBonus = bonsaiCount * 0.10 * haloMultiplier;
+  const privateGrowingBonus = wallCount * 0.10 * haloMultiplier;
+  const baseGrowthRate = 1.0 + growingTogetherBonus + privateGrowingBonus;
+
+  // Cumulative Disrupted Zen Multiplier applies Math.max(0.05, 1 - (totalPenalty / 100))
+  const disruptedPenaltyMultiplier = isDisruptedZen
+    ? Math.max(0.05, 1 - totalDisruptedZenPenalty / 100)
+    : 1.0;
+  let rawGrowthMultiplier = Math.max(0.05, baseGrowthRate * disruptedPenaltyMultiplier);
   const growthMultiplier = isStalled ? 0 : rawGrowthMultiplier;
-  // Zen Rock Formation: +15% Level Up Experience (XP Boosted)
-  const expMultiplier = 1.0 + rockCount * 0.15;
-  // Growing Bamboo Formation: +0.25s Pruning Effect (Quick Prune)
-  const quickPruneBonus = bambooCount * 0.25;
-  // Asparagus Fern Ball: +15% Chance for Extra Organic Waste on Level Up (Efficient Pruning)
-  const extraWasteChance = fernBallCount * 0.15;
+  // Zen Rock Formation: +15% Level Up Experience (XP Boosted, doubled by Torii Gate)
+  const expMultiplier = 1.0 + (rockCount * 0.15) * haloMultiplier;
+  // Growing Bamboo Formation: +0.25s Pruning Effect (Quick Prune, doubled by Torii Gate)
+  const quickPruneBonus = (bambooCount * 0.25) * haloMultiplier;
+  // Asparagus Fern Ball: +15% Chance for Extra Organic Waste on Level Up (Efficient Pruning, doubled by Torii Gate)
+  const extraWasteChance = (fernBallCount * 0.15) * haloMultiplier;
+  // Seven Lucky Gods: +0.01 Bonsai Baseprice per Bonsai Level Up (Fortunate Blessings, doubled by Torii Gate)
+  const basePriceBonusRate = (sevenLuckyGodsCount * 0.01) * haloMultiplier;
+  // Stone Lantern: +0.5% Chance for Zen Point on Bonsai Level Up (Skilled Knowledge, doubled by Torii Gate)
+  const zenPointChance = (stoneLanternCount * 0.005) * haloMultiplier;
+
+  // Double crystal pedestal CP bonuses if Torii Gate is present
+  if (hasToriiGate) {
+    crystalPedestals.foliage *= 2;
+    crystalPedestals.branches *= 2;
+    crystalPedestals.trunk *= 2;
+    crystalPedestals.roots *= 2;
+    crystalPedestals.total *= 2;
+  }
 
   return {
     bonsaiCount,
@@ -3280,8 +4081,14 @@ export function getBonsaiSynergies(
     rockCount,
     bambooCount,
     fernBallCount,
+    sevenLuckyGodsCount,
+    stoneLanternCount,
+    hasToriiGate,
+    haloMultiplier,
+    basePriceBonusRate,
+    zenPointChance,
     bushCount: bambooCount,
-    decorCount: wallCount + rockCount + bambooCount + fernBallCount,
+    decorCount: wallCount + rockCount + bambooCount + fernBallCount + sevenLuckyGodsCount + stoneLanternCount,
     pebbleCount: 0,
     energyCount,
     hasAdjacentBonsai,
@@ -3289,10 +4096,15 @@ export function getBonsaiSynergies(
     hasAdjacentRock,
     hasAdjacentBamboo,
     hasAdjacentFernBall,
+    hasAdjacentSevenLuckyGods,
+    hasAdjacentStoneLantern,
     hasAdjacentBush,
     hasAdjacentDecor,
     hasAdjacentPebbles: false,
     hasAdjacentEnergy,
+    isDisruptedZen,
+    totalDisruptedZenPenalty,
+    degradedTileCount,
     growthMultiplier,
     expMultiplier,
     quickPruneBonus,
@@ -3303,63 +4115,24 @@ export function getBonsaiSynergies(
     stalledEntityLabel,
     stalledEntityKey,
     maxIdenticalCount,
+    isOnDisruptedZenGround,
     crystalPedestals,
   };
 }
 
 /**
- * Renders the two-line overworld level badge above/on the bonsai:
- * - Line 1: Lv.${bonsai.level} (e.g. Lv.1, Lv.25)
- * - Line 2: BA ${bonsai.baseAesthetic.toFixed(2)} (e.g. BA 4.25)
- * - Background is 100% opaque solid color matching the bonsai's Maturity Rating (1-5):
- *   (#38bdf8, #2dd4bf, #34d399, #a3e635, #facc15)
- * - Centered neatly above the pot/foliage.
+ * Overworld bonsai information pill has been completely removed per user specification.
+ * Retained as safe no-op for any external references.
  */
 export function drawBonsaiPotTag(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  maturityOrBonsai: MaturityTier | undefined | any,
-  level = 1,
-  bonsaiObj?: any,
+  _ctx: CanvasRenderingContext2D,
+  _x: number,
+  _y: number,
+  _maturityOrBonsai?: any,
+  _level = 1,
+  _bonsaiObj?: any,
 ) {
-  const bonsaiData =
-    typeof maturityOrBonsai === 'object' && maturityOrBonsai !== null
-      ? maturityOrBonsai
-      : bonsaiObj || { maturity: maturityOrBonsai, level };
-
-  const rating = getBonsaiMaturityRating(bonsaiData);
-  const lvl = bonsaiData.level ?? level ?? 1;
-  const ba = calculateBaseAesthetic(bonsaiData).total;
-
-  const line1 = `Lv.${lvl}`;
-  const line2 = `BA ${ba.toFixed(2)}`;
-
-  ctx.save();
-  ctx.font = 'bold 9px system-ui, sans-serif';
-  const m1 = ctx.measureText(line1).width;
-  const m2 = ctx.measureText(line2).width;
-  const badgeW = Math.max(m1, m2) + 10;
-  const badgeH = 22;
-
-  // 100% Opaque Solid Fill matching Maturity Rating
-  ctx.fillStyle = getMaturityBadgeColor(rating);
-  ctx.beginPath();
-  ctx.roundRect(x - badgeW / 2, y - badgeH / 2, badgeW, badgeH, 4);
-  ctx.fill();
-
-  // Dark contrasting border
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-
-  // Crisp White Text on two compact lines
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(line1, x, y - 5.5);
-  ctx.fillText(line2, x, y + 5.5);
-  ctx.restore();
+  // Completely removed: bonsai information is clearly displayed in lower information box
 }
 
 /**
@@ -3728,6 +4501,439 @@ export function renderWindTurbine(
 }
 
 /**
+ * Complete standalone vector rendering for Solar Panel Farm (2x2 grid size, 4 panels interconnected).
+ * +24 kW (+1.0 kW per adjacent solar panel unit).
+ */
+export function renderSolarFarm2x2(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  struct: DeployedStructure,
+  structures: DeployedStructure[] = [],
+) {
+  const {total: totalKw, count: adjCount} = getSolarStructureOutput(struct, structures);
+  const hasAdj = adjCount > 0;
+
+  // Interconnecting heavy steel/timber subframe
+  ctx.fillStyle = '#291408';
+  ctx.beginPath();
+  ctx.roundRect(sx - 52, sy - 52, 104, 104, 6);
+  ctx.fill();
+  ctx.strokeStyle = hasAdj ? '#fbbf24' : '#b45309';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Heavy cross structural beams
+  ctx.fillStyle = '#78350f';
+  ctx.fillRect(sx - 48, sy - 4, 96, 8);
+  ctx.fillRect(sx - 4, sy - 48, 8, 96);
+
+  // Copper junction conduits running from the 4 quadrants to the center
+  ctx.strokeStyle = '#ea580c';
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(sx - 24, sy - 24); ctx.lineTo(sx, sy);
+  ctx.moveTo(sx + 24, sy - 24); ctx.lineTo(sx, sy);
+  ctx.moveTo(sx - 24, sy + 24); ctx.lineTo(sx, sy);
+  ctx.moveTo(sx + 24, sy + 24); ctx.lineTo(sx, sy);
+  ctx.stroke();
+
+  // 4 Solar Panel quadrant units
+  const panelOffsets = [
+    [-25, -26],
+    [25, -26],
+    [-25, 26],
+    [25, 26],
+  ];
+
+  panelOffsets.forEach(([px, py]) => {
+    const cx = sx + px;
+    const cy = sy + py;
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.roundRect(cx - 20, cy - 18, 40, 26, 3);
+    ctx.fill();
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    const pvGrad = ctx.createLinearGradient(cx - 18, cy - 16, cx + 18, cy + 6);
+    pvGrad.addColorStop(0, '#0284c7');
+    pvGrad.addColorStop(0.5, '#0369a1');
+    pvGrad.addColorStop(1, '#075985');
+    ctx.fillStyle = pvGrad;
+    ctx.beginPath();
+    ctx.roundRect(cx - 18, cy - 16, 36, 22, 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 16); ctx.lineTo(cx, cy + 6);
+    ctx.moveTo(cx - 18, cy - 5); ctx.lineTo(cx + 18, cy - 5);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.beginPath();
+    ctx.moveTo(cx - 14, cy - 14);
+    ctx.lineTo(cx - 4, cy - 14);
+    ctx.lineTo(cx - 10, cy + 4);
+    ctx.lineTo(cx - 16, cy + 4);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  // Central Power Combiner Box / Inverter
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath();
+  ctx.roundRect(sx - 12, sy - 12, 24, 24, 4);
+  ctx.fill();
+  ctx.strokeStyle = hasAdj ? '#fbbf24' : '#f59e0b';
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+
+  const pulse = 0.5 + Math.sin(Date.now() * 0.006) * 0.4;
+  ctx.fillStyle = hasAdj ? `rgba(250, 204, 21, ${pulse})` : `rgba(52, 211, 153, ${pulse})`;
+  ctx.beginPath();
+  ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Generation Badge with Clean Total kW Output
+  const formattedKw = `+${totalKw % 1 === 0 ? totalKw : totalKw.toFixed(1)} kW`;
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+  ctx.beginPath();
+  ctx.roundRect(sx - 34, sy + 44, 68, 16, 4);
+  ctx.fill();
+  ctx.strokeStyle = hasAdj ? '#fbbf24' : 'rgba(56, 189, 248, 0.85)';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  ctx.fillStyle = hasAdj ? '#fef08a' : '#ffffff';
+  ctx.font = 'bold 10px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`☀️ ${formattedKw}`, sx, sy + 55.5);
+}
+
+/**
+ * Complete standalone vector rendering for Big Solar Panel Farm (3x3 grid size, 9 panels interconnected).
+ * +87 kW (+1.5 kW per adjacent solar panel unit).
+ */
+export function renderSolarFarm3x3(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  struct: DeployedStructure,
+  structures: DeployedStructure[] = [],
+) {
+  const {total: totalKw, count: adjCount} = getSolarStructureOutput(struct, structures);
+  const hasAdj = adjCount > 0;
+
+  // Heavy 3x3 industrial subframe
+  ctx.fillStyle = '#291408';
+  ctx.beginPath();
+  ctx.roundRect(sx - 86, sy - 86, 172, 172, 8);
+  ctx.fill();
+  ctx.strokeStyle = hasAdj ? '#fbbf24' : '#b45309';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Grid framework conduits
+  ctx.strokeStyle = '#ea580c';
+  ctx.lineWidth = 2;
+  [-50, 0, 50].forEach((ox) => {
+    ctx.beginPath();
+    ctx.moveTo(sx + ox, sy - 80); ctx.lineTo(sx + ox, sy + 80);
+    ctx.moveTo(sx - 80, sy + ox); ctx.lineTo(sx + 80, sy + ox);
+    ctx.stroke();
+  });
+
+  // 9 Solar Panels
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      if (dx === 0 && dy === 0) continue;
+      const cx = sx + dx * 52;
+      const cy = sy + dy * 52;
+
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.roundRect(cx - 21, cy - 19, 42, 28, 3);
+      ctx.fill();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      const pvGrad = ctx.createLinearGradient(cx - 19, cy - 17, cx + 19, cy + 7);
+      pvGrad.addColorStop(0, '#0284c7');
+      pvGrad.addColorStop(0.5, '#0369a1');
+      pvGrad.addColorStop(1, '#075985');
+      ctx.fillStyle = pvGrad;
+      ctx.beginPath();
+      ctx.roundRect(cx - 19, cy - 17, 38, 24, 2);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 17); ctx.lineTo(cx, cy + 7);
+      ctx.moveTo(cx - 19, cy - 5); ctx.lineTo(cx + 19, cy - 5);
+      ctx.stroke();
+    }
+  }
+
+  // Central Mega Substation Transformer Unit
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath();
+  ctx.roundRect(sx - 20, sy - 20, 40, 40, 5);
+  ctx.fill();
+  ctx.strokeStyle = hasAdj ? '#fbbf24' : '#f59e0b';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = '#b45309';
+  ctx.fillRect(sx - 14, sy - 14, 28, 6);
+  ctx.fillRect(sx - 14, sy + 8, 28, 6);
+
+  const pulse = 0.5 + Math.sin(Date.now() * 0.007) * 0.45;
+  ctx.fillStyle = hasAdj ? `rgba(250, 204, 21, ${pulse})` : `rgba(56, 189, 248, ${pulse})`;
+  ctx.beginPath();
+  ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Generation Badge
+  const formattedKw = `+${totalKw % 1 === 0 ? totalKw : totalKw.toFixed(1)} kW`;
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+  ctx.beginPath();
+  ctx.roundRect(sx - 42, sy + 74, 84, 18, 5);
+  ctx.fill();
+  ctx.strokeStyle = hasAdj ? '#fbbf24' : 'rgba(56, 189, 248, 0.85)';
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+
+  ctx.fillStyle = hasAdj ? '#fef08a' : '#ffffff';
+  ctx.font = 'bold 11px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`☀️ ${formattedKw}`, sx, sy + 86.5);
+}
+
+/**
+ * Complete standalone vector rendering for Wind Turbine Farm (2x2 grid size, 4 turbines interconnected).
+ * +42 kW (+1.5 kW per adjacent wind turbine unit).
+ */
+export function renderWindFarm2x2(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  struct: DeployedStructure,
+  structures: DeployedStructure[] = [],
+  turbineAngle = 0,
+) {
+  const {total: totalKw, count: adjCount} = getWindStructureOutput(struct, structures);
+  const hasAdj = adjCount > 0;
+
+  // Subframe
+  ctx.fillStyle = '#334155';
+  ctx.beginPath();
+  ctx.roundRect(sx - 52, sy - 52, 104, 104, 6);
+  ctx.fill();
+  ctx.strokeStyle = hasAdj ? '#38bdf8' : '#64748b';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(sx - 48, sy - 48); ctx.lineTo(sx + 48, sy + 48);
+  ctx.moveTo(sx + 48, sy - 48); ctx.lineTo(sx - 48, sy + 48);
+  ctx.stroke();
+
+  // Central power dynamo / junction
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.arc(sx, sy, 12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = hasAdj ? '#38bdf8' : '#f59e0b';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  const pulse = 0.5 + Math.sin(Date.now() * 0.007) * 0.4;
+  ctx.fillStyle = `rgba(56, 189, 248, ${pulse})`;
+  ctx.beginPath();
+  ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 4 Animated Wind Turbines
+  const offsets = [
+    [-26, -26, 0],
+    [26, -26, 1.5],
+    [-26, 26, 3.0],
+    [26, 26, 4.5],
+  ];
+
+  offsets.forEach(([tx, ty, phase]) => {
+    const cx = sx + tx;
+    const cy = sy + ty;
+
+    ctx.fillStyle = '#b45309';
+    ctx.fillRect(cx - 2, cy - 18, 4, 26);
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 0.6;
+    ctx.strokeRect(cx - 2, cy - 18, 4, 26);
+
+    const spin = turbineAngle + phase;
+    const bladeOffset = Math.sin(spin) * 12;
+
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.ellipse(cx + bladeOffset, cy - 8, Math.max(2.5, Math.abs(bladeOffset * 0.8)), 10, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.ellipse(cx - bladeOffset, cy - 8, Math.max(2.5, Math.abs(bladeOffset * 0.8)), 10, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#b45309';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fde047';
+    ctx.beginPath();
+    ctx.arc(cx, cy - 19, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.7)';
+    ctx.beginPath();
+    ctx.arc(cx, cy + 6, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Generation Badge
+  const formattedKw = `+${totalKw % 1 === 0 ? totalKw : totalKw.toFixed(1)} kW`;
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+  ctx.beginPath();
+  ctx.roundRect(sx - 34, sy + 44, 68, 16, 4);
+  ctx.fill();
+  ctx.strokeStyle = hasAdj ? '#38bdf8' : 'rgba(245, 158, 11, 0.85)';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  ctx.fillStyle = hasAdj ? '#7dd3fc' : '#ffffff';
+  ctx.font = 'bold 10px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`💨 ${formattedKw}`, sx, sy + 55.5);
+}
+
+/**
+ * Complete standalone vector rendering for Big Wind Turbine Farm (3x3 grid size, 9 turbines interconnected).
+ * +134 kW (+2.0 kW per adjacent wind turbine unit).
+ */
+export function renderWindFarm3x3(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  struct: DeployedStructure,
+  structures: DeployedStructure[] = [],
+  turbineAngle = 0,
+) {
+  const {total: totalKw, count: adjCount} = getWindStructureOutput(struct, structures);
+  const hasAdj = adjCount > 0;
+
+  // Subframe
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath();
+  ctx.roundRect(sx - 86, sy - 86, 172, 172, 8);
+  ctx.fill();
+  ctx.strokeStyle = hasAdj ? '#38bdf8' : '#64748b';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 1.5;
+  [-52, 0, 52].forEach((ox) => {
+    ctx.beginPath();
+    ctx.moveTo(sx + ox, sy - 80); ctx.lineTo(sx + ox, sy + 80);
+    ctx.moveTo(sx - 80, sy + ox); ctx.lineTo(sx + 80, sy + ox);
+    ctx.stroke();
+  });
+
+  // 9 Animated Wind Turbines
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const cx = sx + dx * 52;
+      const cy = sy + dy * 52;
+      const phase = (dx + 1) * 1.2 + (dy + 1) * 0.8;
+
+      ctx.fillStyle = '#b45309';
+      ctx.fillRect(cx - 2, cy - 18, 4, 26);
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 0.6;
+      ctx.strokeRect(cx - 2, cy - 18, 4, 26);
+
+      const spin = turbineAngle + phase;
+      const bladeOffset = Math.sin(spin) * 11;
+
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.ellipse(cx + bladeOffset, cy - 8, Math.max(2.5, Math.abs(bladeOffset * 0.8)), 9, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#d97706';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.ellipse(cx - bladeOffset, cy - 8, Math.max(2.5, Math.abs(bladeOffset * 0.8)), 9, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#b45309';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+
+      ctx.fillStyle = '#fde047';
+      ctx.beginPath();
+      ctx.arc(cx, cy - 19, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.7)';
+      ctx.beginPath();
+      ctx.arc(cx, cy + 6, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Central Substation Unit
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.roundRect(sx - 16, sy - 16, 32, 32, 4);
+  ctx.fill();
+  ctx.strokeStyle = hasAdj ? '#38bdf8' : '#f59e0b';
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+
+  const pulse = 0.5 + Math.sin(Date.now() * 0.008) * 0.45;
+  ctx.fillStyle = `rgba(56, 189, 248, ${pulse})`;
+  ctx.beginPath();
+  ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Generation Badge
+  const formattedKw = `+${totalKw % 1 === 0 ? totalKw : totalKw.toFixed(1)} kW`;
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+  ctx.beginPath();
+  ctx.roundRect(sx - 42, sy + 74, 84, 18, 5);
+  ctx.fill();
+  ctx.strokeStyle = hasAdj ? '#38bdf8' : 'rgba(245, 158, 11, 0.85)';
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+
+  ctx.fillStyle = hasAdj ? '#7dd3fc' : '#ffffff';
+  ctx.font = 'bold 11px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`💨 ${formattedKw}`, sx, sy + 86.5);
+}
+
+/**
  * Complete standalone vector rendering for Fertilizer Station:
  * A sophisticated eco-chemical processing apparatus with a glass distilling flask/beaker,
  * bronze pressure valves, condenser tube, and nutrient catchment hopper.
@@ -3738,7 +4944,10 @@ export function renderFertilizerStation(
   sy: number,
   struct: DeployedStructure,
 ) {
-  const isDistilling = Boolean(struct.isDistilling && (struct.timer || 0) > 0);
+  const isDistilling = Boolean(
+    (struct.isDistilling && (struct.timer || 0) > 0) ||
+    ((struct.depositedWaste || 0) >= 3 && (struct.depositedBiochemicals || 0) >= 1),
+  );
   const ready = struct.readyFertilizer || 0;
   const timer = struct.timer || 0;
 
@@ -3909,9 +5118,20 @@ export function renderFertilizerStation(
     ctx.fill();
   }
 
-  // Status Badge underneath
-  const statusBoxW = 66;
-  const statusBoxH = 15;
+  // Status Badge underneath - standard 58px width, 16px height
+  let statusText = 'Empty';
+  let statusTextColor = '#94a3b8';
+
+  if (ready > 0) {
+    statusText = `${ready} Fertilizer`;
+    statusTextColor = '#6ee7b7';
+  } else if (isDistilling || timer > 0 || (struct.depositedWaste || 0) >= 3) {
+    statusText = 'Brewing';
+    statusTextColor = '#fef08a';
+  }
+
+  const statusBoxW = 58;
+  const statusBoxH = 16;
   const statusBoxX = sx - statusBoxW / 2;
   const statusBoxY = sy + 18;
 
@@ -3920,38 +5140,11 @@ export function renderFertilizerStation(
   ctx.roundRect(statusBoxX, statusBoxY, statusBoxW, statusBoxH, 4);
   ctx.fill();
 
-  if (isDistilling && timer > 0) {
-    const prog = Math.min(1.0, (60 - timer) / 60);
-    const fillW = Math.max(3, (statusBoxW - 2) * prog);
-    const grad = ctx.createLinearGradient(statusBoxX + 1, statusBoxY + 1, statusBoxX + 1 + fillW, statusBoxY + 1);
-    grad.addColorStop(0, '#047857');
-    grad.addColorStop(1, '#10b981');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.roundRect(statusBoxX + 1, statusBoxY + 1, fillW, statusBoxH - 2, 3);
-    ctx.fill();
-  } else if (ready > 0) {
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.4)';
-    ctx.beginPath();
-    ctx.roundRect(statusBoxX + 1, statusBoxY + 1, statusBoxW - 2, statusBoxH - 2, 3);
-    ctx.fill();
-  }
-
   ctx.strokeStyle = ready > 0 ? '#34d399' : isDistilling ? '#10b981' : '#475569';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.roundRect(statusBoxX, statusBoxY, statusBoxW, statusBoxH, 4);
   ctx.stroke();
-
-  let statusText = 'Fertilizer Stn';
-  let statusTextColor = '#94a3b8';
-  if (ready > 0) {
-    statusText = `${ready} Fertilizer!`;
-    statusTextColor = '#6ee7b7';
-  } else if (isDistilling) {
-    statusText = `${Math.ceil(timer)}s Distilling`;
-    statusTextColor = '#fef08a';
-  }
 
   ctx.fillStyle = statusTextColor;
   ctx.font = 'bold 9px system-ui, sans-serif';
@@ -3959,6 +5152,32 @@ export function renderFertilizerStation(
   ctx.textBaseline = 'middle';
   ctx.fillText(statusText, sx, statusBoxY + statusBoxH / 2);
   ctx.textBaseline = 'alphabetic';
+
+  // Dedicated overhead mini progress bar below status pill: ALWAYS visible when crafting is active
+  if (timer > 0) {
+    const prog = Math.min(1.0, Math.max(0, (60 - timer) / 60));
+    const pBarW = 44;
+    const pBarH = 3.5;
+    const pBarX = sx - pBarW / 2;
+    const pBarY = statusBoxY + statusBoxH + 2.5;
+
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    ctx.beginPath();
+    ctx.roundRect(pBarX, pBarY, pBarW, pBarH, 1.5);
+    ctx.fill();
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+
+    const fillW = Math.max(2, (pBarW - 1) * prog);
+    const grad = ctx.createLinearGradient(pBarX, pBarY, pBarX + fillW, pBarY);
+    grad.addColorStop(0, '#047857');
+    grad.addColorStop(1, '#10b981');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect(pBarX + 0.5, pBarY + 0.5, fillW, pBarH - 1, 1);
+    ctx.fill();
+  }
 }
 
 /**
@@ -4123,35 +5342,18 @@ export function renderCompostHeap(
     }
   }
 
-  // Status Box
-  const statusBoxW = 62;
-  const statusBoxH = 15;
+  // Status Box - standard 58px width, 16px height
+  const statusBoxW = 58;
+  const statusBoxH = 16;
   const statusBoxX = sx - statusBoxW / 2;
   const statusBoxY = sy + 18;
-  const cycleProgress = waste >= 2 ? Math.min(1.0, timer / 10) : 0;
 
   ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
   ctx.beginPath();
   ctx.roundRect(statusBoxX, statusBoxY, statusBoxW, statusBoxH, 4);
   ctx.fill();
 
-  if (cycleProgress > 0) {
-    const fillW = Math.max(3, (statusBoxW - 2) * cycleProgress);
-    const progGrad = ctx.createLinearGradient(statusBoxX + 1, statusBoxY + 1, statusBoxX + 1 + fillW, statusBoxY + 1);
-    progGrad.addColorStop(0, '#15803d');
-    progGrad.addColorStop(1, '#84cc16');
-    ctx.fillStyle = progGrad;
-    ctx.beginPath();
-    ctx.roundRect(statusBoxX + 1, statusBoxY + 1, fillW, statusBoxH - 2, 3);
-    ctx.fill();
-  } else if (ready > 0) {
-    ctx.fillStyle = 'rgba(132, 204, 22, 0.35)';
-    ctx.beginPath();
-    ctx.roundRect(statusBoxX + 1, statusBoxY + 1, statusBoxW - 2, statusBoxH - 2, 3);
-    ctx.fill();
-  }
-
-  ctx.strokeStyle = ready > 0 ? '#a3e635' : waste >= 2 ? '#84cc16' : '#475569';
+  ctx.strokeStyle = ready > 0 ? '#a3e635' : (waste >= 2 || timer > 0) ? '#84cc16' : '#475569';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.roundRect(statusBoxX, statusBoxY, statusBoxW, statusBoxH, 4);
@@ -4162,17 +5364,43 @@ export function renderCompostHeap(
   if (ready > 0) {
     statusText = `${ready} Compost`;
     statusTextColor = '#bef264';
-  } else if (waste > 0) {
+  } else if (waste >= 2 || timer > 0) {
     statusText = 'Composting';
     statusTextColor = '#fef08a';
   }
 
   ctx.fillStyle = statusTextColor;
-  ctx.font = 'bold 9.5px system-ui, sans-serif';
+  ctx.font = 'bold 9px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(statusText, sx, statusBoxY + statusBoxH / 2);
   ctx.textBaseline = 'alphabetic';
+
+  // Dedicated overhead mini progress bar below status pill: ALWAYS visible when crafting is active
+  if (timer > 0 && waste >= 2) {
+    const cycleProgress = Math.min(1.0, Math.max(0, (10 - timer) / 10));
+    const pBarW = 44;
+    const pBarH = 3.5;
+    const pBarX = sx - pBarW / 2;
+    const pBarY = statusBoxY + statusBoxH + 2.5;
+
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    ctx.beginPath();
+    ctx.roundRect(pBarX, pBarY, pBarW, pBarH, 1.5);
+    ctx.fill();
+    ctx.strokeStyle = '#291408';
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+
+    const fillW = Math.max(2, (pBarW - 1) * cycleProgress);
+    const progGrad = ctx.createLinearGradient(pBarX, pBarY, pBarX + fillW, pBarY);
+    progGrad.addColorStop(0, '#15803d');
+    progGrad.addColorStop(1, '#84cc16');
+    ctx.fillStyle = progGrad;
+    ctx.beginPath();
+    ctx.roundRect(pBarX + 0.5, pBarY + 0.5, fillW, pBarH - 1, 1);
+    ctx.fill();
+  }
 }
 
 /**
@@ -5772,8 +7000,16 @@ export function renderCompleteDecor(
 
   if (type === 'solar_panel') {
     renderSolarPanel(ctx, sx, sy, dummyStruct, structures);
+  } else if (type === 'solar_farm_2x2') {
+    renderSolarFarm2x2(ctx, sx, sy, dummyStruct, structures);
+  } else if (type === 'solar_farm_3x3') {
+    renderSolarFarm3x3(ctx, sx, sy, dummyStruct, structures);
   } else if (type === 'wind_turbine') {
     renderWindTurbine(ctx, sx, sy, dummyStruct, structures, turbineAngle);
+  } else if (type === 'wind_farm_2x2') {
+    renderWindFarm2x2(ctx, sx, sy, dummyStruct, structures, turbineAngle);
+  } else if (type === 'wind_farm_3x3') {
+    renderWindFarm3x3(ctx, sx, sy, dummyStruct, structures, turbineAngle);
   } else if (type === 'automaton_t1') {
     renderAutomatonT1(ctx, sx, sy, true);
   } else if (type === 'automaton_t2') {
@@ -5804,6 +7040,10 @@ export function renderCompleteDecor(
     renderFertilizerStation(ctx, sx, sy, dummyStruct);
   } else if (type === 'tool_garden_well') {
     renderGardenWell(ctx, sx, sy, dummyStruct);
+  } else if (type === 'seven_lucky_gods') {
+    renderSevenLuckyGods(ctx, sx, sy, dummyStruct.variant ?? (dummyStruct as any).godIndex ?? 0);
+  } else if (type === 'stone_lantern') {
+    renderStoneLantern(ctx, sx, sy);
   } else if (type.startsWith('crystal_pedestal') || type === 'empty_crystal_pedestal') {
     renderCrystalPedestal(ctx, sx, sy, dummyStruct);
   } else if (type === 'torii_gate') {
@@ -7624,6 +8864,860 @@ export function renderBambooFence(
   ctx.restore();
 }
 
+export const SEVEN_LUCKY_GODS_INFO = [
+  { name: 'Ebisu', title: 'God of Fortune & Fishermen', kanji: '恵比寿', color: '#f59e0b' },
+  { name: 'Daikokuten', title: 'God of Wealth & Commerce', kanji: '大黒天', color: '#d97706' },
+  { name: 'Bishamonten', title: 'God of Warriors & Dignity', kanji: '毘沙門天', color: '#dc2626' },
+  { name: 'Benzaiten', title: 'Goddess of Music & Water', kanji: '弁財天', color: '#c084fc' },
+  { name: 'Fukurokuju', title: 'God of Wisdom & Longevity', kanji: '福禄寿', color: '#10b981' },
+  { name: 'Jurojin', title: 'God of Elderly & Longevity', kanji: '寿老人', color: '#38bdf8' },
+  { name: 'Hotei', title: 'God of Happiness & Contentment', kanji: '布袋', color: '#fbbf24' },
+];
+
+/**
+ * Complete standalone vector rendering for Seven Lucky Gods (Shichifukujin):
+ * 7 unique deity statues cycling based on placement variant (0-6):
+ * 1. Ebisu (Golden robes, holding sea bream tai & fishing rod)
+ * 2. Daikokuten (Standing on rice bales, holding magic mallet uchide-no-kozuchi)
+ * 3. Bishamonten (Armor, holding small treasure pagoda stupa & spear)
+ * 4. Benzaiten (Celestial robes & scarves, playing biwa lute)
+ * 5. Fukurokuju (High elongated forehead, walking staff & scroll)
+ * 6. Jurojin (Long white beard, holding peach of immortality & scroll)
+ * 7. Hotei (Cheerful round belly, holding large cloth sack & fan)
+ */
+export function renderSevenLuckyGods(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  variant = 0,
+) {
+  const godIdx = Math.abs(variant) % 7;
+  const info = SEVEN_LUCKY_GODS_INFO[godIdx];
+
+  // Ground shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 15, 24, 7.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tiered carved stone pedestal base
+  const plinthGrad = ctx.createLinearGradient(sx - 18, sy + 6, sx + 18, sy + 14);
+  plinthGrad.addColorStop(0, '#334155');
+  plinthGrad.addColorStop(0.5, '#475569');
+  plinthGrad.addColorStop(1, '#1e293b');
+  ctx.fillStyle = plinthGrad;
+  ctx.beginPath();
+  ctx.roundRect(sx - 18, sy + 6, 36, 9, 2.5);
+  ctx.fill();
+  ctx.strokeStyle = '#64748b';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Golden relief inscription band on plinth
+  ctx.fillStyle = '#f59e0b';
+  ctx.fillRect(sx - 12, sy + 9, 24, 1.2);
+
+  // Radiant divine aura glow behind statue
+  const auraPulse = 0.5 + Math.sin(Date.now() * 0.005 + sx) * 0.3;
+  const auraGrad = ctx.createRadialGradient(sx, sy - 8, 4, sx, sy - 8, 28);
+  auraGrad.addColorStop(0, `${info.color}66`);
+  auraGrad.addColorStop(0.7, `${info.color}15`);
+  auraGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = auraGrad;
+  ctx.beginPath();
+  ctx.arc(sx, sy - 8, 28, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+
+  if (godIdx === 0) {
+    // 1. EBISU (God of fortune/fishermen: holding sea bream/tai & fishing rod, golden robes)
+    const robeGrad = ctx.createLinearGradient(sx - 14, sy - 12, sx + 14, sy + 6);
+    robeGrad.addColorStop(0, '#fef08a');
+    robeGrad.addColorStop(0.4, '#f59e0b');
+    robeGrad.addColorStop(1, '#b45309');
+    ctx.fillStyle = robeGrad;
+    ctx.beginPath();
+    ctx.roundRect(sx - 14, sy - 8, 28, 15, [4, 4, 2, 2]);
+    ctx.fill();
+    ctx.strokeStyle = '#92400e';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Kimono lapels
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(sx - 6, sy - 8); ctx.lineTo(sx + 2, sy + 4);
+    ctx.moveTo(sx + 6, sy - 8); ctx.lineTo(sx - 2, sy + 4);
+    ctx.stroke();
+
+    // Cheerful bearded face
+    ctx.fillStyle = '#fed7aa';
+    ctx.beginPath();
+    ctx.arc(sx, sy - 14, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ea580c';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // White mustache & beard
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(sx - 4, sy - 13);
+    ctx.lineTo(sx, sy - 8);
+    ctx.lineTo(sx + 4, sy - 13);
+    ctx.lineTo(sx, sy - 11);
+    ctx.closePath();
+    ctx.fill();
+
+    // Ebisu tall black/slate folded hat (kazaori eboshi)
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.moveTo(sx - 6, sy - 18);
+    ctx.lineTo(sx - 2, sy - 28);
+    ctx.lineTo(sx + 5, sy - 25);
+    ctx.lineTo(sx + 6, sy - 18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#fde047';
+    ctx.beginPath();
+    ctx.arc(sx, sy - 20, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Plump Red Sea Bream (Tai fish) held under left arm
+    const fishX = sx - 10;
+    const fishY = sy - 2;
+    ctx.fillStyle = '#f43f5e';
+    ctx.beginPath();
+    ctx.ellipse(fishX, fishY, 7.5, 4.5, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#9f1239';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fb7185';
+    ctx.beginPath();
+    ctx.moveTo(fishX - 7, fishY);
+    ctx.lineTo(fishX - 11, fishY - 3);
+    ctx.lineTo(fishX - 10, fishY + 3);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(fishX + 4, fishY - 1.2, 1.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.arc(fishX + 4.4, fishY - 1.2, 0.7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bamboo fishing rod held in right hand
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(sx + 10, sy + 2);
+    ctx.lineTo(sx + 16, sy - 27);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(sx + 16, sy - 27);
+    ctx.quadraticCurveTo(sx + 20, sy - 15, sx + 14, sy - 5);
+    ctx.stroke();
+
+  } else if (godIdx === 1) {
+    // 2. DAIKOKUTEN (God of wealth: standing on rice bales, holding golden magic wooden mallet)
+    const drawRiceBale = (bx: number, by: number) => {
+      ctx.fillStyle = '#b45309';
+      ctx.beginPath();
+      ctx.ellipse(bx, by, 7.5, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+      ctx.strokeStyle = '#fef08a';
+      ctx.lineWidth = 0.7;
+      ctx.beginPath();
+      ctx.moveTo(bx - 4, by - 3); ctx.lineTo(bx - 4, by + 3);
+      ctx.moveTo(bx + 4, by - 3); ctx.lineTo(bx + 4, by + 3);
+      ctx.stroke();
+    };
+    drawRiceBale(sx - 7, sy + 5);
+    drawRiceBale(sx + 7, sy + 5);
+
+    const dRobeGrad = ctx.createLinearGradient(sx - 13, sy - 8, sx + 13, sy + 4);
+    dRobeGrad.addColorStop(0, '#475569');
+    dRobeGrad.addColorStop(0.5, '#334155');
+    dRobeGrad.addColorStop(1, '#1e293b');
+    ctx.fillStyle = dRobeGrad;
+    ctx.beginPath();
+    ctx.roundRect(sx - 13, sy - 8, 26, 14, [4, 4, 2, 2]);
+    ctx.fill();
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#e2e8f0';
+    ctx.beginPath();
+    ctx.ellipse(sx - 11, sy - 2, 6.5, 9, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fed7aa';
+    ctx.beginPath();
+    ctx.arc(sx, sy - 13, 6.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy - 18, 9, 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#334155';
+    ctx.beginPath();
+    ctx.arc(sx, sy - 19, 5, Math.PI, 0);
+    ctx.fill();
+
+    const mx = sx + 12;
+    const my = sy - 12;
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx + 7, sy - 5);
+    ctx.lineTo(mx, my);
+    ctx.stroke();
+
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.roundRect(mx - 5, my - 6, 10, 6.5, 2);
+    ctx.fill();
+    ctx.strokeStyle = '#b45309';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(mx, my - 2.8, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+  } else if (godIdx === 2) {
+    // 3. BISHAMONTEN (God of warriors: armor, holding small treasure pagoda stupa & spear)
+    const armGrad = ctx.createLinearGradient(sx - 12, sy - 8, sx + 12, sy + 4);
+    armGrad.addColorStop(0, '#991b1b');
+    armGrad.addColorStop(0.5, '#7f1d1d');
+    armGrad.addColorStop(1, '#450a0a');
+    ctx.fillStyle = armGrad;
+    ctx.beginPath();
+    ctx.roundRect(sx - 12, sy - 8, 24, 15, [3, 3, 2, 2]);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.roundRect(sx - 7, sy - 6, 14, 5, 1);
+    ctx.fill();
+
+    ctx.fillStyle = '#fed7aa';
+    ctx.beginPath();
+    ctx.arc(sx, sy - 13, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.arc(sx, sy - 15, 7, Math.PI, 0);
+    ctx.fill();
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fde047';
+    ctx.beginPath();
+    ctx.moveTo(sx - 6, sy - 17);
+    ctx.lineTo(sx - 8, sy - 24);
+    ctx.lineTo(sx, sy - 19);
+    ctx.lineTo(sx + 8, sy - 24);
+    ctx.lineTo(sx + 6, sy - 17);
+    ctx.closePath();
+    ctx.fill();
+
+    const pagX = sx - 10;
+    const pagY = sy - 12;
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.roundRect(pagX - 3.5, pagY - 2, 7, 7, 1);
+    ctx.fill();
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.moveTo(pagX - 4.5, pagY - 2); ctx.lineTo(pagX + 4.5, pagY - 2); ctx.lineTo(pagX, pagY - 7); ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#b45309';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx + 10, sy + 5);
+    ctx.lineTo(sx + 12, sy - 26);
+    ctx.stroke();
+
+    ctx.fillStyle = '#e2e8f0';
+    ctx.beginPath();
+    ctx.moveTo(sx + 12, sy - 26);
+    ctx.lineTo(sx + 10, sy - 20);
+    ctx.lineTo(sx + 14, sy - 20);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+  } else if (godIdx === 3) {
+    // 4. BENZAITEN (Goddess of music/water: flowing celestial robes, holding biwa lute)
+    const benGrad = ctx.createLinearGradient(sx - 13, sy - 8, sx + 13, sy + 5);
+    benGrad.addColorStop(0, '#f472b6');
+    benGrad.addColorStop(0.5, '#ec4899');
+    benGrad.addColorStop(1, '#a855f7');
+    ctx.fillStyle = benGrad;
+    ctx.beginPath();
+    ctx.roundRect(sx - 13, sy - 8, 26, 15, [6, 6, 3, 3]);
+    ctx.fill();
+    ctx.strokeStyle = '#fbcfe8';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(sx, sy - 14, 14, Math.PI * 0.8, Math.PI * 2.2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#fed7aa';
+    ctx.beginPath();
+    ctx.arc(sx, sy - 13, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.arc(sx, sy - 15, 6, Math.PI, 0);
+    ctx.fill();
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.moveTo(sx - 5, sy - 17);
+    ctx.lineTo(sx, sy - 23);
+    ctx.lineTo(sx + 5, sy - 17);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#34d399';
+    ctx.beginPath();
+    ctx.arc(sx, sy - 18, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(sx - 1, sy - 2);
+    ctx.rotate(0.35);
+    ctx.fillStyle = '#b45309';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 5, 8.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
+    ctx.fillStyle = '#78350f';
+    ctx.fillRect(-1.5, -14, 3, 7);
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(0, -13); ctx.lineTo(0, 7);
+    ctx.stroke();
+    ctx.restore();
+
+  } else if (godIdx === 4) {
+    // 5. FUKUROKUJU (God of wisdom/longevity: high elongated forehead, walking staff & crane/scroll)
+    const fRobeGrad = ctx.createLinearGradient(sx - 12, sy - 6, sx + 12, sy + 5);
+    fRobeGrad.addColorStop(0, '#047857');
+    fRobeGrad.addColorStop(0.5, '#065f46');
+    fRobeGrad.addColorStop(1, '#022c22');
+    ctx.fillStyle = fRobeGrad;
+    ctx.beginPath();
+    ctx.roundRect(sx - 12, sy - 6, 24, 13, [3, 3, 2, 2]);
+    ctx.fill();
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fed7aa';
+    ctx.beginPath();
+    ctx.ellipse(sx - 1, sy - 17, 5, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(sx - 5, sy - 12);
+    ctx.lineTo(sx + 3, sy - 12);
+    ctx.lineTo(sx, sy + 3);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(sx + 10, sy + 5);
+    ctx.lineTo(sx + 11, sy - 25);
+    ctx.stroke();
+
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.roundRect(sx + 12, sy - 21, 6, 8, 1);
+    ctx.fill();
+    ctx.strokeStyle = '#b45309';
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(sx + 12, sy - 18, 6, 1.5);
+
+  } else if (godIdx === 5) {
+    // 6. JUROJIN (God of elderly/longevity: long white beard, holding peach of immortality & scroll)
+    const jRobeGrad = ctx.createLinearGradient(sx - 12, sy - 8, sx + 12, sy + 5);
+    jRobeGrad.addColorStop(0, '#2563eb');
+    jRobeGrad.addColorStop(0.5, '#1d4ed8');
+    jRobeGrad.addColorStop(1, '#1e3a8a');
+    ctx.fillStyle = jRobeGrad;
+    ctx.beginPath();
+    ctx.roundRect(sx - 12, sy - 7, 24, 14, [4, 4, 2, 2]);
+    ctx.fill();
+    ctx.strokeStyle = '#93c5fd';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fed7aa';
+    ctx.beginPath();
+    ctx.arc(sx, sy - 14, 6.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.roundRect(sx - 6, sy - 21, 12, 5, 2);
+    ctx.fill();
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(sx - 4.5, sy - 13);
+    ctx.lineTo(sx + 4.5, sy - 13);
+    ctx.lineTo(sx + 2, sy + 2);
+    ctx.lineTo(sx - 2, sy + 2);
+    ctx.closePath();
+    ctx.fill();
+
+    const peachX = sx + 9;
+    const peachY = sy - 4;
+    ctx.fillStyle = '#f472b6';
+    ctx.beginPath();
+    ctx.moveTo(peachX, peachY - 4.5);
+    ctx.bezierCurveTo(peachX + 4.5, peachY - 3, peachX + 4, peachY + 3.5, peachX, peachY + 4);
+    ctx.bezierCurveTo(peachX - 4, peachY + 3.5, peachX - 4.5, peachY - 3, peachX, peachY - 4.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#10b981';
+    ctx.beginPath();
+    ctx.ellipse(peachX - 3, peachY - 4, 2.5, 1.2, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#fef3c7';
+    ctx.beginPath();
+    ctx.roundRect(sx - 12, sy - 5, 5, 8, 1);
+    ctx.fill();
+    ctx.strokeStyle = '#b45309';
+    ctx.lineWidth = 0.7;
+    ctx.stroke();
+
+  } else {
+    // 7. HOTEI (God of happiness/contentment: cheerful round belly, holding large cloth sack & fan)
+    ctx.fillStyle = '#e2e8f0';
+    ctx.beginPath();
+    ctx.ellipse(sx - 10, sy - 4, 10, 12, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#d97706';
+    ctx.beginPath();
+    ctx.roundRect(sx - 12, sy - 8, 24, 15, [4, 4, 2, 2]);
+    ctx.fill();
+    ctx.strokeStyle = '#92400e';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fed7aa';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy - 1, 7.5, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ea580c';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.fillStyle = '#c2410c';
+    ctx.beginPath();
+    ctx.arc(sx, sy, 1, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#fed7aa';
+    ctx.beginPath();
+    ctx.arc(sx, sy - 13, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#7c2d12';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.arc(sx, sy - 13, 3.5, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+
+    const fanX = sx + 12;
+    const fanY = sy - 7;
+    ctx.fillStyle = '#fde047';
+    ctx.beginPath();
+    ctx.ellipse(fanX, fanY, 4.5, 5.5, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#b45309';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(fanX, fanY + 5); ctx.lineTo(fanX - 2, fanY + 9);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Complete standalone vector rendering for Classical Japanese Stone Lantern (Tōrō / Kasuga-dōrō):
+ * - Tiered stone pedestal base (Kiso)
+ * - Cylindrical fluted column (Sao) with central ring
+ * - Lotus platform (Chūdai)
+ * - Carved stone firebox (Hibukuro) glowing with warm amber candlelight through window latticework
+ * - Hexagonal flared pagoda roof umbrella (Kasa) with upturned corners
+ * - Round jewel finial (Hōju)
+ */
+export function renderStoneLantern(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+) {
+  // Ground shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 16, 22, 6.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 1. Tiered Stone Pedestal Base (Kiso)
+  const kisoGrad = ctx.createLinearGradient(sx - 15, sy + 7, sx + 15, sy + 14);
+  kisoGrad.addColorStop(0, '#334155');
+  kisoGrad.addColorStop(0.5, '#475569');
+  kisoGrad.addColorStop(1, '#1e293b');
+  ctx.fillStyle = kisoGrad;
+  ctx.beginPath();
+  ctx.roundRect(sx - 15, sy + 8, 30, 7, [1, 1, 2, 2]);
+  ctx.fill();
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  ctx.fillStyle = '#475569';
+  ctx.beginPath();
+  ctx.roundRect(sx - 11, sy + 3, 22, 5.5, 1.5);
+  ctx.fill();
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // 2. Cylindrical Fluted Column (Sao)
+  const saoGrad = ctx.createLinearGradient(sx - 6, sy - 9, sx + 6, sy - 9);
+  saoGrad.addColorStop(0, '#334155');
+  saoGrad.addColorStop(0.5, '#64748b');
+  saoGrad.addColorStop(1, '#334155');
+  ctx.fillStyle = saoGrad;
+  ctx.beginPath();
+  ctx.roundRect(sx - 5.5, sy - 8, 11, 12, 1);
+  ctx.fill();
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(sx - 2, sy - 8); ctx.lineTo(sx - 2, sy + 4);
+  ctx.moveTo(sx + 2, sy - 8); ctx.lineTo(sx + 2, sy + 4);
+  ctx.stroke();
+
+  ctx.fillStyle = '#64748b';
+  ctx.fillRect(sx - 7, sy - 2.5, 14, 2.5);
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 0.7;
+  ctx.strokeRect(sx - 7, sy - 2.5, 14, 2.5);
+
+  // 3. Lotus Platform (Chūdai)
+  ctx.fillStyle = '#475569';
+  ctx.beginPath();
+  ctx.moveTo(sx - 7, sy - 8);
+  ctx.lineTo(sx - 13, sy - 14);
+  ctx.lineTo(sx + 13, sy - 14);
+  ctx.lineTo(sx + 7, sy - 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.arc(sx - 6, sy - 11, 3.5, 0, Math.PI);
+  ctx.arc(sx, sy - 11, 3.5, 0, Math.PI);
+  ctx.arc(sx + 6, sy - 11, 3.5, 0, Math.PI);
+  ctx.stroke();
+
+  // 4. Carved Stone Firebox / Lantern Housing (Hibukuro) glowing with warm amber candlelight
+  const fireboxW = 20;
+  const fireboxH = 12;
+  const fireboxX = sx - fireboxW / 2;
+  const fireboxY = sy - 26;
+
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath();
+  ctx.roundRect(fireboxX, fireboxY, fireboxW, fireboxH, 1.5);
+  ctx.fill();
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+
+  // Radiant warm amber candlelight aura pulsating softly
+  const flicker = Math.sin(Date.now() * 0.007) * 2;
+  const fireGlow = ctx.createRadialGradient(sx, fireboxY + fireboxH / 2, 2, sx, fireboxY + fireboxH / 2, 26 + flicker);
+  fireGlow.addColorStop(0, 'rgba(254, 240, 138, 0.75)');
+  fireGlow.addColorStop(0.35, 'rgba(245, 158, 11, 0.45)');
+  fireGlow.addColorStop(0.7, 'rgba(217, 119, 6, 0.2)');
+  fireGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = fireGlow;
+  ctx.beginPath();
+  ctx.arc(sx, fireboxY + fireboxH / 2, 26 + flicker, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Inner warm luminous firebox window
+  ctx.fillStyle = '#fef08a';
+  ctx.fillRect(fireboxX + 3, fireboxY + 2, fireboxW - 6, fireboxH - 4);
+
+  // Flame core
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.ellipse(sx, fireboxY + fireboxH / 2, 2.5, 3.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Window stone/timber latticework
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(sx, fireboxY + 1);
+  ctx.lineTo(sx, fireboxY + fireboxH - 1);
+  ctx.moveTo(fireboxX + 2, fireboxY + fireboxH / 2);
+  ctx.lineTo(fireboxX + fireboxW - 2, fireboxY + fireboxH / 2);
+  ctx.stroke();
+
+  // 5. Hexagonal Flared Pagoda Roof Umbrella (Kasa) with upturned corners
+  const roofApexY = fireboxY - 8;
+  const roofBaseY = fireboxY;
+  const roofSpread = 19;
+
+  ctx.fillStyle = '#334155';
+  ctx.beginPath();
+  ctx.moveTo(sx - roofSpread, roofBaseY);
+  ctx.quadraticCurveTo(sx - roofSpread * 0.5, roofBaseY - 3, sx, roofApexY);
+  ctx.quadraticCurveTo(sx + roofSpread * 0.5, roofBaseY - 3, sx + roofSpread, roofBaseY);
+  ctx.lineTo(sx + roofSpread + 1, roofBaseY + 1.5);
+  ctx.quadraticCurveTo(sx, roofBaseY - 1, sx - roofSpread - 1, roofBaseY + 1.5);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Upturned eaves (sori) and roof ridges
+  ctx.strokeStyle = '#64748b';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(sx, roofApexY); ctx.lineTo(sx - roofSpread, roofBaseY);
+  ctx.moveTo(sx, roofApexY); ctx.lineTo(sx - roofSpread * 0.45, roofBaseY + 0.5);
+  ctx.moveTo(sx, roofApexY); ctx.lineTo(sx + roofSpread * 0.45, roofBaseY + 0.5);
+  ctx.moveTo(sx, roofApexY); ctx.lineTo(sx + roofSpread, roofBaseY);
+  ctx.stroke();
+
+  // 6. Round Jewel Finial (Hōju)
+  ctx.fillStyle = '#475569';
+  ctx.fillRect(sx - 3.5, roofApexY - 2, 7, 2.5);
+  ctx.fillStyle = '#fef08a';
+  ctx.beginPath();
+  ctx.arc(sx, roofApexY - 4.5, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#d97706';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(sx - 0.8, roofApexY - 5.5, 1, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
+ * Animated Canvas Vector Preview component for Market and Deployment cards.
+ * Cycles variations for items with multiple appearances:
+ * - Zen Pebble Path: cycles 5 variations every 1.5 seconds.
+ * - Seven Lucky Gods: cycles all 7 god statues every 1.5 seconds.
+ * - All other items: renders their crisp procedural vector graphic matching the on-grid rendering.
+ */
+export function ItemVectorPreview({
+  itemKey,
+  width = 44,
+  height = 44,
+}: {
+  itemKey: string;
+  width?: number;
+  height?: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    let animId: number;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = width * 2;
+    canvas.height = height * 2;
+
+    const render = () => {
+      ctx.setTransform(2, 0, 0, 2, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      const cx = width / 2;
+      const cy = height / 2;
+
+      ctx.save();
+      let scale = 0.65;
+      let offsetY = 0;
+      if (itemKey === 'torii_gate') {
+        scale = 0.32;
+        offsetY = 5;
+      } else if (itemKey === 'solar_farm_2x2' || itemKey === 'wind_farm_2x2') {
+        scale = 0.32;
+        offsetY = 0;
+      } else if (itemKey === 'solar_farm_3x3' || itemKey === 'wind_farm_3x3') {
+        scale = 0.21;
+        offsetY = 0;
+      } else if (itemKey === 'bamboo_fence') {
+        scale = 0.55;
+      } else if (itemKey === 'seven_lucky_gods') {
+        scale = 0.62;
+        offsetY = -2;
+      } else if (itemKey === 'stone_lantern') {
+        scale = 0.58;
+        offsetY = -2;
+      } else if (itemKey === 'asparagus_fern_ball') {
+        scale = 0.6;
+        offsetY = 4;
+      } else if (itemKey === 'water_feature') {
+        scale = 0.62;
+      } else if (itemKey === 'zen_rock_formation') {
+        scale = 0.65;
+      } else if (itemKey === 'growing_bamboo_formation') {
+        scale = 0.55;
+        offsetY = 6;
+      }
+
+      ctx.translate(cx, cy + offsetY);
+      ctx.scale(scale, scale);
+
+      if (itemKey === 'decor_pebble_path' || itemKey === 'zen_pebble_path') {
+        const variant = Math.floor(Date.now() / 1500) % 5;
+        renderPebbleCluster(ctx, 0, 0, variant);
+      } else if (itemKey === 'seven_lucky_gods') {
+        const variant = Math.floor(Date.now() / 1500) % 7;
+        renderSevenLuckyGods(ctx, 0, 0, variant);
+      } else if (itemKey === 'stone_lantern') {
+        renderStoneLantern(ctx, 0, 0);
+      } else if (itemKey === 'torii_gate') {
+        drawToriiGateGround(ctx, 0, 0, 'horizontal');
+        drawToriiZenBushes(ctx, 0, 0, 'horizontal', false);
+        drawToriiGatePillars(ctx, 0, 0, 'horizontal', false);
+        drawToriiGateRoofLintel(ctx, 0, 0, 'horizontal', false);
+      } else if (itemKey === 'bamboo_fence') {
+        renderBambooFence(ctx, 0, 0, 'horizontal');
+      } else if (itemKey === 'water_feature') {
+        renderWaterFeature(ctx, 0, 0);
+      } else if (itemKey === 'zen_rock_formation') {
+        renderRockFormation(ctx, 0, 0);
+      } else if (itemKey === 'growing_bamboo_formation') {
+        renderGrowingBambooFormation(ctx, 0, 0);
+      } else if (itemKey === 'asparagus_fern_ball') {
+        renderAsparagusFernBall(ctx, 0, 0);
+      } else if (itemKey === 'empty_crystal_pedestal') {
+        renderCrystalPedestal(ctx, 0, 0, {
+          id: 'prev',
+          type: 'empty_crystal_pedestal',
+          x: 0,
+          y: 0,
+          gridX: 0,
+          gridY: 0,
+        });
+      } else {
+        renderCompleteDecor(ctx, itemKey as DeployedStructureType, 0, 0, 'horizontal');
+      }
+      ctx.restore();
+
+      const needsAnimation =
+        itemKey === 'decor_pebble_path' ||
+        itemKey === 'zen_pebble_path' ||
+        itemKey === 'seven_lucky_gods' ||
+        itemKey === 'water_feature' ||
+        itemKey === 'stone_lantern';
+
+      if (needsAnimation) {
+        animId = requestAnimationFrame(render);
+      }
+    };
+
+    render();
+
+    return () => {
+      if (animId) cancelAnimationFrame(animId);
+    };
+  }, [itemKey, width, height]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{ width, height }}
+      className="rounded-xl border border-slate-700 bg-slate-950/80 shrink-0 shadow-inner pointer-events-none"
+    />
+  );
+}
+
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -8019,6 +10113,12 @@ export default function App() {
   // Permanent Sanctuary Storage (with Coins Currency, Purchased Maps, Expansions, Organic Waste & Composting)
   const sanctuaryInventoryRef = useRef<SanctuaryInventory>({
     coins: 50,
+    license_t1: 0,
+    license_t2: 0,
+    license_t3: 0,
+    licenseT1: 0,
+    licenseT2: 0,
+    licenseT3: 0,
     player_level: 1,
     player_exp: 0,
     scrap_metal: 0,
@@ -8030,6 +10130,22 @@ export default function App() {
     organic_compost: 0,
     biochemicals: 0,
     fertilizer: 0,
+    resources: {
+      license_t1: 0,
+      license_t2: 0,
+      license_t3: 0,
+      licenseT1: 0,
+      licenseT2: 0,
+      licenseT3: 0,
+      scrap_metal: 0,
+      copper_wire: 0,
+      brass_gears: 0,
+      circuit_boards: 0,
+      electronic_chips: 0,
+      organic_waste: 0,
+      biochemicals: 0,
+      fertilizer: 0,
+    },
     seedlingList: [],
     storedBonsais: [],
     scrapMetal: 0,
@@ -8045,17 +10161,40 @@ export default function App() {
     has_tier2_guide: false,
     has_tier3_guide: false,
     has_auto_fabricator_guide: false,
+    has_auto_fab_book_1: false,
+    has_auto_fab_book_2: false,
+    has_auto_fab_book_3: false,
     has_workbench_t2_guide: false,
     has_workbench_t3_guide: false,
+    has_assembly_blueprint_1: false,
+    has_assembly_blueprint_2: false,
+    has_assembly_blueprint_3: false,
+    has_overclock_schematic_1: false,
+    has_overclock_schematic_2: false,
+    has_overclock_schematic_3: false,
     workbench_tier: 1,
     crafting_automatons_inv: 0,
+    assembly_module_t1_inv: 0,
+    assembly_module_t2_inv: 0,
+    assembly_module_t3_inv: 0,
+    overclock_module_t1_inv: 0,
+    overclock_module_t2_inv: 0,
+    overclock_module_t3_inv: 0,
+    attached_workbench_modules: [],
     auto_fabricators_inv: 0,
+    auto_fabrication_t1_inv: 0,
+    auto_fabrication_t2_inv: 0,
+    auto_fabrication_t3_inv: 0,
     solar_panels_inv: 0,
     solar_panel_inv: 0,
     solarPanels: 0,
+    solar_farm_2x2_inv: 0,
+    solar_farm_3x3_inv: 0,
     wind_turbines_inv: 0,
     wind_turbine_inv: 0,
     windTurbines: 0,
+    wind_farm_2x2_inv: 0,
+    wind_farm_3x3_inv: 0,
     automaton_t1_inv: 0,
     automaton_t2_inv: 0,
     automaton_t3_inv: 0,
@@ -8070,6 +10209,8 @@ export default function App() {
     asparagus_fern_ball_inv: 0,
     decor_woven_wall_inv: 0,
     water_feature_inv: 0,
+    seven_lucky_gods_inv: 0,
+    stone_lantern_inv: 0,
     torii_gate_inv: 0,
     crystal_pedestal_foliage_inv: 0,
     crystal_pedestal_branches_inv: 0,
@@ -8089,7 +10230,14 @@ export default function App() {
       asparagus_fern_ball: 0,
       wovenWall: 0,
       waterFeature: 0,
+      bambooFence: 0,
+      bamboo_fence: 0,
+      sevenLuckyGods: 0,
+      seven_lucky_gods: 0,
+      stoneLantern: 0,
+      stone_lantern: 0,
       toriiGate: 0,
+      torii_gate: 0,
     },
     tool_compost_heap_inv: 0,
     tool_garden_well_inv: 0,
@@ -8777,16 +10925,8 @@ export default function App() {
       return deployedStructuresRef.current.some((s) => {
         if (excludeStructId && s.id === excludeStructId) return false;
         if (s.type === 'bamboo_fence') return false; // Fences are boundary edge entities and do not occupy plot interiors
-        const sCol = Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-        const sRow = Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
-        if (s.type === 'torii_gate') {
-          if (s.orientation === 'vertical') {
-            return c === sCol && (r === sRow - 1 || r === sRow || r === sRow + 1);
-          } else {
-            return (c === sCol - 1 || c === sCol || c === sCol + 1) && r === sRow;
-          }
-        }
-        return c === sCol && r === sRow;
+        const plots = getStructureConstituentPlots(s);
+        return plots.some((p) => p.col === c && p.row === r);
       });
     },
     [],
@@ -8853,59 +10993,9 @@ export default function App() {
         offCtx.stroke();
       }
 
-      // 16x8 GRID TILE OVERLAY WITH UNLOCKED / LOCKED SANCTUARY PLOTS
-      const halfTileW = (SANCTUARY_GRID.cellW - 8) / 2;
-      const halfTileH = (SANCTUARY_GRID.cellH - 8) / 2;
-
-      for (let c = 0; c < SANCTUARY_GRID.cols; c++) {
-        for (let r = 0; r < SANCTUARY_GRID.rows; r++) {
-          const gx = SANCTUARY_GRID.startX + c * SANCTUARY_GRID.cellW;
-          const gy = SANCTUARY_GRID.startY + r * SANCTUARY_GRID.cellH;
-          const isUnlocked = isGridPlotUnlocked(gx, gy);
-          const tileX = gx - halfTileW;
-          const tileY = gy - halfTileH;
-          const tileW = halfTileW * 2;
-          const tileH = halfTileH * 2;
-
-          if (isUnlocked) {
-            // Unlocked Active Soil Tile with subtle parquet grain
-            offCtx.fillStyle = 'rgba(34, 197, 94, 0.07)';
-            offCtx.fillRect(tileX, tileY, tileW, tileH);
-            offCtx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-            offCtx.lineWidth = 1;
-            offCtx.strokeRect(tileX, tileY, tileW, tileH);
-
-            // Brass corner soil markers
-            offCtx.fillStyle = 'rgba(250, 204, 21, 0.4)';
-            offCtx.fillRect(tileX + 2, tileY + 2, 4, 4);
-            offCtx.fillRect(tileX + tileW - 6, tileY + 2, 4, 4);
-            offCtx.fillRect(tileX + 2, tileY + tileH - 6, 4, 4);
-            offCtx.fillRect(tileX + tileW - 6, tileY + tileH - 6, 4, 4);
-
-            // Center planting alignment dot
-            offCtx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-            offCtx.fillRect(gx - 1.5, gy - 1.5, 3, 3);
-          } else {
-            // Locked plot boundary with subtle decorative soil ribbon & lock marker
-            offCtx.fillStyle = 'rgba(15, 23, 42, 0.72)';
-            offCtx.fillRect(tileX, tileY, tileW, tileH);
-            offCtx.strokeStyle = 'rgba(245, 158, 11, 0.25)';
-            offCtx.lineWidth = 1;
-            offCtx.setLineDash([3, 3]);
-            offCtx.strokeRect(tileX, tileY, tileW, tileH);
-            offCtx.setLineDash([]);
-
-            offCtx.fillStyle = 'rgba(245, 158, 11, 0.45)';
-            offCtx.font = '10px system-ui';
-            offCtx.textAlign = 'center';
-            offCtx.fillText('🔒', gx, gy + 3.5);
-          }
-        }
-      }
-
       offscreenTerrainDirtyRef.current = false;
     },
-    [isGridPlotUnlocked],
+    [],
   );
 
   // Compute Current Total Rover Cargo Weight (kg)
@@ -8926,15 +11016,19 @@ export default function App() {
     return Math.round(w * 10) / 10;
   }, []);
 
-  // Compute Power Grid metrics (Dynamically sums DEPLOYED solar panels & wind turbines with stackable Proximity Resonance)
+  // Compute Power Grid metrics (Dynamically sums DEPLOYED solar panels, wind turbines & farms with stackable Proximity Resonance)
   const getPowerMetrics = useCallback(() => {
-    const deployedSolarList = deployedStructuresRef.current.filter((s) => s.type === 'solar_panel');
-    const deployedTurbineList = deployedStructuresRef.current.filter((s) => s.type === 'wind_turbine');
+    const deployedSolarList = deployedStructuresRef.current.filter(
+      (s) => s.type === 'solar_panel' || s.type === 'solar_farm_2x2' || s.type === 'solar_farm_3x3',
+    );
+    const deployedTurbineList = deployedStructuresRef.current.filter(
+      (s) => s.type === 'wind_turbine' || s.type === 'wind_farm_2x2' || s.type === 'wind_farm_3x3',
+    );
 
     let solarKw = 0;
     let solarBonusCount = 0;
     deployedSolarList.forEach((panel) => {
-      const {total, count} = getSolarPanelOutput(panel, deployedStructuresRef.current);
+      const {total, count} = getSolarStructureOutput(panel, deployedStructuresRef.current);
       solarKw += total;
       solarBonusCount += count;
     });
@@ -8942,7 +11036,7 @@ export default function App() {
     let turbineKw = 0;
     let turbineBonusCount = 0;
     deployedTurbineList.forEach((turbine) => {
-      const {total, count} = getWindTurbineOutput(turbine, deployedStructuresRef.current);
+      const {total, count} = getWindStructureOutput(turbine, deployedStructuresRef.current);
       turbineKw += total;
       turbineBonusCount += count;
     });
@@ -8956,29 +11050,42 @@ export default function App() {
       if (b.automatonTier > 0) {
         activeAutomatonsCount += 1;
         const tierConfig = getAutomatonConfig(b.automatonTier);
-        totalRequired += tierConfig?.kwDrain || 2;
+        totalRequired += tierConfig?.kwDrain || (b.automatonTier === 3 ? 12 : b.automatonTier === 2 ? 7 : 4);
       }
     });
 
     deployedStructuresRef.current.forEach((s) => {
       if (s.type === 'automaton_t1') {
         activeAutomatonsCount += 1;
-        totalRequired += 2;
+        totalRequired += 4;
       } else if (s.type === 'automaton_t2') {
         activeAutomatonsCount += 1;
-        totalRequired += 4;
+        totalRequired += 7;
       } else if (s.type === 'automaton_t3') {
         activeAutomatonsCount += 1;
-        totalRequired += 7;
+        totalRequired += 12;
       }
     });
 
-    // Installed Crafting Assembly Arms consume 3 kW each
-    const craftingPowerDrain = installedCraftingArmsRef.current * 3;
+    // Installed Crafting Assembly Arms & Workbench Modules power drain
+    let craftingPowerDrain = installedCraftingArmsRef.current * 3;
+    const attachedWbModules = sanctuaryInventoryRef.current.attached_workbench_modules || [];
+    attachedWbModules.forEach((m) => {
+      if (m === 'assembly_module_t1') craftingPowerDrain += 2;
+      else if (m === 'assembly_module_t2') craftingPowerDrain += 3;
+      else if (m === 'assembly_module_t3') craftingPowerDrain += 4;
+      else if (m === 'overclock_module_t1') craftingPowerDrain += 3;
+      else if (m === 'overclock_module_t2') craftingPowerDrain += 5;
+      else if (m === 'overclock_module_t3') craftingPowerDrain += 7;
+      else craftingPowerDrain += 3;
+    });
     totalRequired += craftingPowerDrain;
 
-    // Installed Auto-Fabrication Lanes consume 10 kW each
-    const autoFabricatorPowerDrain = autoFabricatorLanesRef.current.length * 10;
+    // Installed Auto-Fabrication Lanes consume power by tier: T1 (6 kW), T2 (10 kW), T3 (14 kW)
+    let autoFabricatorPowerDrain = 0;
+    autoFabricatorLanesRef.current.forEach((lane) => {
+      autoFabricatorPowerDrain += lane.tier === 1 ? 6 : lane.tier === 3 ? 14 : 10;
+    });
     totalRequired += autoFabricatorPowerDrain;
 
     const isPowerSufficient = totalGenerated >= totalRequired;
@@ -9929,6 +12036,12 @@ export default function App() {
 
     sanctuaryInventoryRef.current = {
       coins: 50,
+      license_t1: 0,
+      license_t2: 0,
+      license_t3: 0,
+      licenseT1: 0,
+      licenseT2: 0,
+      licenseT3: 0,
       player_level: 1,
       player_exp: 0,
       scrap_metal: 0,
@@ -9940,6 +12053,22 @@ export default function App() {
       organic_compost: 0,
       biochemicals: 0,
       fertilizer: 0,
+      resources: {
+        license_t1: 0,
+        license_t2: 0,
+        license_t3: 0,
+        licenseT1: 0,
+        licenseT2: 0,
+        licenseT3: 0,
+        scrap_metal: 0,
+        copper_wire: 0,
+        brass_gears: 0,
+        circuit_boards: 0,
+        electronic_chips: 0,
+        organic_waste: 0,
+        biochemicals: 0,
+        fertilizer: 0,
+      },
       seedlingList: [],
       storedBonsais: [],
       scrapMetal: 0,
@@ -9955,17 +12084,40 @@ export default function App() {
       has_tier2_guide: false,
       has_tier3_guide: false,
       has_auto_fabricator_guide: false,
+      has_auto_fab_book_1: false,
+      has_auto_fab_book_2: false,
+      has_auto_fab_book_3: false,
       has_workbench_t2_guide: false,
       has_workbench_t3_guide: false,
+      has_assembly_blueprint_1: false,
+      has_assembly_blueprint_2: false,
+      has_assembly_blueprint_3: false,
+      has_overclock_schematic_1: false,
+      has_overclock_schematic_2: false,
+      has_overclock_schematic_3: false,
       workbench_tier: 1,
       crafting_automatons_inv: 0,
+      assembly_module_t1_inv: 0,
+      assembly_module_t2_inv: 0,
+      assembly_module_t3_inv: 0,
+      overclock_module_t1_inv: 0,
+      overclock_module_t2_inv: 0,
+      overclock_module_t3_inv: 0,
+      attached_workbench_modules: [],
       auto_fabricators_inv: 0,
+      auto_fabrication_t1_inv: 0,
+      auto_fabrication_t2_inv: 0,
+      auto_fabrication_t3_inv: 0,
       solar_panels_inv: 0,
       solar_panel_inv: 0,
       solarPanels: 0,
+      solar_farm_2x2_inv: 0,
+      solar_farm_3x3_inv: 0,
       wind_turbines_inv: 0,
       wind_turbine_inv: 0,
       windTurbines: 0,
+      wind_farm_2x2_inv: 0,
+      wind_farm_3x3_inv: 0,
       automaton_t1_inv: 0,
       automaton_t2_inv: 0,
       automaton_t3_inv: 0,
@@ -9980,6 +12132,8 @@ export default function App() {
       asparagus_fern_ball_inv: 0,
       decor_woven_wall_inv: 0,
       water_feature_inv: 0,
+      seven_lucky_gods_inv: 0,
+      stone_lantern_inv: 0,
       torii_gate_inv: 0,
       crystal_pedestal_foliage_inv: 0,
       crystal_pedestal_branches_inv: 0,
@@ -9999,7 +12153,14 @@ export default function App() {
         asparagus_fern_ball: 0,
         wovenWall: 0,
         waterFeature: 0,
+        bambooFence: 0,
+        bamboo_fence: 0,
+        sevenLuckyGods: 0,
+        seven_lucky_gods: 0,
+        stoneLantern: 0,
+        stone_lantern: 0,
         toriiGate: 0,
+        torii_gate: 0,
       },
       tool_compost_heap_inv: 0,
       tool_garden_well_inv: 0,
@@ -10210,23 +12371,12 @@ export default function App() {
     refreshHud();
   }, [revealAreaSpecies, refreshHud, triggerNotification]);
 
-  // Helper to locate active/anomaly site at current tile or adjacent (for crystals and seedlings)
+  // Helper to locate active/anomaly site strictly at current tile
   const findNearbyExcursionNode = useCallback(() => {
     const rover = roverRef.current;
     const currentKey = `${rover.tileX},${rover.tileY}`;
     const exactNode = excursionNodesRef.current.get(currentKey);
     if (exactNode && !exactNode.collected) return exactNode;
-    // Check adjacent tiles if player is right next to an anomaly/site
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        if (dx === 0 && dy === 0) continue;
-        const k = `${rover.tileX + dx},${rover.tileY + dy}`;
-        const n = excursionNodesRef.current.get(k);
-        if (n && !n.collected && (n.type === 'CRYSTAL' || n.type === 'SAPLING' || n.type === 'RESOURCE')) {
-          return n;
-        }
-      }
-    }
     return null;
   }, []);
 
@@ -10353,6 +12503,12 @@ export default function App() {
       if (bonsaiIdx === -1) return;
 
       const bonsai = plantedBonsaisRef.current[bonsaiIdx];
+      if (bonsai.isFavorite) {
+        gameAudio.playErrorBuzz();
+        triggerNotification('Cannot donate: Bonsai is Favorited! Unfavorite to unlock donation.', '#ef4444');
+        return;
+      }
+
       const basePayout = calculateDonationValue(bonsai);
 
       // Check Eco Quest active Botanical Request matching
@@ -10428,6 +12584,12 @@ export default function App() {
       if (idx === -1) return;
 
       const bonsai = storedPottedBonsaisRef.current[idx];
+      if (bonsai.isFavorite) {
+        gameAudio.playErrorBuzz();
+        triggerNotification('Cannot donate: Bonsai is Favorited! Unfavorite to unlock donation.', '#ef4444');
+        return;
+      }
+
       const basePayout = calculateDonationValue(bonsai);
 
       // Check Eco Quest active Botanical Request matching
@@ -10477,6 +12639,39 @@ export default function App() {
     [refreshHud, refreshMasterQuests, triggerNotification],
   );
   const sellStoredPottedBonsai = donateStoredPottedBonsai;
+
+  // --- BONSAI FAVORITE TOGGLE HANDLER ---
+  const toggleBonsaiFavorite = useCallback(
+    (bonsaiId: string) => {
+      const planted = plantedBonsaisRef.current.find((b) => b.id === bonsaiId);
+      if (planted) {
+        planted.isFavorite = !planted.isFavorite;
+        gameAudio.playConfirmSelect();
+        triggerNotification(
+          planted.isFavorite
+            ? `⭐ Favorited ${getBonsaiDisplayName(planted)} (Locked from donation)`
+            : `Unlocked ${getBonsaiDisplayName(planted)} (Can now be donated)`,
+          planted.isFavorite ? '#fbbf24' : '#94a3b8',
+        );
+        refreshHud();
+        return;
+      }
+      const stored = storedPottedBonsaisRef.current.find((b) => b.id === bonsaiId);
+      if (stored) {
+        stored.isFavorite = !stored.isFavorite;
+        gameAudio.playConfirmSelect();
+        triggerNotification(
+          stored.isFavorite
+            ? `⭐ Favorited ${getBonsaiDisplayName(stored)} (Locked from donation)`
+            : `Unlocked ${getBonsaiDisplayName(stored)} (Can now be donated)`,
+          stored.isFavorite ? '#fbbf24' : '#94a3b8',
+        );
+        refreshHud();
+        return;
+      }
+    },
+    [refreshHud, triggerNotification],
+  );
 
   // --- BONSAI MASTER QUEST: TIER 1 COMPLETION HANDLERS ---
   const handleCompleteDiscoveryTier1 = useCallback(() => {
@@ -10547,6 +12742,7 @@ export default function App() {
         cultivationPotential: bonsai.cultivationPotential || { ...DEFAULT_CULTIVATION_POTENTIAL },
         width: bonsai.width,
         height: bonsai.height,
+        isFavorite: bonsai.isFavorite,
       });
       sanctuaryInventoryRef.current.storedBonsais = storedPottedBonsaisRef.current;
 
@@ -10663,6 +12859,7 @@ export default function App() {
   const handleBonsaiLevelUp = useCallback(
     (bonsai: PlantedBonsai) => {
       bonsai.level += 1;
+      bonsai.lastLevelUpTime = Date.now();
 
       // Expand to 2x2 footprint if reaching Rating 5 (Lv. 21+ / Ancient)
       const currentRating = getBonsaiMaturityRating(bonsai);
@@ -10822,7 +13019,30 @@ export default function App() {
         );
       }
 
-      const inv = sanctuaryInventoryRef.current;
+      // Seven Lucky Gods (Fortunate Blessings): +0.01 Bonsai Baseprice per Bonsai Level Up (doubled if Torii Gate active)
+      if (synergies.basePriceBonusRate > 0) {
+        bonsai.basePriceBonus = Number(((bonsai.basePriceBonus || 0) + synergies.basePriceBonusRate).toFixed(4));
+        addFloatingText(
+          bonsai.x,
+          bonsai.y - 120,
+          `+${synergies.basePriceBonusRate.toFixed(2)} Baseprice! (🌟 Fortunate Blessings)`,
+          '#facc15',
+        );
+      }
+
+      // Stone Lantern (Skilled Knowledge): +0.5% Chance for Zen Point on Bonsai Level Up (doubled if Torii Gate active)
+      if (synergies.zenPointChance > 0 && Math.random() < synergies.zenPointChance) {
+        inv.zen_essence += 1;
+        gameAudio.playPowerupChime();
+        addFloatingText(
+          bonsai.x,
+          bonsai.y - 135,
+          `+1 🌸 Zen Point! (🌟 Skilled Knowledge)`,
+          '#ec4899',
+        );
+        triggerNotification(`🌸 Skilled Knowledge: Stone Lantern awarded +1 Zen Point on level up!`, '#ec4899');
+      }
+
       let organicWasteCount = 1;
       let extraWasteTriggered = false;
       if (synergies.extraWasteChance > 0 && Math.random() < synergies.extraWasteChance) {
@@ -11046,6 +13266,9 @@ export default function App() {
         | 'has_tier2_guide'
         | 'has_tier3_guide'
         | 'has_auto_fabricator_guide'
+        | 'has_auto_fab_book_1'
+        | 'has_auto_fab_book_2'
+        | 'has_auto_fab_book_3'
         | 'has_workbench_t2_guide'
         | 'has_workbench_t3_guide'
         | 'has_rover_t2_blueprint'
@@ -11058,7 +13281,13 @@ export default function App() {
         | 'has_battery_module_3_guide'
         | 'has_radar_module_1_guide'
         | 'has_radar_module_2_guide'
-        | 'has_radar_module_3_guide',
+        | 'has_radar_module_3_guide'
+        | 'has_assembly_blueprint_1'
+        | 'has_assembly_blueprint_2'
+        | 'has_assembly_blueprint_3'
+        | 'has_overclock_schematic_1'
+        | 'has_overclock_schematic_2'
+        | 'has_overclock_schematic_3',
       cost: number,
       title: string,
     ) => {
@@ -11095,7 +13324,7 @@ export default function App() {
       return;
     }
 
-    const currentTotal = installedCraftingArmsRef.current + autoFabricatorLanesRef.current.length;
+    const currentTotal = installedCraftingArmsRef.current + autoFabricatorLanesRef.current.length + (inv.attached_workbench_modules?.length || 0);
     const maxCapacity = getWorkbenchAutomatonCapacity(inv.workbench_tier || 1);
     if (currentTotal >= maxCapacity) {
       gameAudio.playErrorBuzz();
@@ -11120,15 +13349,17 @@ export default function App() {
     refreshHud();
   }, [refreshHud, triggerNotification]);
 
-  const attachAutoFabricatorLane = useCallback(() => {
+  const attachAutoFabricatorLane = useCallback((tier: 1 | 2 | 3 = 1) => {
     const inv = sanctuaryInventoryRef.current;
-    if (inv.auto_fabricators_inv <= 0) {
+    const invKey = `auto_fabrication_t${tier}_inv` as keyof SanctuaryInventory;
+    const stock = ((inv[invKey] as number) || 0) + (tier === 2 ? inv.auto_fabricators_inv : 0);
+    if (stock <= 0) {
       gameAudio.playErrorBuzz();
-      triggerNotification('No Auto-Fabrication Automatons in inventory! Craft one first.', '#ef4444');
+      triggerNotification(`No T${tier} Auto-Fabrication Modules in inventory! Craft one first.`, '#ef4444');
       return;
     }
 
-    const currentTotal = installedCraftingArmsRef.current + autoFabricatorLanesRef.current.length;
+    const currentTotal = installedCraftingArmsRef.current + autoFabricatorLanesRef.current.length + (inv.attached_workbench_modules?.length || 0);
     const maxCapacity = getWorkbenchAutomatonCapacity(inv.workbench_tier || 1);
     if (currentTotal >= maxCapacity) {
       gameAudio.playErrorBuzz();
@@ -11136,16 +13367,23 @@ export default function App() {
       return;
     }
 
-    inv.auto_fabricators_inv -= 1;
+    if (((inv[invKey] as number) || 0) > 0) {
+      (inv[invKey] as number) -= 1;
+    } else {
+      inv.auto_fabricators_inv = Math.max(0, inv.auto_fabricators_inv - 1);
+    }
+
     const newLane: AutoFabricatorLane = {
       id: `lane_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      tier,
       targetRecipeId: 'craft_enriched_compost',
       progressSeconds: 0,
     };
     autoFabricatorLanesRef.current.push(newLane);
 
+    const speedLabel = tier === 1 ? '50%' : tier === 2 ? '100%' : '150%';
     gameAudio.playPowerupChime();
-    triggerNotification('🏭 Installed Automated Production Lane! Select target recipe to begin loop.', '#38bdf8');
+    triggerNotification(`🏭 Installed T${tier} Auto-Fabrication Module (${speedLabel} Speed)! Select target recipe to begin loop.`, '#38bdf8');
     refreshHud();
   }, [refreshHud, triggerNotification]);
 
@@ -11153,10 +13391,12 @@ export default function App() {
     const idx = autoFabricatorLanesRef.current.findIndex((l) => l.id === laneId);
     if (idx === -1) return;
 
-    autoFabricatorLanesRef.current.splice(idx, 1);
-    sanctuaryInventoryRef.current.auto_fabricators_inv += 1;
+    const [lane] = autoFabricatorLanesRef.current.splice(idx, 1);
+    const laneTier = lane.tier || 1;
+    const invKey = `auto_fabrication_t${laneTier}_inv` as keyof SanctuaryInventory;
+    (inv[invKey] as number) = ((inv[invKey] as number) || 0) + 1;
     gameAudio.playCrispClick();
-    triggerNotification('🏭 Detached Auto-Fabrication Lane (Unit returned to inventory).', '#f59e0b');
+    triggerNotification(`🏭 Detached T${laneTier} Auto-Fabrication Module (Returned to inventory).`, '#f59e0b');
     refreshHud();
   }, [refreshHud, triggerNotification]);
 
@@ -11172,6 +13412,71 @@ export default function App() {
     refreshHud();
   }, [refreshHud, triggerNotification]);
 
+  const attachWorkbenchModule = useCallback(
+    (modType: WorkbenchModuleType) => {
+      if (modType === 'auto_fabrication_t1') {
+        attachAutoFabricatorLane(1);
+        return;
+      }
+      if (modType === 'auto_fabrication_t2') {
+        attachAutoFabricatorLane(2);
+        return;
+      }
+      if (modType === 'auto_fabrication_t3') {
+        attachAutoFabricatorLane(3);
+        return;
+      }
+
+      const inv = sanctuaryInventoryRef.current;
+      const attached = inv.attached_workbench_modules || [];
+      const maxCapacity = getWorkbenchAutomatonCapacity(inv.workbench_tier || 1);
+      const totalAttached = attached.length + autoFabricatorLanesRef.current.length + installedCraftingArmsRef.current;
+
+      if (totalAttached >= maxCapacity) {
+        gameAudio.playErrorBuzz();
+        triggerNotification(`Workbench module capacity reached (${totalAttached}/${maxCapacity})! Upgrade to next tier.`, '#ef4444');
+        return;
+      }
+
+      const invKey = `${modType}_inv` as keyof SanctuaryInventory;
+      const available = (inv[invKey] as number) || 0;
+      if (available <= 0) {
+        gameAudio.playErrorBuzz();
+        triggerNotification(`No uninstalled ${WORKBENCH_MODULE_CONFIGS[modType].name} in inventory! Craft one first.`, '#ef4444');
+        return;
+      }
+
+      inv[invKey] = available - 1;
+      attached.push(modType);
+      inv.attached_workbench_modules = [...attached];
+
+      gameAudio.playPowerupChime();
+      const cfg = WORKBENCH_MODULE_CONFIGS[modType];
+      triggerNotification(`⚙️ Attached ${cfg.name} (${cfg.bonusLabel})! Loadout: ${attached.length + autoFabricatorLanesRef.current.length}/${maxCapacity}`, '#38bdf8');
+      refreshHud();
+    },
+    [attachAutoFabricatorLane, refreshHud, triggerNotification],
+  );
+
+  const detachWorkbenchModule = useCallback(
+    (slotIdx: number) => {
+      const inv = sanctuaryInventoryRef.current;
+      const attached = inv.attached_workbench_modules || [];
+      if (slotIdx < 0 || slotIdx >= attached.length) return;
+
+      const [detached] = attached.splice(slotIdx, 1);
+      inv.attached_workbench_modules = [...attached];
+      const invKey = `${detached}_inv` as keyof SanctuaryInventory;
+      inv[invKey] = ((inv[invKey] as number) || 0) + 1;
+
+      gameAudio.playCrispClick();
+      const cfg = WORKBENCH_MODULE_CONFIGS[detached];
+      triggerNotification(`📦 Detached ${cfg.name}! Unit returned to inventory.`, '#f59e0b');
+      refreshHud();
+    },
+    [refreshHud, triggerNotification],
+  );
+
   // --- ECONOMY: PURCHASE GARDEN DECORATIONS ---
   const buyDecoration = useCallback(
     (
@@ -11185,6 +13490,8 @@ export default function App() {
         | 'decor_woven_wall'
         | 'water_feature'
         | 'bamboo_fence'
+        | 'seven_lucky_gods'
+        | 'stone_lantern'
         | 'torii_gate'
         | 'empty_crystal_pedestal'
         | 'crystal_pedestal_foliage'
@@ -11195,10 +13502,34 @@ export default function App() {
       name: string,
     ) => {
       const inv = sanctuaryInventoryRef.current;
+      if (decorType === 'torii_gate') {
+        const hasTorii =
+          (inv.torii_gate_inv ?? 0) > 0 ||
+          (inv.decorations?.toriiGate ?? 0) > 0 ||
+          (inv.decorations?.['torii_gate'] ?? 0) > 0 ||
+          deployedStructuresRef.current.some((s) => s.type === 'torii_gate');
+        if (hasTorii) {
+          gameAudio.playErrorBuzz();
+          triggerNotification('You already own a Torii Gate (Limit 1 per game)!', '#ef4444');
+          return;
+        }
+      }
       if (inv.coins >= cost) {
         inv.coins = Number((inv.coins - cost).toFixed(2));
         if (decorType === 'empty_crystal_pedestal') {
           inv.empty_crystal_pedestal_inv = (inv.empty_crystal_pedestal_inv || 0) + 1;
+        } else if (decorType === 'seven_lucky_gods') {
+          const next = getStructureInventoryCount(inv, 'seven_lucky_gods') + 1;
+          inv.seven_lucky_gods_inv = next;
+          if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0 };
+          inv.decorations.sevenLuckyGods = next;
+          inv.decorations['seven_lucky_gods'] = next;
+        } else if (decorType === 'stone_lantern') {
+          const next = getStructureInventoryCount(inv, 'stone_lantern') + 1;
+          inv.stone_lantern_inv = next;
+          if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0 };
+          inv.decorations.stoneLantern = next;
+          inv.decorations['stone_lantern'] = next;
         } else if (decorType === 'bamboo_fence') {
           const next = getStructureInventoryCount(inv, 'bamboo_fence') + 1;
           inv.bamboo_fence_inv = next;
@@ -11241,7 +13572,11 @@ export default function App() {
           inv[key] = (inv[key] || 0) + 1;
         }
         if (decorType === 'decor_pebble_path') inv.decorations.pebblePath = (inv.decorations.pebblePath || 0) + 1;
-        else if (decorType === 'torii_gate') inv.decorations.toriiGate = (inv.decorations.toriiGate || 0) + 1;
+        else if (decorType === 'torii_gate') {
+          inv.decorations.toriiGate = (inv.decorations.toriiGate || 0) + 1;
+          inv.decorations['torii_gate'] = inv.decorations.toriiGate;
+          inv.torii_gate_inv = (inv.torii_gate_inv || 0) + 1;
+        }
 
         gameAudio.playCoinPickup();
         triggerNotification(`🎋 Claimed ${name}! (+1 added to Inventory)`, '#10b981');
@@ -11249,6 +13584,29 @@ export default function App() {
       } else {
         gameAudio.playErrorBuzz();
         triggerNotification(`Need ${cost} Verdure to purchase ${name}! Donate mature bonsais.`, '#ef4444');
+      }
+    },
+    [refreshHud, triggerNotification],
+  );
+
+  const buyEngineeringLicense = useCallback(
+    (tier: 1 | 2 | 3, cost: number) => {
+      const inv = sanctuaryInventoryRef.current;
+      if (inv.coins >= cost) {
+        inv.coins = Number((inv.coins - cost).toFixed(2));
+        const key = `license_t${tier}`;
+        const altKey = `licenseT${tier}`;
+        inv[key] = (inv[key] || 0) + 1;
+        inv[altKey] = (inv[altKey] || 0) + 1;
+        if (!inv.resources) inv.resources = {};
+        inv.resources[key] = inv[key];
+        inv.resources[altKey] = inv[altKey];
+        gameAudio.playCoinPickup();
+        triggerNotification(`📜 Purchased T${tier} License (+1 in Stock)!`, '#10b981');
+        refreshHud();
+      } else {
+        gameAudio.playErrorBuzz();
+        triggerNotification(`Need ${cost} Verdure to purchase T${tier} License! Donate mature bonsais.`, '#ef4444');
       }
     },
     [refreshHud, triggerNotification],
@@ -11346,6 +13704,8 @@ export default function App() {
         decor_woven_wall: 'Water Features',
         water_feature: 'Water Features',
         bamboo_fence: 'Bamboo Fences',
+        seven_lucky_gods: 'Seven Lucky Gods Statues',
+        stone_lantern: 'Stone Lanterns',
         torii_gate: 'Torii Gates',
         tool_compost_heap: 'Compost Heaps',
         fertilizer_station: 'Fertilizer Stations',
@@ -11377,17 +13737,49 @@ export default function App() {
       return;
     }
 
-    if (!currentPlot.isUnlocked) {
-      gameAudio.playErrorBuzz();
-      triggerNotification('🔒 Locked Plot - Purchase Greenhouse Expansions at the Botanical Market!', '#f59e0b');
-      return;
-    }
+    const is2x2Farm = type === 'solar_farm_2x2' || type === 'wind_farm_2x2';
+    const is3x3Farm = type === 'solar_farm_3x3' || type === 'wind_farm_3x3';
+    const farmWidth = is3x3Farm ? 3 : is2x2Farm ? 2 : 1;
+    const farmHeight = is3x3Farm ? 3 : is2x2Farm ? 2 : 1;
 
-    const snapX = currentPlot.centerX;
-    const snapY = currentPlot.centerY;
+    // Multi-tile validation for farms
+    if (is2x2Farm || is3x3Farm) {
+      const c = currentPlot.col;
+      const r = currentPlot.row;
+      if (c + farmWidth > SANCTUARY_GRID.cols || r + farmHeight > SANCTUARY_GRID.rows) {
+        gameAudio.playErrorBuzz();
+        triggerNotification(`Farm (${farmWidth}x${farmHeight}) does not fit here! Move away from grid edges.`, '#ef4444');
+        return;
+      }
+      for (let dc = 0; dc < farmWidth; dc++) {
+        for (let dr = 0; dr < farmHeight; dr++) {
+          const pc = c + dc;
+          const pr = r + dr;
+          const px = SANCTUARY_GRID.startX + pc * SANCTUARY_GRID.cellW;
+          const py = SANCTUARY_GRID.startY + pr * SANCTUARY_GRID.cellH;
+          if (
+            !isGridPlotUnlocked(px, py) ||
+            isPlotOccupiedByPlantedBonsai(pc, pr) ||
+            isPlotOccupiedByStructure(pc, pr)
+          ) {
+            gameAudio.playErrorBuzz();
+            triggerNotification(`Farm (${farmWidth}x${farmHeight}) needs all ${farmWidth * farmHeight} plots empty and unlocked!`, '#ef4444');
+            return;
+          }
+        }
+      }
+    } else {
+      if (!currentPlot.isUnlocked) {
+        gameAudio.playErrorBuzz();
+        triggerNotification('🔒 Locked Plot - Purchase Greenhouse Expansions at the Botanical Market!', '#f59e0b');
+        return;
+      }
 
-    const isTreeOccupied = isPlotOccupiedByPlantedBonsai(currentPlot.col, currentPlot.row);
-    const isStructureOccupied = isPlotOccupiedByStructure(currentPlot.col, currentPlot.row);
+      const snapX = currentPlot.centerX;
+      const snapY = currentPlot.centerY;
+
+      const isTreeOccupied = isPlotOccupiedByPlantedBonsai(currentPlot.col, currentPlot.row);
+      const isStructureOccupied = isPlotOccupiedByStructure(currentPlot.col, currentPlot.row);
 
       const nearWb =
         snapX >= sanctuaryWorkbench.x - 30 &&
@@ -11424,16 +13816,44 @@ export default function App() {
         triggerNotification('Grid plot is occupied or blocked! Stand over an empty nursery plot.', '#ef4444');
         return;
       }
+    }
+
+    const snapX = is3x3Farm
+      ? SANCTUARY_GRID.startX + (currentPlot.col + 1) * SANCTUARY_GRID.cellW
+      : is2x2Farm
+      ? SANCTUARY_GRID.startX + (currentPlot.col + 0.5) * SANCTUARY_GRID.cellW
+      : currentPlot.centerX;
+    const snapY = is3x3Farm
+      ? SANCTUARY_GRID.startY + (currentPlot.row + 1) * SANCTUARY_GRID.cellH
+      : is2x2Farm
+      ? SANCTUARY_GRID.startY + (currentPlot.row + 0.5) * SANCTUARY_GRID.cellH
+      : currentPlot.centerY;
 
       inv[key] = Math.max(0, (inv[key] ?? stock) - 1);
       if (type === 'solar_panel') {
         inv.solar_panels_inv = inv[key];
         inv.solar_panel_inv = inv[key];
         inv.solarPanels = inv[key];
+      } else if (type === 'solar_farm_2x2') {
+        inv.solar_farm_2x2_inv = inv[key];
+        if (inv.infrastructure) inv.infrastructure['solar_farm_2x2'] = inv[key];
+        if (inv.deployables) inv.deployables['solar_farm_2x2'] = inv[key];
+      } else if (type === 'solar_farm_3x3') {
+        inv.solar_farm_3x3_inv = inv[key];
+        if (inv.infrastructure) inv.infrastructure['solar_farm_3x3'] = inv[key];
+        if (inv.deployables) inv.deployables['solar_farm_3x3'] = inv[key];
       } else if (type === 'wind_turbine') {
         inv.wind_turbines_inv = inv[key];
         inv.wind_turbine_inv = inv[key];
         inv.windTurbines = inv[key];
+      } else if (type === 'wind_farm_2x2') {
+        inv.wind_farm_2x2_inv = inv[key];
+        if (inv.infrastructure) inv.infrastructure['wind_farm_2x2'] = inv[key];
+        if (inv.deployables) inv.deployables['wind_farm_2x2'] = inv[key];
+      } else if (type === 'wind_farm_3x3') {
+        inv.wind_farm_3x3_inv = inv[key];
+        if (inv.infrastructure) inv.infrastructure['wind_farm_3x3'] = inv[key];
+        if (inv.deployables) inv.deployables['wind_farm_3x3'] = inv[key];
       } else if (type === 'tool_compost_heap') {
         inv.tool_compost_heap_inv = inv[key];
         if (inv.tools) inv.tools.compostHeap = inv[key];
@@ -11486,6 +13906,22 @@ export default function App() {
           inv.decorations['asparagus_fern_ball'] = remaining;
         }
       }
+      else if (type === 'seven_lucky_gods') {
+        const remaining = Math.max(0, stock - 1);
+        inv.seven_lucky_gods_inv = remaining;
+        if (inv.decorations) {
+          inv.decorations.sevenLuckyGods = remaining;
+          inv.decorations['seven_lucky_gods'] = remaining;
+        }
+      }
+      else if (type === 'stone_lantern') {
+        const remaining = Math.max(0, stock - 1);
+        inv.stone_lantern_inv = remaining;
+        if (inv.decorations) {
+          inv.decorations.stoneLantern = remaining;
+          inv.decorations['stone_lantern'] = remaining;
+        }
+      }
       else if (type === 'decor_woven_wall' || type === 'water_feature') {
         const remaining = Math.max(0, stock - 1);
         inv.water_feature_inv = remaining;
@@ -11524,7 +13960,17 @@ export default function App() {
         y: snapY,
         gridX: snapX,
         gridY: snapY,
-        variant: type === 'decor_pebble_path' ? Math.floor(Math.random() * 5) : 0,
+        col: currentPlot.col,
+        row: currentPlot.row,
+        width: farmWidth,
+        height: farmHeight,
+        variant:
+          type === 'decor_pebble_path'
+            ? Math.floor(Math.random() * 5)
+            : type === 'seven_lucky_gods'
+            ? Math.floor(Math.random() * 7)
+            : 0,
+        godIndex: type === 'seven_lucky_gods' ? 0 : undefined,
         depositedWaste: type === 'tool_compost_heap' || type === 'fertilizer_station' ? 0 : undefined,
         depositedBiochemicals: type === 'fertilizer_station' ? 0 : undefined,
         maxCapacity: type === 'tool_compost_heap' ? 20 : type === 'fertilizer_station' ? 30 : undefined,
@@ -11539,6 +13985,7 @@ export default function App() {
         cooldownRemaining: type === 'tool_garden_well' ? 0 : undefined,
       };
       deployedStructuresRef.current.push(newStruct);
+      offscreenTerrainDirtyRef.current = true;
       invalidateSynergiesCache();
 
       setIsPlantingModalOpen(false);
@@ -11556,6 +14003,10 @@ export default function App() {
           ? '#34d399'
           : type === 'tool_garden_well'
           ? '#0ea5e9'
+          : type === 'seven_lucky_gods'
+          ? '#fbbf24'
+          : type === 'stone_lantern'
+          ? '#f59e0b'
           : type === 'decor_shrubbery_bush' || type === 'growing_bamboo_formation'
           ? '#16a34a'
           : type === 'asparagus_fern_ball'
@@ -11590,7 +14041,11 @@ export default function App() {
 
       const titleMap: Record<string, string> = {
         solar_panel: '☀️ Solar Panel Array (3 kW)',
+        solar_farm_2x2: '☀️ Solar Panel Farm (2x2 • 24 kW)',
+        solar_farm_3x3: '☀️ Big Solar Panel Farm (3x3 • 87 kW)',
         wind_turbine: '💨 Wind Turbine Generator (6 kW)',
+        wind_farm_2x2: '💨 Wind Turbine Farm (2x2 • 42 kW)',
+        wind_farm_3x3: '💨 Big Wind Turbine Farm (3x3 • 134 kW)',
         tool_compost_heap: '🍂 Compost Heap (20 Capacity)',
         fertilizer_station: '🧪 Fertilizer Station (Eco-Chemical Processor)',
         tool_garden_well: '💧 Stone Well (3×3 Irrigation)',
@@ -11603,6 +14058,8 @@ export default function App() {
         decor_woven_wall: '🌊 Water Feature (Shishi-Odoshi)',
         water_feature: '🌊 Water Feature (Shishi-Odoshi)',
         bamboo_fence: '🎋 Bamboo Fence (Takegaki)',
+        seven_lucky_gods: '✨ Seven Lucky Gods (+0.01 Baseprice/lvl)',
+        stone_lantern: '🏮 Stone Lantern (+0.5% Zen Point/lvl)',
         torii_gate: '⛩️ Torii Gate (3x1)',
         empty_crystal_pedestal: '💎 Empty Pedestal (Can Host Crystal Artifacts)',
         crystal_pedestal: '💎 Empty Pedestal',
@@ -11684,10 +14141,34 @@ export default function App() {
         inv.solar_panels_inv = (inv.solar_panels_inv || 0) + 1;
         inv.solar_panel_inv = inv.solar_panels_inv;
         inv.solarPanels = inv.solar_panels_inv;
+      } else if (struct.type === 'solar_farm_2x2') {
+        inv.solar_farm_2x2_inv = (inv.solar_farm_2x2_inv || 0) + 1;
+        if (!inv.infrastructure) inv.infrastructure = {};
+        if (!inv.deployables) inv.deployables = {};
+        inv.infrastructure['solar_farm_2x2'] = inv.solar_farm_2x2_inv;
+        inv.deployables['solar_farm_2x2'] = inv.solar_farm_2x2_inv;
+      } else if (struct.type === 'solar_farm_3x3') {
+        inv.solar_farm_3x3_inv = (inv.solar_farm_3x3_inv || 0) + 1;
+        if (!inv.infrastructure) inv.infrastructure = {};
+        if (!inv.deployables) inv.deployables = {};
+        inv.infrastructure['solar_farm_3x3'] = inv.solar_farm_3x3_inv;
+        inv.deployables['solar_farm_3x3'] = inv.solar_farm_3x3_inv;
       } else if (struct.type === 'wind_turbine') {
         inv.wind_turbines_inv = (inv.wind_turbines_inv || 0) + 1;
         inv.wind_turbine_inv = inv.wind_turbines_inv;
         inv.windTurbines = inv.wind_turbines_inv;
+      } else if (struct.type === 'wind_farm_2x2') {
+        inv.wind_farm_2x2_inv = (inv.wind_farm_2x2_inv || 0) + 1;
+        if (!inv.infrastructure) inv.infrastructure = {};
+        if (!inv.deployables) inv.deployables = {};
+        inv.infrastructure['wind_farm_2x2'] = inv.wind_farm_2x2_inv;
+        inv.deployables['wind_farm_2x2'] = inv.wind_farm_2x2_inv;
+      } else if (struct.type === 'wind_farm_3x3') {
+        inv.wind_farm_3x3_inv = (inv.wind_farm_3x3_inv || 0) + 1;
+        if (!inv.infrastructure) inv.infrastructure = {};
+        if (!inv.deployables) inv.deployables = {};
+        inv.infrastructure['wind_farm_3x3'] = inv.wind_farm_3x3_inv;
+        inv.deployables['wind_farm_3x3'] = inv.wind_farm_3x3_inv;
       } else if (struct.type === 'tool_compost_heap') {
         inv.tool_compost_heap_inv = (inv.tool_compost_heap_inv || 0) + 1;
         if (inv.tools) inv.tools.compostHeap = inv.tool_compost_heap_inv;
@@ -11756,6 +14237,16 @@ export default function App() {
         if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
         inv.decorations.bambooFence = nextStock;
         inv.decorations['bamboo_fence'] = nextStock;
+      } else if (struct.type === 'seven_lucky_gods') {
+        inv.seven_lucky_gods_inv = (inv.seven_lucky_gods_inv || 0) + 1;
+        if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
+        inv.decorations.sevenLuckyGods = (inv.decorations.sevenLuckyGods || 0) + 1;
+        inv.decorations['seven_lucky_gods'] = inv.decorations.sevenLuckyGods;
+      } else if (struct.type === 'stone_lantern') {
+        inv.stone_lantern_inv = (inv.stone_lantern_inv || 0) + 1;
+        if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
+        inv.decorations.stoneLantern = (inv.decorations.stoneLantern || 0) + 1;
+        inv.decorations['stone_lantern'] = inv.decorations.stoneLantern;
       } else if (struct.type === 'torii_gate') {
         inv.torii_gate_inv = (inv.torii_gate_inv || 0) + 1;
         if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0, toriiGate: 0 };
@@ -11786,13 +14277,18 @@ export default function App() {
       }
 
       deployedStructuresRef.current.splice(idx, 1);
+      offscreenTerrainDirtyRef.current = true;
       invalidateSynergiesCache();
       setInspectingStructureId(null);
       gameAudio.playCrispClick();
 
       const nameMap: Record<string, string> = {
         solar_panel: 'Solar Panel Array',
+        solar_farm_2x2: 'Solar Panel Farm (2x2)',
+        solar_farm_3x3: 'Big Solar Panel Farm (3x3)',
         wind_turbine: 'Wind Turbine Generator',
+        wind_farm_2x2: 'Wind Turbine Farm (2x2)',
+        wind_farm_3x3: 'Big Wind Turbine Farm (3x3)',
         tool_compost_heap: 'Compost Heap',
         fertilizer_station: 'Fertilizer Station',
         tool_garden_well: 'Stone Well',
@@ -11805,6 +14301,8 @@ export default function App() {
         decor_woven_wall: 'Water Feature',
         water_feature: 'Water Feature',
         bamboo_fence: 'Bamboo Fence',
+        seven_lucky_gods: 'Seven Lucky Gods Statue',
+        stone_lantern: 'Stone Lantern',
         torii_gate: '⛩️ Torii Gate',
         crystal_pedestal_foliage: 'Emerald Leaf Crystal Pedestal',
         crystal_pedestal_branches: 'Amber Branch Crystal Pedestal',
@@ -11833,6 +14331,24 @@ export default function App() {
     [addFloatingText, refreshHud, triggerNotification],
   );
 
+  // --- SEVEN LUCKY GODS DEITY ROTATION ---
+  const cycleSevenLuckyGods = useCallback(
+    (structId: string) => {
+      const struct = deployedStructuresRef.current.find((s) => s.id === structId);
+      if (!struct || struct.type !== 'seven_lucky_gods') return;
+      const curIdx = struct.variant ?? (struct as any).godIndex ?? 0;
+      const nextIdx = (curIdx + 1) % 7;
+      struct.variant = nextIdx;
+      (struct as any).godIndex = nextIdx;
+      const newGod = SEVEN_LUCKY_GODS_INFO[nextIdx];
+      gameAudio.playConfirmSelect();
+      addFloatingText(struct.x, struct.y - 45, `✨ ${newGod.name} (${newGod.kanji})`, newGod.color);
+      triggerNotification(`Rotated to ${newGod.name} - ${newGod.title} (${newGod.kanji})`, newGod.color);
+      refreshHud();
+    },
+    [addFloatingText, refreshHud, triggerNotification],
+  );
+
   // --- COMPOST HEAP INTERACTION METHODS (DIRECT [E] INTERACTION) ---
   const interactCompostHeapDirect = useCallback(
     (structId: string) => {
@@ -11841,43 +14357,54 @@ export default function App() {
       const inv = sanctuaryInventoryRef.current;
 
       const ready = struct.readyCompost || 0;
+      // DECOUPLED: If ready units exist, COLLECT ONLY and do NOT deposit new raw resources on this click!
       if (ready > 0) {
-        // Collect all ready compost
         inv.organic_compost = (inv.organic_compost || 0) + ready;
         inv.enrichedCompost = inv.organic_compost;
         struct.readyCompost = 0;
         gameAudio.playCoinPickup();
-        addFloatingText(struct.x, struct.y - 45, `+${ready} Enriched Compost`, '#a3e635');
-        triggerNotification(`🌾 Collected +${ready} Enriched Compost into Inventory!`, '#84cc16');
+        addFloatingText(struct.x, struct.y - 45, `+${ready} Compost`, '#a3e635');
+        triggerNotification(`🌾 Collected +${ready} Compost into Inventory!`, '#84cc16');
         refreshHud();
-        return;
+        return; // Preserve player agency: strictly return without depositing
       }
 
-      // No ready compost: Deposit up to 20 Organic Waste
+      // ONLY when ready === 0: deposit available waste up to max capacity (20)
       const current = struct.depositedWaste || 0;
       const maxCap = struct.maxCapacity || 20;
       const space = maxCap - current;
 
-      if (space <= 0) {
-        gameAudio.playErrorBuzz();
-        triggerNotification('Compost Heap is at maximum capacity (20/20)!', '#f59e0b');
-        return;
+      if (space >= 2 && (inv.organic_waste || 0) >= 2) {
+        const toDeposit = Math.min(space, Math.floor((inv.organic_waste || 0) / 2) * 2);
+        if (toDeposit > 0) {
+          inv.organic_waste -= toDeposit;
+          inv.organicWaste = inv.organic_waste;
+          struct.depositedWaste = current + toDeposit;
+
+          const addedBatches = Math.floor(toDeposit / 2);
+          if ((struct.timer || 0) <= 0) {
+            struct.timer = 10;
+            struct.currentBatchIndex = 1;
+            struct.totalBatchCount = addedBatches;
+          } else {
+            struct.totalBatchCount = (struct.totalBatchCount || Math.floor(current / 2)) + addedBatches;
+            if (!struct.currentBatchIndex) struct.currentBatchIndex = 1;
+          }
+
+          gameAudio.playConfirmSelect();
+          addFloatingText(struct.x, struct.y - 45, `+${toDeposit} Waste Deposited`, '#84cc16');
+          triggerNotification(`🍂 Deposited +${toDeposit} Organic Waste into Compost Heap (${struct.depositedWaste}/${maxCap})`, '#84cc16');
+        }
+      } else {
+        if (space < 2) {
+          gameAudio.playErrorBuzz();
+          triggerNotification('Compost Heap is at maximum capacity (20/20)!', '#f59e0b');
+        } else {
+          gameAudio.playErrorBuzz();
+          triggerNotification('Requires at least 2 Organic Waste to compost! Prune trees or gain levels to collect waste.', '#ef4444');
+        }
       }
 
-      if ((inv.organic_waste || 0) <= 0) {
-        gameAudio.playErrorBuzz();
-        triggerNotification('No Organic Waste in inventory! Prune trees or cultivate levels to collect waste.', '#ef4444');
-        return;
-      }
-
-      const toDeposit = Math.min(space, inv.organic_waste);
-      inv.organic_waste -= toDeposit;
-      inv.organicWaste = inv.organic_waste;
-      struct.depositedWaste = current + toDeposit;
-
-      gameAudio.playConfirmSelect();
-      addFloatingText(struct.x, struct.y - 45, `+${toDeposit} Organic Waste Deposited`, '#84cc16');
-      triggerNotification(`🍂 Deposited +${toDeposit} Organic Waste into Compost Heap (${struct.depositedWaste}/${maxCap})`, '#84cc16');
       refreshHud();
     },
     [addFloatingText, refreshHud, triggerNotification],
@@ -11890,70 +14417,77 @@ export default function App() {
       if (!struct || struct.type !== 'fertilizer_station') return;
       const inv = sanctuaryInventoryRef.current;
 
-      // 1. Collect finished fertilizer
       const ready = struct.readyFertilizer || 0;
+      // DECOUPLED: If ready units exist, COLLECT ONLY and do NOT deposit new raw resources on this click!
       if (ready > 0) {
         inv.fertilizer = (inv.fertilizer || 0) + ready;
         if (inv.resources) inv.resources.fertilizer = inv.fertilizer;
         struct.readyFertilizer = 0;
         gameAudio.playPowerupChime();
-        addFloatingText(struct.x, struct.y - 45, `+${ready} 🧪 Fertilizer!`, '#34d399');
+        addFloatingText(struct.x, struct.y - 45, `+${ready} Fertilizer`, '#34d399');
         triggerNotification(`🧪 Collected +${ready} Fertilizer into Inventory!`, '#10b981');
         refreshHud();
-        return;
+        return; // Preserve player agency: strictly return without depositing
       }
 
-      // 2. Deposit materials: Recipe: 3 Organic Waste + 1 Biochemical = 1 Fertilizer
-      // Up to 30 Organic Waste and 10 Biochemicals can be deposited at once (yielding up to 10 Fertilizer)
+      // ONLY when ready === 0: deposit ingredients (3 waste + 1 bio = 1 fertilizer)
       const curWaste = struct.depositedWaste || 0;
       const curBio = struct.depositedBiochemicals || 0;
       const maxBatches = 10;
       const curBatches = Math.min(Math.floor(curWaste / 3), curBio);
       const availableBatchSlots = maxBatches - curBatches;
 
-      if (availableBatchSlots <= 0) {
-        gameAudio.playErrorBuzz();
-        triggerNotification(`Fertilizer Station is currently at full capacity (${curBatches}/10 batches)!`, '#f59e0b');
-        return;
-      }
-
       const playerWaste = inv.organic_waste || 0;
       const playerBio = inv.biochemicals || 0;
-
       const possibleFromWaste = Math.floor(playerWaste / 3);
       const possibleBatches = Math.min(possibleFromWaste, playerBio, availableBatchSlots);
 
-      if (possibleBatches <= 0) {
-        gameAudio.playErrorBuzz();
+      if (possibleBatches > 0) {
+        const wasteToDeposit = possibleBatches * 3;
+        const bioToDeposit = possibleBatches;
+
+        inv.organic_waste -= wasteToDeposit;
+        inv.organicWaste = inv.organic_waste;
+        inv.biochemicals = Math.max(0, (inv.biochemicals ?? 0) - bioToDeposit);
+        if (inv.resources) {
+          inv.resources.organic_waste = inv.organic_waste;
+          inv.resources.biochemicals = inv.biochemicals;
+        }
+
+        struct.depositedWaste = curWaste + wasteToDeposit;
+        struct.depositedBiochemicals = curBio + bioToDeposit;
+
+        // If timer was 0, start 60s distillation. DO NOT reset timer if unit is already distilling!
+        if ((struct.timer || 0) <= 0) {
+          struct.timer = 60;
+          struct.isDistilling = true;
+          struct.currentBatchIndex = 1;
+          struct.totalBatchCount = possibleBatches;
+        } else {
+          struct.totalBatchCount = (struct.totalBatchCount || curBatches) + possibleBatches;
+          if (!struct.currentBatchIndex) struct.currentBatchIndex = 1;
+        }
+
+        const newTotalBatches = Math.min(Math.floor(struct.depositedWaste / 3), struct.depositedBiochemicals);
+        gameAudio.playConfirmSelect();
+        addFloatingText(struct.x, struct.y - 45, `+${possibleBatches} Queued!`, '#38bdf8');
         triggerNotification(
-          `Requires 3 Organic Waste + 1 Biochemical! (You have: ${playerWaste} Waste, ${playerBio} Bio)`,
-          '#ef4444',
+          `🧪 Deposited ${wasteToDeposit} Waste & ${bioToDeposit} Bio! (${newTotalBatches}/10 batches queued)`,
+          '#10b981',
         );
-        return;
+      } else {
+        if (availableBatchSlots <= 0) {
+          gameAudio.playErrorBuzz();
+          triggerNotification(`Fertilizer Station queue full (${curBatches}/10 batches)!`, '#f59e0b');
+        } else {
+          gameAudio.playErrorBuzz();
+          triggerNotification(
+            `Requires 3 Organic Waste + 1 Biochemical! (You have: ${playerWaste} Waste, ${playerBio} Bio)`,
+            '#ef4444',
+          );
+        }
       }
 
-      const wasteToDeposit = possibleBatches * 3;
-      const bioToDeposit = possibleBatches;
-
-      inv.organic_waste -= wasteToDeposit;
-      inv.organicWaste = inv.organic_waste;
-      inv.biochemicals = Math.max(0, (inv.biochemicals ?? 0) - bioToDeposit);
-      if (inv.resources) {
-        inv.resources.organic_waste = inv.organic_waste;
-        inv.resources.biochemicals = inv.biochemicals;
-      }
-
-      struct.depositedWaste = curWaste + wasteToDeposit;
-      struct.depositedBiochemicals = curBio + bioToDeposit;
-      struct.timer = 60; // 60 seconds processing time
-      struct.isDistilling = true;
-
-      gameAudio.playConfirmSelect();
-      addFloatingText(struct.x, struct.y - 45, `+${possibleBatches} Batches Distilling!`, '#38bdf8');
-      triggerNotification(
-        `🧪 Deposited ${wasteToDeposit} Organic Waste & ${bioToDeposit} Biochemicals! Distilling ${possibleBatches} Fertilizer (60s)...`,
-        '#10b981',
-      );
       refreshHud();
     },
     [addFloatingText, refreshHud, triggerNotification],
@@ -12087,9 +14621,31 @@ export default function App() {
   );
 
   // --- WORKBENCH TIMED CRAFTING QUEUE MANAGEMENT ---
-  const getMaxCraftingQueueCapacity = useCallback(() => {
-    return 1 + installedCraftingArmsRef.current;
+  const getAssemblyBonusQueueSlots = useCallback(() => {
+    const attached = sanctuaryInventoryRef.current.attached_workbench_modules || [];
+    let bonus = installedCraftingArmsRef.current; // legacy arm support
+    attached.forEach((mod) => {
+      if (mod === 'assembly_module_t1') bonus += 1;
+      else if (mod === 'assembly_module_t2') bonus += 2;
+      else if (mod === 'assembly_module_t3') bonus += 3;
+    });
+    return bonus;
   }, []);
+
+  const getOverclockBonusSpeed = useCallback(() => {
+    const attached = sanctuaryInventoryRef.current.attached_workbench_modules || [];
+    let bonus = installedCraftingArmsRef.current * 0.25; // legacy arm support
+    attached.forEach((mod) => {
+      if (mod === 'overclock_module_t1') bonus += 0.05;
+      else if (mod === 'overclock_module_t2') bonus += 0.10;
+      else if (mod === 'overclock_module_t3') bonus += 0.20;
+    });
+    return bonus;
+  }, []);
+
+  const getMaxCraftingQueueCapacity = useCallback(() => {
+    return 1 + getAssemblyBonusQueueSlots();
+  }, [getAssemblyBonusQueueSlots]);
 
   const getTotalQueuedCount = useCallback(() => {
     return (activeCraftingRef.current ? 1 : 0) + craftingQueueRef.current.length;
@@ -12195,47 +14751,100 @@ export default function App() {
         return;
       }
 
-      // Check materials
+      // Check materials supporting both snake_case, camelCase, resources sub-object, and licenses
       const costs = recipe.costs;
+      const curScrap = inv.scrap_metal ?? inv.scrapMetal ?? inv.resources?.scrap_metal ?? inv.resources?.scrapMetal ?? 0;
+      const curWire = inv.copper_wire ?? inv.copperWire ?? inv.resources?.copper_wire ?? inv.resources?.copperWire ?? 0;
+      const curGears = inv.brass_gears ?? inv.gears ?? inv.resources?.brass_gears ?? inv.resources?.gears ?? 0;
+      const curCircuits = inv.circuit_boards ?? inv.microcircuits ?? inv.resources?.circuit_boards ?? inv.resources?.microcircuits ?? inv.resources?.circuits ?? 0;
+      const curChips = inv.electronic_chips ?? inv.chips ?? inv.quantumChips ?? inv.resources?.electronic_chips ?? inv.resources?.chips ?? 0;
+      const curWaste = inv.organic_waste ?? inv.organicWaste ?? inv.resources?.organic_waste ?? inv.resources?.organicWaste ?? 0;
+      const curBio = inv.biochemicals ?? inv.resources?.biochemicals ?? 0;
+      const curLicT1 = inv.license_t1 ?? inv.licenseT1 ?? inv.resources?.license_t1 ?? inv.resources?.licenseT1 ?? 0;
+      const curLicT2 = inv.license_t2 ?? inv.licenseT2 ?? inv.resources?.license_t2 ?? inv.resources?.licenseT2 ?? 0;
+      const curLicT3 = inv.license_t3 ?? inv.licenseT3 ?? inv.resources?.license_t3 ?? inv.resources?.licenseT3 ?? 0;
+
       if (
-        (costs.scrap_metal && inv.scrap_metal < costs.scrap_metal) ||
-        (costs.copper_wire && inv.copper_wire < costs.copper_wire) ||
-        (costs.brass_gears && inv.brass_gears < costs.brass_gears) ||
-        (costs.circuit_boards && inv.circuit_boards < costs.circuit_boards) ||
-        (costs.electronic_chips && inv.electronic_chips < costs.electronic_chips) ||
-        (costs.organic_waste && inv.organic_waste < costs.organic_waste)
+        (costs.license_t1 && curLicT1 < costs.license_t1) ||
+        (costs.license_t2 && curLicT2 < costs.license_t2) ||
+        (costs.license_t3 && curLicT3 < costs.license_t3) ||
+        (costs.scrap_metal && curScrap < costs.scrap_metal) ||
+        (costs.copper_wire && curWire < costs.copper_wire) ||
+        (costs.brass_gears && curGears < costs.brass_gears) ||
+        (costs.circuit_boards && curCircuits < costs.circuit_boards) ||
+        (costs.electronic_chips && curChips < costs.electronic_chips) ||
+        (costs.organic_waste && curWaste < costs.organic_waste) ||
+        (costs.biochemicals && curBio < costs.biochemicals)
       ) {
         if (!isSilent) {
           gameAudio.playErrorBuzz();
-          triggerNotification('Insufficient materials to craft this item!', '#ef4444');
+          triggerNotification('Insufficient materials or licenses to craft this item!', '#ef4444');
         }
         return;
       }
 
-      // Deduct materials
+      // Deduct materials across all aliases
+      if (!inv.resources) inv.resources = {};
+      if (costs.license_t1) {
+        const next = Math.max(0, curLicT1 - costs.license_t1);
+        inv.license_t1 = next;
+        inv.licenseT1 = next;
+        inv.resources.license_t1 = next;
+        inv.resources.licenseT1 = next;
+      }
+      if (costs.license_t2) {
+        const next = Math.max(0, curLicT2 - costs.license_t2);
+        inv.license_t2 = next;
+        inv.licenseT2 = next;
+        inv.resources.license_t2 = next;
+        inv.resources.licenseT2 = next;
+      }
+      if (costs.license_t3) {
+        const next = Math.max(0, curLicT3 - costs.license_t3);
+        inv.license_t3 = next;
+        inv.licenseT3 = next;
+        inv.resources.license_t3 = next;
+        inv.resources.licenseT3 = next;
+      }
       if (costs.scrap_metal) {
-        inv.scrap_metal -= costs.scrap_metal;
+        inv.scrap_metal = Math.max(0, curScrap - costs.scrap_metal);
         inv.scrapMetal = inv.scrap_metal;
+        inv.resources.scrap_metal = inv.scrap_metal;
+        inv.resources.scrapMetal = inv.scrap_metal;
       }
       if (costs.copper_wire) {
-        inv.copper_wire -= costs.copper_wire;
+        inv.copper_wire = Math.max(0, curWire - costs.copper_wire);
         inv.copperWire = inv.copper_wire;
+        inv.resources.copper_wire = inv.copper_wire;
+        inv.resources.copperWire = inv.copper_wire;
       }
       if (costs.brass_gears) {
-        inv.brass_gears -= costs.brass_gears;
+        inv.brass_gears = Math.max(0, curGears - costs.brass_gears);
         inv.gears = inv.brass_gears;
+        inv.resources.brass_gears = inv.brass_gears;
+        inv.resources.gears = inv.brass_gears;
       }
       if (costs.circuit_boards) {
-        inv.circuit_boards -= costs.circuit_boards;
+        inv.circuit_boards = Math.max(0, curCircuits - costs.circuit_boards);
         inv.microcircuits = inv.circuit_boards;
+        inv.resources.circuit_boards = inv.circuit_boards;
+        inv.resources.microcircuits = inv.circuit_boards;
       }
       if (costs.electronic_chips) {
-        inv.electronic_chips -= costs.electronic_chips;
+        inv.electronic_chips = Math.max(0, curChips - costs.electronic_chips);
         inv.chips = inv.quantumChips = inv.electronic_chips;
+        inv.resources.electronic_chips = inv.electronic_chips;
+        inv.resources.chips = inv.electronic_chips;
       }
       if (costs.organic_waste) {
-        inv.organic_waste -= costs.organic_waste;
+        inv.organic_waste = Math.max(0, curWaste - costs.organic_waste);
         inv.organicWaste = inv.organic_waste;
+        inv.resources.organic_waste = inv.organic_waste;
+        inv.resources.organicWaste = inv.organic_waste;
+      }
+      if (costs.biochemicals) {
+        inv.biochemicals = Math.max(0, curBio - costs.biochemicals);
+        inv.resources.biochemicals = inv.biochemicals;
       }
 
       const newItem: CraftingQueueItem = {
@@ -12275,29 +14884,64 @@ export default function App() {
         if (recipe) {
           // Refund materials
           const c = recipe.costs;
+          if (!inv.resources) inv.resources = {};
+          if (c.license_t1) {
+            inv.license_t1 = (inv.license_t1 || 0) + c.license_t1;
+            inv.licenseT1 = inv.license_t1;
+            inv.resources.license_t1 = inv.license_t1;
+            inv.resources.licenseT1 = inv.license_t1;
+          }
+          if (c.license_t2) {
+            inv.license_t2 = (inv.license_t2 || 0) + c.license_t2;
+            inv.licenseT2 = inv.license_t2;
+            inv.resources.license_t2 = inv.license_t2;
+            inv.resources.licenseT2 = inv.license_t2;
+          }
+          if (c.license_t3) {
+            inv.license_t3 = (inv.license_t3 || 0) + c.license_t3;
+            inv.licenseT3 = inv.license_t3;
+            inv.resources.license_t3 = inv.license_t3;
+            inv.resources.licenseT3 = inv.license_t3;
+          }
           if (c.scrap_metal) {
-            inv.scrap_metal += c.scrap_metal;
+            inv.scrap_metal = (inv.scrap_metal ?? inv.scrapMetal ?? 0) + c.scrap_metal;
             inv.scrapMetal = inv.scrap_metal;
+            inv.resources.scrap_metal = inv.scrap_metal;
+            inv.resources.scrapMetal = inv.scrap_metal;
           }
           if (c.copper_wire) {
-            inv.copper_wire += c.copper_wire;
+            inv.copper_wire = (inv.copper_wire ?? inv.copperWire ?? 0) + c.copper_wire;
             inv.copperWire = inv.copper_wire;
+            inv.resources.copper_wire = inv.copper_wire;
+            inv.resources.copperWire = inv.copper_wire;
           }
           if (c.brass_gears) {
-            inv.brass_gears += c.brass_gears;
+            inv.brass_gears = (inv.brass_gears ?? inv.gears ?? 0) + c.brass_gears;
             inv.gears = inv.brass_gears;
+            inv.resources.brass_gears = inv.brass_gears;
+            inv.resources.gears = inv.brass_gears;
           }
           if (c.circuit_boards) {
-            inv.circuit_boards += c.circuit_boards;
+            inv.circuit_boards = (inv.circuit_boards ?? inv.microcircuits ?? 0) + c.circuit_boards;
             inv.microcircuits = inv.circuit_boards;
+            inv.resources.circuit_boards = inv.circuit_boards;
+            inv.resources.microcircuits = inv.circuit_boards;
           }
           if (c.electronic_chips) {
-            inv.electronic_chips += c.electronic_chips;
+            inv.electronic_chips = (inv.electronic_chips ?? inv.chips ?? inv.quantumChips ?? 0) + c.electronic_chips;
             inv.chips = inv.quantumChips = inv.electronic_chips;
+            inv.resources.electronic_chips = inv.electronic_chips;
+            inv.resources.chips = inv.electronic_chips;
           }
           if (c.organic_waste) {
-            inv.organic_waste += c.organic_waste;
+            inv.organic_waste = (inv.organic_waste ?? inv.organicWaste ?? 0) + c.organic_waste;
             inv.organicWaste = inv.organic_waste;
+            inv.resources.organic_waste = inv.organic_waste;
+            inv.resources.organicWaste = inv.organic_waste;
+          }
+          if (c.biochemicals) {
+            inv.biochemicals = (inv.biochemicals || 0) + c.biochemicals;
+            inv.resources.biochemicals = inv.biochemicals;
           }
         }
         activeCraftingRef.current = craftingQueueRef.current.shift() || null;
@@ -12308,29 +14952,64 @@ export default function App() {
         const recipe = WORKBENCH_RECIPES[item.recipeId];
         if (recipe) {
           const c = recipe.costs;
+          if (!inv.resources) inv.resources = {};
+          if (c.license_t1) {
+            inv.license_t1 = (inv.license_t1 || 0) + c.license_t1;
+            inv.licenseT1 = inv.license_t1;
+            inv.resources.license_t1 = inv.license_t1;
+            inv.resources.licenseT1 = inv.license_t1;
+          }
+          if (c.license_t2) {
+            inv.license_t2 = (inv.license_t2 || 0) + c.license_t2;
+            inv.licenseT2 = inv.license_t2;
+            inv.resources.license_t2 = inv.license_t2;
+            inv.resources.licenseT2 = inv.license_t2;
+          }
+          if (c.license_t3) {
+            inv.license_t3 = (inv.license_t3 || 0) + c.license_t3;
+            inv.licenseT3 = inv.license_t3;
+            inv.resources.license_t3 = inv.license_t3;
+            inv.resources.licenseT3 = inv.license_t3;
+          }
           if (c.scrap_metal) {
-            inv.scrap_metal += c.scrap_metal;
+            inv.scrap_metal = (inv.scrap_metal ?? inv.scrapMetal ?? 0) + c.scrap_metal;
             inv.scrapMetal = inv.scrap_metal;
+            inv.resources.scrap_metal = inv.scrap_metal;
+            inv.resources.scrapMetal = inv.scrap_metal;
           }
           if (c.copper_wire) {
-            inv.copper_wire += c.copper_wire;
+            inv.copper_wire = (inv.copper_wire ?? inv.copperWire ?? 0) + c.copper_wire;
             inv.copperWire = inv.copper_wire;
+            inv.resources.copper_wire = inv.copper_wire;
+            inv.resources.copperWire = inv.copper_wire;
           }
           if (c.brass_gears) {
-            inv.brass_gears += c.brass_gears;
+            inv.brass_gears = (inv.brass_gears ?? inv.gears ?? 0) + c.brass_gears;
             inv.gears = inv.brass_gears;
+            inv.resources.brass_gears = inv.brass_gears;
+            inv.resources.gears = inv.brass_gears;
           }
           if (c.circuit_boards) {
-            inv.circuit_boards += c.circuit_boards;
+            inv.circuit_boards = (inv.circuit_boards ?? inv.microcircuits ?? 0) + c.circuit_boards;
             inv.microcircuits = inv.circuit_boards;
+            inv.resources.circuit_boards = inv.circuit_boards;
+            inv.resources.microcircuits = inv.circuit_boards;
           }
           if (c.electronic_chips) {
-            inv.electronic_chips += c.electronic_chips;
+            inv.electronic_chips = (inv.electronic_chips ?? inv.chips ?? inv.quantumChips ?? 0) + c.electronic_chips;
             inv.chips = inv.quantumChips = inv.electronic_chips;
+            inv.resources.electronic_chips = inv.electronic_chips;
+            inv.resources.chips = inv.electronic_chips;
           }
           if (c.organic_waste) {
-            inv.organic_waste += c.organic_waste;
+            inv.organic_waste = (inv.organic_waste ?? inv.organicWaste ?? 0) + c.organic_waste;
             inv.organicWaste = inv.organic_waste;
+            inv.resources.organic_waste = inv.organic_waste;
+            inv.resources.organicWaste = inv.organic_waste;
+          }
+          if (c.biochemicals) {
+            inv.biochemicals = (inv.biochemicals || 0) + c.biochemicals;
+            inv.resources.biochemicals = inv.biochemicals;
           }
         }
         craftingQueueRef.current.splice(index, 1);
@@ -12461,6 +15140,7 @@ export default function App() {
         waterSprayAnim: 0,
         attributes: stored.attributes || { ...DEFAULT_BONSAI_ATTRIBUTES },
         cultivationPotential: stored.cultivationPotential || { ...DEFAULT_CULTIVATION_POTENTIAL },
+        isFavorite: stored.isFavorite,
       };
 
       plantedBonsaisRef.current.push(newBonsai);
@@ -12835,6 +15515,69 @@ export default function App() {
           ? (preview.width === 2 && preview.height === 2) || getBonsaiMaturityRating(preview.payload) === 5
           : false;
 
+      const is2x2Farm = preview.payload === 'solar_farm_2x2' || preview.payload === 'wind_farm_2x2';
+      const is3x3Farm = preview.payload === 'solar_farm_3x3' || preview.payload === 'wind_farm_3x3';
+
+      if (is2x2Farm) {
+        const c = plot.col;
+        const r = plot.row;
+        if (c + 1 >= SANCTUARY_GRID.cols || r + 1 >= SANCTUARY_GRID.rows) return false;
+        const fenceSet = new Set(
+          deployedStructuresRef.current
+            .filter((s) => s.type === 'bamboo_fence' && s.edgeKey)
+            .map((s) => s.edgeKey!),
+        );
+        if (
+          fenceSet.has(`V_${c + 1}_${r}`) ||
+          fenceSet.has(`V_${c + 1}_${r + 1}`) ||
+          fenceSet.has(`H_${c}_${r + 1}`) ||
+          fenceSet.has(`H_${c + 1}_${r + 1}`)
+        ) {
+          return false;
+        }
+        for (let dc = 0; dc <= 1; dc++) {
+          for (let dr = 0; dr <= 1; dr++) {
+            const plotC = c + dc;
+            const plotR = r + dr;
+            const pX = SANCTUARY_GRID.startX + plotC * SANCTUARY_GRID.cellW;
+            const py = SANCTUARY_GRID.startY + plotR * SANCTUARY_GRID.cellH;
+            if (!isGridPlotUnlocked(pX, py)) return false;
+            if (isNearStationCoords(pX, py)) return false;
+            if (checkOccupied(plotC, plotR)) return false;
+          }
+        }
+        return true;
+      }
+
+      if (is3x3Farm) {
+        const c = plot.col;
+        const r = plot.row;
+        if (c + 2 >= SANCTUARY_GRID.cols || r + 2 >= SANCTUARY_GRID.rows) return false;
+        const fenceSet = new Set(
+          deployedStructuresRef.current
+            .filter((s) => s.type === 'bamboo_fence' && s.edgeKey)
+            .map((s) => s.edgeKey!),
+        );
+        for (let dc = 0; dc <= 2; dc++) {
+          for (let dr = 0; dr <= 2; dr++) {
+            if (dc < 2 && fenceSet.has(`V_${c + dc + 1}_${r + dr}`)) return false;
+            if (dr < 2 && fenceSet.has(`H_${c + dc}_${r + dr + 1}`)) return false;
+          }
+        }
+        for (let dc = 0; dc <= 2; dc++) {
+          for (let dr = 0; dr <= 2; dr++) {
+            const plotC = c + dc;
+            const plotR = r + dr;
+            const pX = SANCTUARY_GRID.startX + plotC * SANCTUARY_GRID.cellW;
+            const py = SANCTUARY_GRID.startY + plotR * SANCTUARY_GRID.cellH;
+            if (!isGridPlotUnlocked(pX, py)) return false;
+            if (isNearStationCoords(pX, py)) return false;
+            if (checkOccupied(plotC, plotR)) return false;
+          }
+        }
+        return true;
+      }
+
       if (isRating5Bonsai) {
         const c = plot.col;
         const r = plot.row;
@@ -12982,6 +15725,7 @@ export default function App() {
         };
         deployedStructuresRef.current.push(newFence);
         invalidateSynergiesCache();
+        offscreenTerrainDirtyRef.current = true;
         gameAudio.playPowerupChime();
         addFloatingText(edgeGeom.x, edgeGeom.y - 15, 'Placed 🎋 Bamboo Fence!', '#10b981');
         triggerNotification(
@@ -13239,17 +15983,22 @@ export default function App() {
         dig.currentHits += 1;
         hitSuccess = true;
 
-        // Calculate precision using 16-tier ladder and Steady Hands skill bonus
-        const centerAngle = sector.startAngle + sector.arcLength / 2;
-        let diff = current - centerAngle;
-        diff = ((diff + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
-        const distPct = (Math.abs(diff) / sector.arcLength) * 100;
-        const steadyHandsLevel = zenSkillsRef.current.steady_hands || 0;
-        const precision = calculateExcavationPrecision(distPct, steadyHandsLevel);
-        sector.precision = precision;
+        if (dig.isCrystal) {
+          sector.precision = 100;
+        } else {
+          // Calculate precision using 16-tier ladder and Steady Hands skill bonus
+          const centerAngle = sector.startAngle + sector.arcLength / 2;
+          let diff = current - centerAngle;
+          diff = ((diff + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+          const distPct = (Math.abs(diff) / sector.arcLength) * 100;
+          const steadyHandsLevel = zenSkillsRef.current.steady_hands || 0;
+          const precision = calculateExcavationPrecision(distPct, steadyHandsLevel);
+          sector.precision = precision;
+        }
 
         gameAudio.playConfirmSelect();
 
+        const precision = sector.precision ?? 100;
         const particleColor = precision >= 90 ? '#facc15' : precision > 0 ? '#10b981' : '#64748b';
         for (let p = 0; p < (precision >= 90 ? 10 : 6); p++) {
           const pAngle = Math.random() * Math.PI * 2;
@@ -13505,9 +16254,9 @@ export default function App() {
     const tabLengths = {
       MAPS: 2,
       EXPANSIONS: 4,
-      DECOR: 8,
-      GUIDES: 18,
-      EQUIPMENT: 6,
+      DECOR: 10,
+      GUIDES: 26,
+      EQUIPMENT: 9,
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -13541,47 +16290,60 @@ export default function App() {
           if (exp) buySanctuaryExpansion(exp.tier, exp.cost, exp.name);
         } else if (shopTab === 'DECOR') {
           const decorList = [
+            { type: 'bamboo_fence' as const, cost: 3, name: 'Bamboo Fence (Takegaki)' },
             { type: 'decor_pebble_path' as const, cost: 5, name: 'Zen Pebble Stepping Path' },
-            { type: 'zen_rock_formation' as const, cost: 20, name: 'Zen Rock Formation' },
-            { type: 'water_feature' as const, cost: 30, name: 'Water Feature (Shishi-Odoshi)' },
             { type: 'growing_bamboo_formation' as const, cost: 10, name: 'Growing Bamboo Formation' },
             { type: 'asparagus_fern_ball' as const, cost: 15, name: 'Asparagus Fern Ball' },
-            { type: 'bamboo_fence' as const, cost: 3, name: 'Bamboo Fence (Takegaki)' },
-            { type: 'torii_gate' as const, cost: 0, name: 'Torii Gate (3x1)' },
+            { type: 'zen_rock_formation' as const, cost: 20, name: 'Zen Rock Formation' },
+            { type: 'water_feature' as const, cost: 30, name: 'Water Feature (Shishi-Odoshi)' },
             { type: 'empty_crystal_pedestal' as const, cost: 50, name: 'Empty Pedestal' },
+            { type: 'seven_lucky_gods' as const, cost: 75, name: 'Seven Lucky Gods (Shichifukujin)' },
+            { type: 'stone_lantern' as const, cost: 125, name: 'Stone Lantern (Tōrō)' },
+            { type: 'torii_gate' as const, cost: 250, name: 'Torii Gate (3x1)' },
           ];
           const it = decorList[focusedShopIdx];
           if (it) buyDecoration(it.type, it.cost, it.name);
         } else if (shopTab === 'GUIDES') {
           const guideList = [
+            { key: 'has_assembly_blueprint_1' as const, cost: 15, title: 'Assembly Blueprint I' },
+            { key: 'has_assembly_blueprint_2' as const, cost: 35, title: 'Assembly Blueprint II' },
+            { key: 'has_assembly_blueprint_3' as const, cost: 60, title: 'Assembly Blueprint III' },
+            { key: 'has_overclock_schematic_1' as const, cost: 20, title: 'Overclock Schematic I' },
+            { key: 'has_overclock_schematic_2' as const, cost: 45, title: 'Overclock Schematic II' },
+            { key: 'has_overclock_schematic_3' as const, cost: 80, title: 'Overclock Schematic III' },
+            { key: 'has_auto_fab_book_1' as const, cost: 20, title: 'Auto-Fabrication Schematic I' },
+            { key: 'has_auto_fab_book_2' as const, cost: 50, title: 'Auto-Fabrication Schematic II' },
+            { key: 'has_auto_fab_book_3' as const, cost: 90, title: 'Auto-Fabrication Schematic III' },
             { key: 'has_compost_guide' as const, cost: 35, title: 'Compost Guidebook' },
             { key: 'has_tier1_guide' as const, cost: 75, title: 'Tier 1 Mist Irrigation Guidebook' },
             { key: 'has_workbench_t2_guide' as const, cost: 160, title: 'T2 Precision Workbench Blueprint' },
             { key: 'has_rover_t2_blueprint' as const, cost: 75, title: 'Rover T2 Blueprint' },
             { key: 'has_rover_t3_blueprint' as const, cost: 150, title: 'Rover T3 Blueprint' },
-            { key: 'has_storage_module_1_guide' as const, cost: 25, title: 'Storage Module I Guidebook' },
-            { key: 'has_storage_module_2_guide' as const, cost: 50, title: 'Storage Module II Guidebook' },
-            { key: 'has_storage_module_3_guide' as const, cost: 100, title: 'Storage Module III Guidebook' },
-            { key: 'has_battery_module_1_guide' as const, cost: 25, title: 'Battery Module I Guidebook' },
-            { key: 'has_battery_module_2_guide' as const, cost: 50, title: 'Battery Module II Guidebook' },
-            { key: 'has_battery_module_3_guide' as const, cost: 100, title: 'Battery Module III Guidebook' },
-            { key: 'has_radar_module_1_guide' as const, cost: 30, title: 'Radar Module I Guidebook' },
-            { key: 'has_radar_module_2_guide' as const, cost: 65, title: 'Radar Module II Guidebook' },
-            { key: 'has_radar_module_3_guide' as const, cost: 120, title: 'Radar Module III Guidebook' },
+            { key: 'has_storage_module_1_guide' as const, cost: 25, title: 'T1 Storage Module Guidebook' },
+            { key: 'has_storage_module_2_guide' as const, cost: 50, title: 'T2 Storage Module Guidebook' },
+            { key: 'has_storage_module_3_guide' as const, cost: 100, title: 'T3 Storage Module Guidebook' },
+            { key: 'has_battery_module_1_guide' as const, cost: 25, title: 'T1 Battery Module Guidebook' },
+            { key: 'has_battery_module_2_guide' as const, cost: 50, title: 'T2 Battery Module Guidebook' },
+            { key: 'has_battery_module_3_guide' as const, cost: 100, title: 'T3 Battery Module Guidebook' },
+            { key: 'has_radar_module_1_guide' as const, cost: 30, title: 'T1 Radar Module Guidebook' },
+            { key: 'has_radar_module_2_guide' as const, cost: 65, title: 'T2 Radar Module Guidebook' },
+            { key: 'has_radar_module_3_guide' as const, cost: 120, title: 'T3 Radar Module Guidebook' },
             { key: 'has_tier2_guide' as const, cost: 220, title: 'Tier 2 Pulsar Irrigation Guidebook' },
-            { key: 'has_auto_fabricator_guide' as const, cost: 300, title: 'Auto-Fabrication Blueprint Guidebook' },
             { key: 'has_workbench_t3_guide' as const, cost: 350, title: 'T3 Master Foundry Blueprint' },
             { key: 'has_tier3_guide' as const, cost: 450, title: 'Tier 3 Hydro Irrigation Guidebook' },
           ];
           const it = guideList[focusedShopIdx];
           if (it) buyGuidebook(it.key, it.cost, it.title);
         } else if (shopTab === 'EQUIPMENT') {
-          if (focusedShopIdx === 0) buyTool('tool_compost_heap', 20, 'Compost Heap');
-          else if (focusedShopIdx === 1) buyTool('fertilizer_station', 50, 'Fertilizer Station');
-          else if (focusedShopIdx === 2) buyBiochemicalsItem(5);
-          else if (focusedShopIdx === 3) buyManualIrrigation('irrigation_t1', 10, 'T1 Manual Irrigation System');
-          else if (focusedShopIdx === 4) buyManualIrrigation('irrigation_t2', 25, 'T2 Manual Irrigation System');
-          else if (focusedShopIdx === 5) buyManualIrrigation('irrigation_t3', 75, 'T3 Manual Irrigation System');
+          if (focusedShopIdx === 0) buyEngineeringLicense(1, 25);
+          else if (focusedShopIdx === 1) buyEngineeringLicense(2, 75);
+          else if (focusedShopIdx === 2) buyEngineeringLicense(3, 200);
+          else if (focusedShopIdx === 3) buyTool('tool_compost_heap', 20, 'Compost Heap');
+          else if (focusedShopIdx === 4) buyTool('fertilizer_station', 50, 'Fertilizer Station');
+          else if (focusedShopIdx === 5) buyBiochemicalsItem(5);
+          else if (focusedShopIdx === 6) buyManualIrrigation('irrigation_t1', 10, 'T1 Manual Irrigation System');
+          else if (focusedShopIdx === 7) buyManualIrrigation('irrigation_t2', 25, 'T2 Manual Irrigation System');
+          else if (focusedShopIdx === 8) buyManualIrrigation('irrigation_t3', 75, 'T3 Manual Irrigation System');
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
@@ -13606,9 +16368,9 @@ export default function App() {
     const tabLengths = {
       resources: 5,
       bonsai_automatons: 3,
-      workbench: 4,
+      workbench: 11,
       rover: 11,
-      electricity: 2,
+      electricity: 6,
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -13634,7 +16396,19 @@ export default function App() {
       } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'e' || e.key === 'E') {
         e.preventDefault();
         if (workbenchTab === 'workbench' || workbenchTab === 'upgrades') {
-          const wbList: CraftingRecipeId[] = ['workbench_t2_upgrade', 'workbench_t3_upgrade', 'crafting_automaton', 'auto_fabricator'];
+          const wbList: CraftingRecipeId[] = [
+            'workbench_t2_upgrade',
+            'workbench_t3_upgrade',
+            'assembly_module_t1',
+            'assembly_module_t2',
+            'assembly_module_t3',
+            'overclock_module_t1',
+            'overclock_module_t2',
+            'overclock_module_t3',
+            'auto_fabrication_t1',
+            'auto_fabrication_t2',
+            'auto_fabrication_t3',
+          ];
           const r = wbList[focusedWbIdx];
           if (r) enqueueCraftingRecipe(r);
         } else if (workbenchTab === 'rover') {
@@ -13662,7 +16436,14 @@ export default function App() {
           const r = autoList[focusedWbIdx];
           if (r) enqueueCraftingRecipe(r);
         } else if (workbenchTab === 'electricity') {
-          const elecList: CraftingRecipeId[] = ['solar_panel', 'wind_turbine'];
+          const elecList: CraftingRecipeId[] = [
+            'solar_panel',
+            'solar_farm_2x2',
+            'solar_farm_3x3',
+            'wind_turbine',
+            'wind_farm_2x2',
+            'wind_farm_3x3',
+          ];
           const r = elecList[focusedWbIdx];
           if (r) enqueueCraftingRecipe(r);
         }
@@ -13847,6 +16628,11 @@ export default function App() {
       }
 
       if (e.key === 'Escape') {
+        if (inspectingBonsaiId) {
+          e.preventDefault();
+          setInspectingBonsaiId(null);
+          return;
+        }
         if (isBonsaiSocietyOpenRef.current || isBonsaiSocietyOpen) {
           e.preventDefault();
           handleCloseBonsaiSociety();
@@ -13875,8 +16661,6 @@ export default function App() {
         if (socketingPedestalId) {
           setSocketingPedestalId(null);
           gameAudio.playCrispClick();
-        } else if (inspectingBonsaiId) {
-          setInspectingBonsaiId(null);
         } else if (inspectingStructureId) {
           setInspectingStructureId(null);
         } else if (isPlantingModalOpen) {
@@ -13909,6 +16693,11 @@ export default function App() {
         // Quick Radial Cross Menu Directional Triggering (WASD only, Arrows are reserved for scrolling)
         if (e.key === 'w' || e.key === 'W') {
           e.preventDefault();
+          if (quickRadialBonsai.isFavorite) {
+            gameAudio.playErrorBuzz();
+            triggerNotification('Cannot donate: Bonsai is Favorited! Unfavorite to unlock donation.', '#ef4444');
+            return;
+          }
           donatePlantedBonsai(quickRadialBonsai.id);
           handleCloseRadialMenu('w');
           return;
@@ -14028,11 +16817,15 @@ export default function App() {
               nearbyStructure.type === 'irrigation_t3'
             ) {
               refillManualIrrigation(nearbyStructure.id);
+            } else if (nearbyStructure.type === 'seven_lucky_gods') {
+              cycleSevenLuckyGods(nearbyStructure.id);
             } else if (
               nearbyStructure.type === 'solar_panel' ||
               nearbyStructure.type === 'wind_turbine' ||
               nearbyStructure.type === 'water_feature' ||
-              nearbyStructure.type === 'decor_woven_wall'
+              nearbyStructure.type === 'decor_woven_wall' ||
+              nearbyStructure.type === 'stone_lantern' ||
+              nearbyStructure.type === 'torii_gate'
             ) {
               setInspectingStructureId(nearbyStructure.id);
               gameAudio.playCrispClick();
@@ -14068,8 +16861,8 @@ export default function App() {
             }
           }
         } else if (locationRef.current === 'EXCURSION') {
-          // If at or within 1 step of base camp: Finish Excursion and return with 100% loot!
-          if (Math.hypot(roverRef.current.tileX, roverRef.current.tileY) <= 1.0) {
+          // If strictly positioned right on top of base camp tile: Finish Excursion and return with 100% loot!
+          if (roverRef.current.tileX === 0 && roverRef.current.tileY === 0) {
             e.preventDefault();
             finishExcursion(false);
           } else {
@@ -14222,7 +17015,7 @@ export default function App() {
         } else if (digStateRef.current.active) {
           e.preventDefault();
           executeDigAttempt();
-        } else if (locationRef.current === 'EXCURSION' && Math.hypot(roverRef.current.tileX, roverRef.current.tileY) <= 1.0) {
+        } else if (locationRef.current === 'EXCURSION' && roverRef.current.tileX === 0 && roverRef.current.tileY === 0) {
           e.preventDefault();
           finishExcursion(false);
         } else if (locationRef.current === 'EXCURSION') {
@@ -14323,6 +17116,7 @@ export default function App() {
     handleConfirmPlacement,
     clearRadialActionKey,
     handleCloseRadialMenu,
+    cycleSevenLuckyGods,
   ]);
 
   // Pointer click on canvas in Sanctuary
@@ -14445,9 +17239,13 @@ export default function App() {
         }
 
         for (const s of deployedStructuresRef.current) {
-          const dx = worldX - s.x;
-          const dy = worldY - s.y;
-          if (Math.abs(dx) <= halfTileW + 4 && Math.abs(dy) <= halfTileH + 4) {
+          const is2x2 = s.type === 'solar_farm_2x2' || s.type === 'wind_farm_2x2';
+          const is3x3 = s.type === 'solar_farm_3x3' || s.type === 'wind_farm_3x3';
+          const maxDx = is3x3 ? SANCTUARY_GRID.cellW * 1.5 + 4 : is2x2 ? SANCTUARY_GRID.cellW + 4 : halfTileW + 4;
+          const maxDy = is3x3 ? SANCTUARY_GRID.cellH * 1.5 + 4 : is2x2 ? SANCTUARY_GRID.cellH + 4 : halfTileH + 4;
+          const dx = Math.abs(worldX - s.x);
+          const dy = Math.abs(worldY - s.y);
+          if (dx <= maxDx && dy <= maxDy) {
             if (s.type === 'tool_compost_heap') {
               interactCompostHeapDirect(s.id);
               return;
@@ -14457,7 +17255,21 @@ export default function App() {
             } else if (s.type === 'tool_garden_well') {
               drawWaterFromWell(s.id);
               return;
-            } else if (s.type === 'solar_panel' || s.type === 'wind_turbine') {
+            } else if (s.type === 'seven_lucky_gods') {
+              cycleSevenLuckyGods(s.id);
+              return;
+            } else if (
+              s.type === 'solar_panel' ||
+              s.type === 'solar_farm_2x2' ||
+              s.type === 'solar_farm_3x3' ||
+              s.type === 'wind_turbine' ||
+              s.type === 'wind_farm_2x2' ||
+              s.type === 'wind_farm_3x3' ||
+              s.type === 'water_feature' ||
+              s.type === 'decor_woven_wall' ||
+              s.type === 'stone_lantern' ||
+              s.type === 'torii_gate'
+            ) {
               setInspectingStructureId(s.id);
               gameAudio.playCrispClick();
               return;
@@ -14490,6 +17302,7 @@ export default function App() {
     sanctuaryShopStand,
     sanctuaryWorkbench,
     sanctuaryZenLibrary,
+    cycleSevenLuckyGods,
   ]);
 
   // --- MAIN SIMULATION TICK ---
@@ -14687,7 +17500,16 @@ export default function App() {
                   str.type === 'irrigation_t3'
                 ) {
                   refillManualIrrigation(str.id);
-                } else if (str.type === 'solar_panel' || str.type === 'wind_turbine') {
+                } else if (str.type === 'seven_lucky_gods') {
+                  cycleSevenLuckyGods(str.id);
+                } else if (
+                  str.type === 'solar_panel' ||
+                  str.type === 'wind_turbine' ||
+                  str.type === 'water_feature' ||
+                  str.type === 'decor_woven_wall' ||
+                  str.type === 'stone_lantern' ||
+                  str.type === 'torii_gate'
+                ) {
                   setInspectingStructureId(str.id);
                   gameAudio.playCrispClick();
                 } else if (
@@ -14711,7 +17533,7 @@ export default function App() {
               gameAudio.playCrispClick();
             }
           } else if (locationRef.current === 'EXCURSION') {
-            if (Math.hypot(roverRef.current.tileX, roverRef.current.tileY) <= 1.0) {
+            if (roverRef.current.tileX === 0 && roverRef.current.tileY === 0) {
               finishExcursion(false);
             } else {
               const node = findNearbyExcursionNode();
@@ -14728,6 +17550,10 @@ export default function App() {
 
         // Button 1 (B / Circle): Cancel / Close / Back / Leave
         if (justPressed(1)) {
+          if (inspectingBonsaiId) {
+            setInspectingBonsaiId(null);
+            return;
+          }
           if (placementPreviewRef.current) {
             setPlacementPreview(null);
             gameAudio.playCrispClick();
@@ -14903,9 +17729,14 @@ export default function App() {
         // D-Pad buttons when Quick Radial Menu is open
         if (quickRadialBonsai) {
           if (justPressed(12) || (rawAxisY < -0.5 && lastBtns[12] === false)) {
-            // Up: Quick Sell
-            donatePlantedBonsai(quickRadialBonsai.id);
-            handleCloseRadialMenu();
+            // Up: Quick Sell / Donate
+            if (quickRadialBonsai.isFavorite) {
+              gameAudio.playErrorBuzz();
+              triggerNotification('Cannot donate: Bonsai is Favorited! Unfavorite to unlock donation.', '#ef4444');
+            } else {
+              donatePlantedBonsai(quickRadialBonsai.id);
+              handleCloseRadialMenu();
+            }
           } else if (justPressed(13) || (rawAxisY > 0.5 && lastBtns[13] === false)) {
             // Down: Store Bonsai
             pickUpBonsaiToInventory(quickRadialBonsai.id);
@@ -15188,17 +18019,33 @@ export default function App() {
           s.timer = s.timer ?? 0;
           s.maxCapacity = s.maxCapacity ?? 20;
 
+          // Robust queue & decomposition loop:
+          // Timer counts DOWN from 10s per unit of compost
           if (s.depositedWaste >= 2) {
-            s.timer += dt;
-            if (s.timer >= 10) {
-              // Batch decomposition: 2 Organic Waste -> 1 Enriched Organic Compost (strictly 10s duration)
-              s.timer = 0;
+            if (s.timer <= 0) {
+              s.timer = 10;
+              if (!s.currentBatchIndex) s.currentBatchIndex = 1;
+              if (!s.totalBatchCount) s.totalBatchCount = Math.floor(s.depositedWaste / 2);
+            }
+            s.timer = Math.max(0, s.timer - dt);
+            if (s.timer <= 0) {
               s.depositedWaste = Math.max(0, s.depositedWaste - 2);
               s.readyCompost = (s.readyCompost || 0) + 1;
               addFloatingText(s.x, s.y - 35, '+1 🌾 Compost Ready!', '#a3e635');
+              gameAudio.playLevelUpStinger();
+              if (s.depositedWaste >= 2) {
+                s.timer = 10;
+                s.currentBatchIndex = (s.currentBatchIndex || 1) + 1;
+              } else {
+                s.timer = 0;
+                s.currentBatchIndex = 0;
+                s.totalBatchCount = 0;
+              }
             }
           } else {
             s.timer = 0;
+            s.currentBatchIndex = 0;
+            s.totalBatchCount = 0;
           }
         } else if (s.type === 'fertilizer_station') {
           s.depositedWaste = s.depositedWaste ?? 0;
@@ -15206,7 +18053,16 @@ export default function App() {
           s.readyFertilizer = s.readyFertilizer ?? 0;
           s.timer = s.timer ?? 0;
 
-          if (s.isDistilling && s.timer > 0) {
+          // Robust queue & distillation loop:
+          // Timer counts DOWN from 60s per unit of fertilizer
+          const canDistill = (s.depositedWaste >= 3) && (s.depositedBiochemicals >= 1);
+          if (canDistill) {
+            s.isDistilling = true;
+            if (s.timer <= 0) {
+              s.timer = 60;
+              if (!s.currentBatchIndex) s.currentBatchIndex = 1;
+              if (!s.totalBatchCount) s.totalBatchCount = Math.min(Math.floor(s.depositedWaste / 3), s.depositedBiochemicals);
+            }
             s.timer = Math.max(0, s.timer - dt);
 
             // Ambient distillation bubbles / steam
@@ -15223,16 +18079,30 @@ export default function App() {
             }
 
             if (s.timer <= 0) {
-              s.isDistilling = false;
-              const batches = Math.min(Math.floor(s.depositedWaste / 3), s.depositedBiochemicals);
-              if (batches > 0) {
-                s.depositedWaste -= batches * 3;
-                s.depositedBiochemicals -= batches;
-                s.readyFertilizer = (s.readyFertilizer || 0) + batches;
-                addFloatingText(s.x, s.y - 35, `+${batches} 🧪 Fertilizer Ready!`, '#34d399');
-                gameAudio.playLevelUpStinger();
+              // 1 unit finished distilling!
+              s.depositedWaste = Math.max(0, s.depositedWaste - 3);
+              s.depositedBiochemicals = Math.max(0, s.depositedBiochemicals - 1);
+              s.readyFertilizer = (s.readyFertilizer || 0) + 1;
+              addFloatingText(s.x, s.y - 35, `+1 🧪 Fertilizer Ready!`, '#34d399');
+              gameAudio.playLevelUpStinger();
+
+              // If more batches remain in the queue, start next unit immediately
+              if ((s.depositedWaste >= 3) && (s.depositedBiochemicals >= 1)) {
+                s.timer = 60;
+                s.isDistilling = true;
+                s.currentBatchIndex = (s.currentBatchIndex || 1) + 1;
+              } else {
+                s.timer = 0;
+                s.isDistilling = false;
+                s.currentBatchIndex = 0;
+                s.totalBatchCount = 0;
               }
             }
+          } else {
+            s.timer = 0;
+            s.isDistilling = false;
+            s.currentBatchIndex = 0;
+            s.totalBatchCount = 0;
           }
         } else if (s.type === 'tool_garden_well') {
           s.activeWateringRemaining = s.activeWateringRemaining ?? 0;
@@ -15259,13 +18129,37 @@ export default function App() {
       const activeCraft = activeCraftingRef.current;
       if (activeCraft) {
         if (power.isPowerSufficient) {
-          const craftingSpeedMult = 1.0 + installedCraftingArmsRef.current * 0.25;
+          const craftingSpeedMult = 1.0 + getOverclockBonusSpeed();
           activeCraft.remainingTime = Math.max(0, activeCraft.remainingTime - dt * craftingSpeedMult);
 
           if (activeCraft.remainingTime <= 0) {
             // Finish item crafting!
             const recipeId = activeCraft.recipeId;
-            if (recipeId === 'tier1_automaton') {
+            if (recipeId === 'assembly_module_t1') {
+              inv.assembly_module_t1_inv = (inv.assembly_module_t1_inv || 0) + 1;
+              gameAudio.playLevelUpStinger();
+              triggerNotification('🦾 Crafted T1 Assembly Bench Module (+1 Queue Slot)! Install in Manage Modules.', '#38bdf8');
+            } else if (recipeId === 'assembly_module_t2') {
+              inv.assembly_module_t2_inv = (inv.assembly_module_t2_inv || 0) + 1;
+              gameAudio.playLevelUpStinger();
+              triggerNotification('🦾 Crafted T2 Assembly Bench Module (+2 Queue Slots)! Install in Manage Modules.', '#38bdf8');
+            } else if (recipeId === 'assembly_module_t3') {
+              inv.assembly_module_t3_inv = (inv.assembly_module_t3_inv || 0) + 1;
+              gameAudio.playLevelUpStinger();
+              triggerNotification('🦾 Crafted T3 Assembly Bench Module (+3 Queue Slots)! Install in Manage Modules.', '#38bdf8');
+            } else if (recipeId === 'overclock_module_t1') {
+              inv.overclock_module_t1_inv = (inv.overclock_module_t1_inv || 0) + 1;
+              gameAudio.playLevelUpStinger();
+              triggerNotification('⚡ Crafted T1 Overclock Workbench Module (+5% Speed)! Install in Manage Modules.', '#f59e0b');
+            } else if (recipeId === 'overclock_module_t2') {
+              inv.overclock_module_t2_inv = (inv.overclock_module_t2_inv || 0) + 1;
+              gameAudio.playLevelUpStinger();
+              triggerNotification('⚡ Crafted T2 Overclock Workbench Module (+10% Speed)! Install in Manage Modules.', '#f59e0b');
+            } else if (recipeId === 'overclock_module_t3') {
+              inv.overclock_module_t3_inv = (inv.overclock_module_t3_inv || 0) + 1;
+              gameAudio.playLevelUpStinger();
+              triggerNotification('⚡ Crafted T3 Overclock Workbench Module (+20% Speed)! Install in Manage Modules.', '#f59e0b');
+            } else if (recipeId === 'tier1_automaton') {
               inv.automaton_t1_inv = (inv.automaton_t1_inv || 0) + 1;
               inv.automatons_tier1 = inv.automaton_t1_inv;
             } else if (recipeId === 'tier2_automaton') {
@@ -15274,15 +18168,59 @@ export default function App() {
             } else if (recipeId === 'tier3_automaton') {
               inv.automaton_t3_inv = (inv.automaton_t3_inv || 0) + 1;
               inv.automatons_tier3 = inv.automaton_t3_inv;
-            } else if (recipeId === 'auto_fabricator') inv.auto_fabricators_inv += 1;
-            else if (recipeId === 'solar_panel') {
+            } else if (recipeId === 'auto_fabrication_t1') {
+              inv.auto_fabrication_t1_inv = (inv.auto_fabrication_t1_inv || 0) + 1;
+              gameAudio.playLevelUpStinger();
+              triggerNotification('🏭 Crafted T1 Auto-Fabrication Module (50% Speed)! Install in Manage Modules.', '#38bdf8');
+            } else if (recipeId === 'auto_fabrication_t2' || recipeId === 'auto_fabricator') {
+              inv.auto_fabrication_t2_inv = (inv.auto_fabrication_t2_inv || 0) + 1;
+              inv.auto_fabricators_inv = (inv.auto_fabricators_inv || 0) + 1;
+              gameAudio.playLevelUpStinger();
+              triggerNotification('🏭 Crafted T2 Auto-Fabrication Module (100% Speed)! Install in Manage Modules.', '#38bdf8');
+            } else if (recipeId === 'auto_fabrication_t3') {
+              inv.auto_fabrication_t3_inv = (inv.auto_fabrication_t3_inv || 0) + 1;
+              gameAudio.playLevelUpStinger();
+              triggerNotification('🏭 Crafted T3 Auto-Fabrication Module (150% Speed)! Install in Manage Modules.', '#38bdf8');
+            } else if (recipeId === 'solar_panel') {
               inv.solar_panels_inv = (inv.solar_panels_inv || 0) + 1;
               inv.solar_panel_inv = inv.solar_panels_inv;
               inv.solarPanels = inv.solar_panels_inv;
+            } else if (recipeId === 'solar_farm_2x2') {
+              inv.solar_farm_2x2_inv = (inv.solar_farm_2x2_inv || 0) + 1;
+              if (!inv.infrastructure) inv.infrastructure = {};
+              if (!inv.deployables) inv.deployables = {};
+              inv.infrastructure['solar_farm_2x2'] = inv.solar_farm_2x2_inv;
+              inv.deployables['solar_farm_2x2'] = inv.solar_farm_2x2_inv;
+              gameAudio.playLevelUpStinger();
+              triggerNotification('☀️ Crafted Solar Panel Farm (2x2 • +24 kW)! Deploy via [P] or [E].', '#38bdf8');
+            } else if (recipeId === 'solar_farm_3x3') {
+              inv.solar_farm_3x3_inv = (inv.solar_farm_3x3_inv || 0) + 1;
+              if (!inv.infrastructure) inv.infrastructure = {};
+              if (!inv.deployables) inv.deployables = {};
+              inv.infrastructure['solar_farm_3x3'] = inv.solar_farm_3x3_inv;
+              inv.deployables['solar_farm_3x3'] = inv.solar_farm_3x3_inv;
+              gameAudio.playLevelUpStinger();
+              triggerNotification('☀️ Crafted Big Solar Panel Farm (3x3 • +87 kW)! Deploy via [P] or [E].', '#38bdf8');
             } else if (recipeId === 'wind_turbine') {
               inv.wind_turbines_inv = (inv.wind_turbines_inv || 0) + 1;
               inv.wind_turbine_inv = inv.wind_turbines_inv;
               inv.windTurbines = inv.wind_turbines_inv;
+            } else if (recipeId === 'wind_farm_2x2') {
+              inv.wind_farm_2x2_inv = (inv.wind_farm_2x2_inv || 0) + 1;
+              if (!inv.infrastructure) inv.infrastructure = {};
+              if (!inv.deployables) inv.deployables = {};
+              inv.infrastructure['wind_farm_2x2'] = inv.wind_farm_2x2_inv;
+              inv.deployables['wind_farm_2x2'] = inv.wind_farm_2x2_inv;
+              gameAudio.playLevelUpStinger();
+              triggerNotification('💨 Crafted Wind Turbine Farm (2x2 • +42 kW)! Deploy via [P] or [E].', '#f59e0b');
+            } else if (recipeId === 'wind_farm_3x3') {
+              inv.wind_farm_3x3_inv = (inv.wind_farm_3x3_inv || 0) + 1;
+              if (!inv.infrastructure) inv.infrastructure = {};
+              if (!inv.deployables) inv.deployables = {};
+              inv.infrastructure['wind_farm_3x3'] = inv.wind_farm_3x3_inv;
+              inv.deployables['wind_farm_3x3'] = inv.wind_farm_3x3_inv;
+              gameAudio.playLevelUpStinger();
+              triggerNotification('💨 Crafted Big Wind Turbine Farm (3x3 • +134 kW)! Deploy via [P] or [E].', '#f59e0b');
             } else if (recipeId === 'craft_enriched_compost') {
               inv.organic_compost = (inv.organic_compost || 0) + 1;
               inv.enrichedCompost = inv.organic_compost;
@@ -15301,68 +18239,73 @@ export default function App() {
             } else if (recipeId === 'craft_quantum_chips') {
               inv.electronic_chips = (inv.electronic_chips || 0) + 1;
               inv.chips = inv.quantumChips = inv.electronic_chips;
-            } else if (recipeId === 'crafting_automaton') inv.crafting_automatons_inv += 1;
-            else if (recipeId === 'rover_storage_module_1') {
+            } else if (recipeId === 'crafting_automaton') {
+              inv.crafting_automatons_inv += 1;
+            } else if (recipeId === 'rover_storage_module_1') {
               inv.rover_modules.storage_1 = (inv.rover_modules.storage_1 || 0) + 1;
               if (inv.roverModules) inv.roverModules.storage_1 = inv.rover_modules.storage_1;
               gameAudio.playLevelUpStinger();
-              triggerNotification('📦 Crafted Storage Module I (+2.5 kg)! Attach in Rover Loadout.', '#38bdf8');
+              triggerNotification('📦 Crafted T1 Storage Module (+2.5 kg)! Attach in Rover Loadout.', '#38bdf8');
             } else if (recipeId === 'rover_storage_module_2') {
               inv.rover_modules.storage_2 = (inv.rover_modules.storage_2 || 0) + 1;
               if (inv.roverModules) inv.roverModules.storage_2 = inv.rover_modules.storage_2;
               gameAudio.playLevelUpStinger();
-              triggerNotification('📦 Crafted Storage Module II (+5.0 kg)! Attach in Rover Loadout.', '#38bdf8');
+              triggerNotification('📦 Crafted T2 Storage Module (+5.0 kg)! Attach in Rover Loadout.', '#38bdf8');
             } else if (recipeId === 'rover_storage_module_3') {
               inv.rover_modules.storage_3 = (inv.rover_modules.storage_3 || 0) + 1;
               if (inv.roverModules) inv.roverModules.storage_3 = inv.rover_modules.storage_3;
               gameAudio.playLevelUpStinger();
-              triggerNotification('🚜 Crafted Storage Module III (+7.5 kg)! Attach in Rover Loadout.', '#38bdf8');
+              triggerNotification('🚜 Crafted T3 Storage Module (+7.5 kg)! Attach in Rover Loadout.', '#38bdf8');
             } else if (recipeId === 'rover_battery_module_1') {
               inv.rover_modules.battery_1 = (inv.rover_modules.battery_1 || 0) + 1;
               if (inv.roverModules) inv.roverModules.battery_1 = inv.rover_modules.battery_1;
               gameAudio.playLevelUpStinger();
-              triggerNotification('🔋 Crafted Battery Module I (+25 kWh)! Attach in Rover Loadout.', '#f59e0b');
+              triggerNotification('🔋 Crafted T1 Battery Module (+25 kWh)! Attach in Rover Loadout.', '#f59e0b');
             } else if (recipeId === 'rover_battery_module_2') {
               inv.rover_modules.battery_2 = (inv.rover_modules.battery_2 || 0) + 1;
               if (inv.roverModules) inv.roverModules.battery_2 = inv.rover_modules.battery_2;
               gameAudio.playLevelUpStinger();
-              triggerNotification('⚡ Crafted Battery Module II (+50 kWh)! Attach in Rover Loadout.', '#f59e0b');
+              triggerNotification('⚡ Crafted T2 Battery Module (+50 kWh)! Attach in Rover Loadout.', '#f59e0b');
             } else if (recipeId === 'rover_battery_module_3') {
               inv.rover_modules.battery_3 = (inv.rover_modules.battery_3 || 0) + 1;
               if (inv.roverModules) inv.roverModules.battery_3 = inv.rover_modules.battery_3;
               gameAudio.playLevelUpStinger();
-              triggerNotification('✨ Crafted Battery Module III (+75 kWh)! Attach in Rover Loadout.', '#f59e0b');
+              triggerNotification('✨ Crafted T3 Battery Module (+75 kWh)! Attach in Rover Loadout.', '#f59e0b');
             } else if (recipeId === 'rover_radar_module_1') {
               inv.rover_modules.radar_1 = (inv.rover_modules.radar_1 || 0) + 1;
               if (inv.roverModules) inv.roverModules.radar_1 = inv.rover_modules.radar_1;
               gameAudio.playLevelUpStinger();
-              triggerNotification('📡 Crafted Radar Module I (+1 Step)! Attach in Rover Loadout.', '#38bdf8');
+              triggerNotification('📡 Crafted T1 Radar Module (+1 Step)! Attach in Rover Loadout.', '#38bdf8');
             } else if (recipeId === 'rover_radar_module_2') {
               inv.rover_modules.radar_2 = (inv.rover_modules.radar_2 || 0) + 1;
               if (inv.roverModules) inv.roverModules.radar_2 = inv.rover_modules.radar_2;
               gameAudio.playLevelUpStinger();
-              triggerNotification('📡 Crafted Radar Module II (+2 Steps)! Attach in Rover Loadout.', '#38bdf8');
+              triggerNotification('📡 Crafted T2 Radar Module (+2 Steps)! Attach in Rover Loadout.', '#38bdf8');
             } else if (recipeId === 'rover_radar_module_3') {
               inv.rover_modules.radar_3 = (inv.rover_modules.radar_3 || 0) + 1;
               if (inv.roverModules) inv.roverModules.radar_3 = inv.rover_modules.radar_3;
               gameAudio.playLevelUpStinger();
-              triggerNotification('📡 Crafted Radar Module III (+3 Steps)! Attach in Rover Loadout.', '#38bdf8');
+              triggerNotification('📡 Crafted T3 Radar Module (+3 Steps)! Attach in Rover Loadout.', '#38bdf8');
+              inv.rover_modules.storage_1 = (inv.rover_modules.storage_1 || 0) + 1;
+              if (inv.roverModules) inv.roverModules.storage_1 = inv.rover_modules.storage_1;
+              gameAudio.playLevelUpStinger();
+              triggerNotification('📦 Crafted Storage Module I (+2.5 kg)! Attach in Rover Loadout.', '#38bdf8');
             } else if (recipeId === 'rover_chassis_t2') {
               inv.rover_chassis_tier = 2;
               gameAudio.playLevelUpStinger();
-              triggerNotification('🚜 Upgraded Rover to Surveyor Chassis (Tier 2)! Capacity: 5 Slots', '#38bdf8');
+              triggerNotification('🚜 Upgraded Rover to T2 Surveyor Chassis! Capacity: 5 Slots', '#38bdf8');
             } else if (recipeId === 'rover_chassis_t3') {
               inv.rover_chassis_tier = 3;
               gameAudio.playLevelUpStinger();
-              triggerNotification('👑 Upgraded Rover to Vanguard Heavy Chassis (Tier 3)! Capacity: 10 Slots', '#f59e0b');
+              triggerNotification('👑 Upgraded Rover to T3 Vanguard Heavy Chassis! Capacity: 10 Slots', '#f59e0b');
             } else if (recipeId === 'workbench_t2_upgrade') {
               inv.workbench_tier = 2;
               gameAudio.playLevelUpStinger();
-              triggerNotification('🛠️ Upgraded to Tier 2 Precision Workbench! Automaton Capacity: 5', '#38bdf8');
+              triggerNotification('🛠️ Upgraded to T2 Precision Workbench! Automaton Capacity: 5', '#38bdf8');
             } else if (recipeId === 'workbench_t3_upgrade') {
               inv.workbench_tier = 3;
               gameAudio.playLevelUpStinger();
-              triggerNotification('👑 Upgraded to Tier 3 Master Foundry! Automaton Capacity: 10', '#f59e0b');
+              triggerNotification('👑 Upgraded to T3 Master Foundry! Automaton Capacity: 10', '#f59e0b');
             }
 
             gameAudio.playPowerupChime();
@@ -15389,29 +18332,78 @@ export default function App() {
           if (!isGuideUnlocked) return;
 
           const costs = targetRecipe.costs;
+          // Crafting Speed Specifications:
+          // T1 Auto-Fabrication Module: Crafting speed is 50% (half the speed of the workbench; tasks take 2x as long).
+          // T2 Auto-Fabrication Module: Crafting speed is 100% (same speed as the standard workbench).
+          // T3 Auto-Fabrication Module: Crafting speed is 150% (1.5x faster than the standard workbench; tasks take 0.667x as long).
+          const speedMultiplier = lane.tier === 1 ? 0.5 : lane.tier === 3 ? 1.5 : 1.0;
 
           if (lane.progressSeconds === 0) {
             // Check if ingredients exist in inventory to begin cycle
+            const curScrap = inv.scrap_metal ?? inv.scrapMetal ?? inv.resources?.scrap_metal ?? inv.resources?.scrapMetal ?? 0;
+            const curWire = inv.copper_wire ?? inv.copperWire ?? inv.resources?.copper_wire ?? inv.resources?.copperWire ?? 0;
+            const curGears = inv.brass_gears ?? inv.gears ?? inv.resources?.brass_gears ?? inv.resources?.gears ?? 0;
+            const curCircuits = inv.circuit_boards ?? inv.microcircuits ?? inv.resources?.circuit_boards ?? inv.resources?.microcircuits ?? 0;
+            const curChips = inv.electronic_chips ?? inv.chips ?? inv.quantumChips ?? inv.resources?.electronic_chips ?? inv.resources?.chips ?? 0;
+            const curWaste = inv.organic_waste ?? inv.organicWaste ?? inv.resources?.organic_waste ?? inv.resources?.organicWaste ?? 0;
+            const curBio = inv.biochemicals ?? inv.resources?.biochemicals ?? 0;
+
             const hasMaterials =
-              (!costs.scrap_metal || (inv.scrap_metal ?? 0) >= costs.scrap_metal) &&
-              (!costs.copper_wire || (inv.copper_wire ?? 0) >= costs.copper_wire) &&
-              (!costs.brass_gears || (inv.brass_gears ?? 0) >= costs.brass_gears) &&
-              (!costs.circuit_boards || (inv.circuit_boards ?? 0) >= costs.circuit_boards) &&
-              (!costs.electronic_chips || (inv.electronic_chips ?? 0) >= costs.electronic_chips) &&
-              (!costs.organic_waste || (inv.organic_waste ?? 0) >= costs.organic_waste);
+              (!costs.scrap_metal || curScrap >= costs.scrap_metal) &&
+              (!costs.copper_wire || curWire >= costs.copper_wire) &&
+              (!costs.brass_gears || curGears >= costs.brass_gears) &&
+              (!costs.circuit_boards || curCircuits >= costs.circuit_boards) &&
+              (!costs.electronic_chips || curChips >= costs.electronic_chips) &&
+              (!costs.organic_waste || curWaste >= costs.organic_waste) &&
+              (!costs.biochemicals || curBio >= costs.biochemicals);
 
             if (hasMaterials) {
-              if (costs.scrap_metal) inv.scrap_metal -= costs.scrap_metal;
-              if (costs.copper_wire) inv.copper_wire -= costs.copper_wire;
-              if (costs.brass_gears) inv.brass_gears -= costs.brass_gears;
-              if (costs.circuit_boards) inv.circuit_boards -= costs.circuit_boards;
-              if (costs.electronic_chips) inv.electronic_chips -= costs.electronic_chips;
-              if (costs.organic_waste) inv.organic_waste -= costs.organic_waste;
+              if (!inv.resources) inv.resources = {};
+              if (costs.scrap_metal) {
+                inv.scrap_metal = Math.max(0, curScrap - costs.scrap_metal);
+                inv.scrapMetal = inv.scrap_metal;
+                inv.resources.scrap_metal = inv.scrap_metal;
+                inv.resources.scrapMetal = inv.scrap_metal;
+              }
+              if (costs.copper_wire) {
+                inv.copper_wire = Math.max(0, curWire - costs.copper_wire);
+                inv.copperWire = inv.copper_wire;
+                inv.resources.copper_wire = inv.copper_wire;
+                inv.resources.copperWire = inv.copper_wire;
+              }
+              if (costs.brass_gears) {
+                inv.brass_gears = Math.max(0, curGears - costs.brass_gears);
+                inv.gears = inv.brass_gears;
+                inv.resources.brass_gears = inv.brass_gears;
+                inv.resources.gears = inv.brass_gears;
+              }
+              if (costs.circuit_boards) {
+                inv.circuit_boards = Math.max(0, curCircuits - costs.circuit_boards);
+                inv.microcircuits = inv.circuit_boards;
+                inv.resources.circuit_boards = inv.circuit_boards;
+                inv.resources.microcircuits = inv.circuit_boards;
+              }
+              if (costs.electronic_chips) {
+                inv.electronic_chips = Math.max(0, curChips - costs.electronic_chips);
+                inv.chips = inv.quantumChips = inv.electronic_chips;
+                inv.resources.electronic_chips = inv.electronic_chips;
+                inv.resources.chips = inv.electronic_chips;
+              }
+              if (costs.organic_waste) {
+                inv.organic_waste = Math.max(0, curWaste - costs.organic_waste);
+                inv.organicWaste = inv.organic_waste;
+                inv.resources.organic_waste = inv.organic_waste;
+                inv.resources.organicWaste = inv.organic_waste;
+              }
+              if (costs.biochemicals) {
+                inv.biochemicals = Math.max(0, curBio - costs.biochemicals);
+                inv.resources.biochemicals = inv.biochemicals;
+              }
 
-              lane.progressSeconds += dt;
+              lane.progressSeconds += dt * speedMultiplier;
             }
           } else {
-            lane.progressSeconds += dt;
+            lane.progressSeconds += dt * speedMultiplier;
 
             if (lane.progressSeconds >= targetRecipe.durationSeconds) {
               const rid = targetRecipe.id;
@@ -15424,15 +18416,45 @@ export default function App() {
               } else if (rid === 'tier3_automaton') {
                 inv.automaton_t3_inv = (inv.automaton_t3_inv || 0) + 1;
                 inv.automatons_tier3 = inv.automaton_t3_inv;
-              } else if (rid === 'auto_fabricator') inv.auto_fabricators_inv += 1;
-              else if (rid === 'solar_panel') {
+              } else if (rid === 'auto_fabrication_t1') {
+                inv.auto_fabrication_t1_inv = (inv.auto_fabrication_t1_inv || 0) + 1;
+              } else if (rid === 'auto_fabrication_t2' || rid === 'auto_fabricator') {
+                inv.auto_fabrication_t2_inv = (inv.auto_fabrication_t2_inv || 0) + 1;
+                inv.auto_fabricators_inv = (inv.auto_fabricators_inv || 0) + 1;
+              } else if (rid === 'auto_fabrication_t3') {
+                inv.auto_fabrication_t3_inv = (inv.auto_fabrication_t3_inv || 0) + 1;
+              } else if (rid === 'solar_panel') {
                 inv.solar_panels_inv = (inv.solar_panels_inv || 0) + 1;
                 inv.solar_panel_inv = inv.solar_panels_inv;
                 inv.solarPanels = inv.solar_panels_inv;
+              } else if (rid === 'solar_farm_2x2') {
+                inv.solar_farm_2x2_inv = (inv.solar_farm_2x2_inv || 0) + 1;
+                if (!inv.infrastructure) inv.infrastructure = {};
+                if (!inv.deployables) inv.deployables = {};
+                inv.infrastructure['solar_farm_2x2'] = inv.solar_farm_2x2_inv;
+                inv.deployables['solar_farm_2x2'] = inv.solar_farm_2x2_inv;
+              } else if (rid === 'solar_farm_3x3') {
+                inv.solar_farm_3x3_inv = (inv.solar_farm_3x3_inv || 0) + 1;
+                if (!inv.infrastructure) inv.infrastructure = {};
+                if (!inv.deployables) inv.deployables = {};
+                inv.infrastructure['solar_farm_3x3'] = inv.solar_farm_3x3_inv;
+                inv.deployables['solar_farm_3x3'] = inv.solar_farm_3x3_inv;
               } else if (rid === 'wind_turbine') {
                 inv.wind_turbines_inv = (inv.wind_turbines_inv || 0) + 1;
                 inv.wind_turbine_inv = inv.wind_turbines_inv;
                 inv.windTurbines = inv.wind_turbines_inv;
+              } else if (rid === 'wind_farm_2x2') {
+                inv.wind_farm_2x2_inv = (inv.wind_farm_2x2_inv || 0) + 1;
+                if (!inv.infrastructure) inv.infrastructure = {};
+                if (!inv.deployables) inv.deployables = {};
+                inv.infrastructure['wind_farm_2x2'] = inv.wind_farm_2x2_inv;
+                inv.deployables['wind_farm_2x2'] = inv.wind_farm_2x2_inv;
+              } else if (rid === 'wind_farm_3x3') {
+                inv.wind_farm_3x3_inv = (inv.wind_farm_3x3_inv || 0) + 1;
+                if (!inv.infrastructure) inv.infrastructure = {};
+                if (!inv.deployables) inv.deployables = {};
+                inv.infrastructure['wind_farm_3x3'] = inv.wind_farm_3x3_inv;
+                inv.deployables['wind_farm_3x3'] = inv.wind_farm_3x3_inv;
               } else if (rid === 'craft_enriched_compost') {
                 inv.organic_compost = (inv.organic_compost || 0) + 1;
                 inv.enrichedCompost = inv.organic_compost;
@@ -15596,6 +18618,14 @@ export default function App() {
               const dy = Math.abs(av.y - s.y);
               isWithinTile = dx <= 28 && dy <= halfTileH + 6;
             }
+          } else if (s.type === 'solar_farm_2x2' || s.type === 'wind_farm_2x2') {
+            const dx = Math.abs(av.x - s.x);
+            const dy = Math.abs(av.y - s.y);
+            isWithinTile = dx <= SANCTUARY_GRID.cellW + 4 && dy <= SANCTUARY_GRID.cellH + 4;
+          } else if (s.type === 'solar_farm_3x3' || s.type === 'wind_farm_3x3') {
+            const dx = Math.abs(av.x - s.x);
+            const dy = Math.abs(av.y - s.y);
+            isWithinTile = dx <= SANCTUARY_GRID.cellW * 1.5 + 4 && dy <= SANCTUARY_GRID.cellH * 1.5 + 4;
           } else {
             const dx = Math.abs(av.x - s.x);
             const dy = Math.abs(av.y - s.y);
@@ -15655,9 +18685,14 @@ export default function App() {
         if (activeStruct) {
           const isWellWatering = activeStruct.type === 'tool_garden_well' && (activeStruct.activeWateringRemaining || 0) > 0;
           const hasCompostReady = activeStruct.type === 'tool_compost_heap' && (activeStruct.readyCompost || 0) > 0;
+          const isStationTimerActive =
+            (activeStruct.type === 'tool_compost_heap' || activeStruct.type === 'fertilizer_station') &&
+            (activeStruct.timer || 0) > 0;
+
           if (
             (activeStruct.type === 'tool_garden_well' && isWellWatering !== lastWellWateringRef.current) ||
-            (activeStruct.type === 'tool_compost_heap' && hasCompostReady !== lastCompostReadyRef.current)
+            (activeStruct.type === 'tool_compost_heap' && hasCompostReady !== lastCompostReadyRef.current) ||
+            isStationTimerActive
           ) {
             lastWellWateringRef.current = isWellWatering;
             lastCompostReadyRef.current = hasCompostReady;
@@ -15769,6 +18804,7 @@ export default function App() {
       canvasHeight,
       canvasWidth,
       collectCurrentRoverResource,
+      cycleSevenLuckyGods,
       depositHaulAndReturnToSanctuary,
       dismantleDeployedStructure,
       drawWaterFromWell,
@@ -15842,12 +18878,118 @@ export default function App() {
           sCamY * 0.4,
         );
 
-        // Render / Blit cached offscreen terrain (ambiance, promenade pebbles, flooring, 16x8 soil plots)
+        // Render / Blit cached offscreen terrain (ambiance, promenade pebbles, flooring)
         if (!offscreenTerrainCanvasRef.current || offscreenTerrainDirtyRef.current) {
           renderOffscreenTerrain(canvasWidth, SANCTUARY_WORLD_HEIGHT);
         }
         if (offscreenTerrainCanvasRef.current) {
           ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+        }
+
+        // Live calculation of Disrupted Zen plots executed dynamically on EVERY render frame directly from live gridPlots and fences!
+        const liveDisruptedPlots = getDisruptedZenPlots(deployedStructuresRef.current);
+
+        // 16x8 GRID TILE OVERLAY WITH UNLOCKED & LOCKED SANCTUARY PLOTS (Rendered live every frame)
+        for (let c = 0; c < SANCTUARY_GRID.cols; c++) {
+          for (let r = 0; r < SANCTUARY_GRID.rows; r++) {
+            const gx = SANCTUARY_GRID.startX + c * SANCTUARY_GRID.cellW;
+            const gy = SANCTUARY_GRID.startY + r * SANCTUARY_GRID.cellH;
+            const isUnlocked = isGridPlotUnlocked(gx, gy);
+            const tileX = gx - halfTileW;
+            const tileY = gy - halfTileH;
+            const tileW = halfTileW * 2;
+            const tileH = halfTileH * 2;
+            const isDisrupted = liveDisruptedPlots.has(`${c},${r}`);
+
+            if (isUnlocked) {
+              if (isDisrupted) {
+                // Rich earthy brown barren soil base (#543d2b / #422f21) with desolate scorched texture
+                const brownGrad = ctx.createLinearGradient(tileX, tileY, tileX + tileW, tileY + tileH);
+                brownGrad.addColorStop(0, '#543d2b');
+                brownGrad.addColorStop(0.5, '#483324');
+                brownGrad.addColorStop(1, '#422f21');
+                ctx.fillStyle = brownGrad;
+                ctx.fillRect(tileX, tileY, tileW, tileH);
+
+                // Scorched desolate border
+                ctx.strokeStyle = 'rgba(120, 83, 40, 0.55)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(tileX, tileY, tileW, tileH);
+
+                // Dry cracked earth lines across the tile
+                ctx.strokeStyle = 'rgba(35, 22, 14, 0.75)';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.moveTo(tileX + 10, tileY + 8);
+                ctx.lineTo(tileX + 24, tileY + 22);
+                ctx.lineTo(tileX + 20, tileY + 38);
+                ctx.lineTo(tileX + 34, tileY + 54);
+                ctx.moveTo(tileX + 24, tileY + 22);
+                ctx.lineTo(tileX + 42, tileY + 18);
+                ctx.lineTo(tileX + 52, tileY + 30);
+                ctx.moveTo(tileX + 20, tileY + 38);
+                ctx.lineTo(tileX + 8, tileY + 46);
+                ctx.stroke();
+
+                // Scorched earth parched dust flecks
+                ctx.fillStyle = 'rgba(84, 61, 43, 0.7)';
+                ctx.fillRect(tileX + 15, tileY + 14, 2, 2);
+                ctx.fillRect(tileX + 40, tileY + 40, 2, 2);
+                ctx.fillRect(tileX + 28, tileY + 48, 2, 2);
+              } else {
+                // Unlocked Active Soil Tile with subtle lush grass / parquet grain
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.07)';
+                ctx.fillRect(tileX, tileY, tileW, tileH);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(tileX, tileY, tileW, tileH);
+
+                // Brass corner soil markers
+                ctx.fillStyle = 'rgba(250, 204, 21, 0.4)';
+                ctx.fillRect(tileX + 2, tileY + 2, 4, 4);
+                ctx.fillRect(tileX + tileW - 6, tileY + 2, 4, 4);
+                ctx.fillRect(tileX + 2, tileY + tileH - 6, 4, 4);
+                ctx.fillRect(tileX + tileW - 6, tileY + tileH - 6, 4, 4);
+
+                // Center planting alignment dot
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+                ctx.fillRect(gx - 1.5, gy - 1.5, 3, 3);
+              }
+            } else {
+              // Locked plot: If affected by Disrupted Zen, render the earthy brown soil texture (#452f1e / #362315) underneath its locked shroud!
+              if (isDisrupted) {
+                const brownGrad = ctx.createLinearGradient(tileX, tileY, tileX + tileW, tileY + tileH);
+                brownGrad.addColorStop(0, '#452f1e');
+                brownGrad.addColorStop(0.5, '#3c2919');
+                brownGrad.addColorStop(1, '#362315');
+                ctx.fillStyle = brownGrad;
+                ctx.fillRect(tileX, tileY, tileW, tileH);
+
+                // Dry cracked earth lines underneath the shroud
+                ctx.strokeStyle = 'rgba(35, 22, 14, 0.65)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(tileX + 12, tileY + 10);
+                ctx.lineTo(tileX + 26, tileY + 24);
+                ctx.lineTo(tileX + 36, tileY + 52);
+                ctx.stroke();
+              }
+
+              // Locked plot boundary with subtle decorative soil ribbon & lock marker
+              ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+              ctx.fillRect(tileX, tileY, tileW, tileH);
+              ctx.strokeStyle = 'rgba(245, 158, 11, 0.25)';
+              ctx.lineWidth = 1;
+              ctx.setLineDash([3, 3]);
+              ctx.strokeRect(tileX, tileY, tileW, tileH);
+              ctx.setLineDash([]);
+
+              ctx.fillStyle = 'rgba(245, 158, 11, 0.45)';
+              ctx.font = '10px system-ui';
+              ctx.textAlign = 'center';
+              ctx.fillText('🔒', gx, gy + 3.5);
+            }
+          }
         }
 
         // Greenhouse Arched Glass Roof Ribs & Skylight God-Rays
@@ -17552,6 +20694,18 @@ export default function App() {
               const sr = Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
               return sc === gc && sr === gr;
             });
+            const matchingSevenLuckyGods = deployedStructuresRef.current.find((s) => {
+              if (s.type !== 'seven_lucky_gods') return false;
+              const sc = Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
+              const sr = Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+              return sc === gc && sr === gr;
+            });
+            const matchingStoneLantern = deployedStructuresRef.current.find((s) => {
+              if (s.type !== 'stone_lantern') return false;
+              const sc = Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
+              const sr = Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+              return sc === gc && sr === gr;
+            });
             const matchingTool = deployedStructuresRef.current.find((s) => {
               const isTool = s.type === 'tool_compost_heap' || s.type === 'tool_garden_well' || s.type === 'fertilizer_station';
               if (!isTool) return false;
@@ -17585,6 +20739,10 @@ export default function App() {
               ? 'growing_bamboo_formation'
               : matchingFernBall
               ? 'asparagus_fern_ball'
+              : matchingSevenLuckyGods
+              ? 'seven_lucky_gods'
+              : matchingStoneLantern
+              ? 'stone_lantern'
               : matchingTool
               ? matchingTool.type
               : matchingEnergy
@@ -17684,6 +20842,32 @@ export default function App() {
               ctx.stroke();
               const sparkPulse = 0.6 + Math.sin(haloTime * 2 + gc + gr) * 0.4;
               ctx.fillStyle = `rgba(132, 204, 22, ${sparkPulse})`;
+              ctx.beginPath();
+              ctx.arc((activeHaloBonsai.x + tx) / 2, (activeHaloBonsai.y + ty) / 2, 3.2, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (!isStalled && matchingSevenLuckyGods) {
+              // Seven Lucky Gods: gold Fortunate Blessings beam
+              ctx.strokeStyle = '#f59e0b';
+              ctx.lineWidth = 2.2;
+              ctx.beginPath();
+              ctx.moveTo(activeHaloBonsai.x, activeHaloBonsai.y);
+              ctx.lineTo(tx, ty);
+              ctx.stroke();
+              const sparkPulse = 0.6 + Math.sin(haloTime * 2 + gc + gr) * 0.4;
+              ctx.fillStyle = '#fbbf24';
+              ctx.beginPath();
+              ctx.arc((activeHaloBonsai.x + tx) / 2, (activeHaloBonsai.y + ty) / 2, 3.4, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (!isStalled && matchingStoneLantern) {
+              // Stone Lantern: warm cyan/amber Skilled Knowledge beam
+              ctx.strokeStyle = '#38bdf8';
+              ctx.lineWidth = 2.0;
+              ctx.beginPath();
+              ctx.moveTo(activeHaloBonsai.x, activeHaloBonsai.y);
+              ctx.lineTo(tx, ty);
+              ctx.stroke();
+              const sparkPulse = 0.6 + Math.sin(haloTime * 2 + gc + gr) * 0.4;
+              ctx.fillStyle = '#7dd3fc';
               ctx.beginPath();
               ctx.arc((activeHaloBonsai.x + tx) / 2, (activeHaloBonsai.y + ty) / 2, 3.2, 0, Math.PI * 2);
               ctx.fill();
@@ -17864,7 +21048,21 @@ export default function App() {
 
             ctx.save();
 
-            // Bounding Box (Handles 1x1, 2x2, 3x1 torii gate, and edge bamboo fences)
+            const is2x2Farm = prev.payload === 'solar_farm_2x2' || prev.payload === 'wind_farm_2x2';
+            const is3x3Farm = prev.payload === 'solar_farm_3x3' || prev.payload === 'wind_farm_3x3';
+
+            const previewCenterX = is3x3Farm
+              ? SANCTUARY_GRID.startX + (currentPlot.col + 1) * SANCTUARY_GRID.cellW
+              : (is2x2Preview || is2x2Farm)
+              ? SANCTUARY_GRID.startX + (currentPlot.col + 0.5) * SANCTUARY_GRID.cellW
+              : px;
+            const previewCenterY = is3x3Farm
+              ? SANCTUARY_GRID.startY + (currentPlot.row + 1) * SANCTUARY_GRID.cellH
+              : (is2x2Preview || is2x2Farm)
+              ? SANCTUARY_GRID.startY + (currentPlot.row + 0.5) * SANCTUARY_GRID.cellH
+              : py;
+
+            // Bounding Box (Handles 1x1, 2x2, 3x3, 3x1 torii gate, and edge bamboo fences)
             if (prev.payload === 'bamboo_fence') {
               const side = prev.edgeSide || 'top';
               const edgeGeom = getFenceEdgeGeometry(currentPlot.col, currentPlot.row, side);
@@ -17892,12 +21090,22 @@ export default function App() {
                 ctx.stroke();
               }
               ctx.setLineDash([]);
-            } else if (is2x2Preview) {
+            } else if (is3x3Farm) {
+              const boxX = SANCTUARY_GRID.startX + currentPlot.col * SANCTUARY_GRID.cellW - halfTileW;
+              const boxY = SANCTUARY_GRID.startY + currentPlot.row * SANCTUARY_GRID.cellH - halfTileH;
+              const boxW = 3 * SANCTUARY_GRID.cellW - 8;
+              const boxH = 3 * SANCTUARY_GRID.cellH - 8;
+              ctx.strokeStyle = isValid ? '#38bdf8' : '#f43f5e';
+              ctx.lineWidth = 3;
+              ctx.beginPath();
+              ctx.roundRect(boxX, boxY, boxW, boxH, 8);
+              ctx.stroke();
+            } else if (is2x2Preview || is2x2Farm) {
               const boxX = SANCTUARY_GRID.startX + currentPlot.col * SANCTUARY_GRID.cellW - halfTileW;
               const boxY = SANCTUARY_GRID.startY + currentPlot.row * SANCTUARY_GRID.cellH - halfTileH;
               const boxW = 2 * SANCTUARY_GRID.cellW - 8;
               const boxH = 2 * SANCTUARY_GRID.cellH - 8;
-              ctx.strokeStyle = isValid ? '#f59e0b' : '#f43f5e';
+              ctx.strokeStyle = isValid ? (is2x2Farm ? '#38bdf8' : '#f59e0b') : '#f43f5e';
               ctx.lineWidth = 3;
               ctx.beginPath();
               ctx.roundRect(boxX, boxY, boxW, boxH, 8);
@@ -17931,8 +21139,8 @@ export default function App() {
               const potW = is2x2Preview ? (38 * stageScale + 6) * 2 : (26 * stageScale + 4) * 2;
               const potH = is2x2Preview ? 20 * stageScale + 4 : 16 * stageScale + 2;
 
-              const bx = is2x2Preview ? SANCTUARY_GRID.startX + (currentPlot.col + 0.5) * SANCTUARY_GRID.cellW : px;
-              const by = is2x2Preview ? SANCTUARY_GRID.startY + (currentPlot.row + 0.5) * SANCTUARY_GRID.cellH + 4 : py + 4;
+              const bx = previewCenterX;
+              const by = previewCenterY + 4;
 
               // Ceramic Pot Body
               ctx.fillStyle = seedlingData.potColor || '#1e293b';
@@ -17975,8 +21183,8 @@ export default function App() {
                 renderCompleteDecor(
                   ctx,
                   decorType,
-                  px,
-                  py,
+                  previewCenterX,
+                  previewCenterY,
                   prev.orientation || 'horizontal',
                   undefined,
                   deployedStructuresRef.current,
@@ -18028,6 +21236,10 @@ export default function App() {
                 ? '#f59e0b'
                 : struct.type === 'torii_gate'
                 ? '#ef4444'
+                : struct.type === 'seven_lucky_gods'
+                ? '#fbbf24'
+                : struct.type === 'stone_lantern'
+                ? '#38bdf8'
                 : '#10b981';
               ctx.lineWidth = 2.5;
               ctx.setLineDash([4, 4]);
@@ -18247,6 +21459,91 @@ export default function App() {
               }
             }
 
+            // Overworld Protected / Favorited Visual Indicator: Miniature Star Pennant Flag on the RIGHT side of the plot
+            if (bonsai.isFavorite) {
+              const flagX = bx + (is2x2 ? 40 : 20);
+              const flagBaseY = by + (is2x2 ? 11 : 9);
+              const flagH = is2x2 ? 35 : 27.5;
+              const flagTopY = flagBaseY - flagH;
+
+              ctx.save();
+              // Flag base ground shadow
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+              ctx.beginPath();
+              ctx.ellipse(flagX, flagBaseY + 1, 4.4, 2.0, 0, 0, Math.PI * 2);
+              ctx.fill();
+
+              // Slender bamboo/wooden flagpole
+              ctx.strokeStyle = '#78350f';
+              ctx.lineWidth = 2.2;
+              ctx.lineCap = 'round';
+              ctx.beginPath();
+              ctx.moveTo(flagX, flagBaseY);
+              ctx.lineTo(flagX, flagTopY);
+              ctx.stroke();
+
+              // Slender bamboo joints
+              ctx.fillStyle = '#fef08a';
+              ctx.fillRect(flagX - 1.6, flagBaseY - flagH * 0.4, 3.2, 1.3);
+              ctx.fillRect(flagX - 1.6, flagBaseY - flagH * 0.7, 3.2, 1.3);
+
+              // Shiny gold finial sphere at pole top
+              ctx.fillStyle = '#fbbf24';
+              ctx.beginPath();
+              ctx.arc(flagX, flagTopY, 2.6, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.strokeStyle = '#b45309';
+              ctx.lineWidth = 0.7;
+              ctx.stroke();
+
+              // Waving rich amber/gold pennant banner
+              const waveAnim = Math.sin(Date.now() * 0.005 + bonsai.x) * 1.6;
+              const pennantW = is2x2 ? 20 : 15.4;
+              const pennantH = is2x2 ? 13.2 : 10.5;
+
+              // Amber & Gold Gradient Banner with Gold Trim
+              const pennantGrad = ctx.createLinearGradient(flagX, flagTopY + 2, flagX - pennantW, flagTopY + 2 + pennantH);
+              pennantGrad.addColorStop(0, '#b45309');
+              pennantGrad.addColorStop(0.5, '#f59e0b');
+              pennantGrad.addColorStop(1, '#d97706');
+              ctx.fillStyle = pennantGrad;
+
+              ctx.beginPath();
+              ctx.moveTo(flagX, flagTopY + 2);
+              ctx.lineTo(flagX - pennantW, flagTopY + 2 + pennantH * 0.5 + waveAnim);
+              ctx.lineTo(flagX, flagTopY + 2 + pennantH);
+              ctx.closePath();
+              ctx.fill();
+
+              ctx.strokeStyle = '#fef08a';
+              ctx.lineWidth = 1.0;
+              ctx.stroke();
+
+              // Crisp gold five-pointed star ⭐ emblem on pennant
+              const starX = flagX - pennantW * 0.48;
+              const starY = flagTopY + 2 + pennantH * 0.5 + waveAnim * 0.5;
+
+              let starRot = (Math.PI / 2) * 3;
+              const spikes = 5;
+              const outerRad = is2x2 ? 3.7 : 3.0;
+              const innerRad = is2x2 ? 1.7 : 1.3;
+              const step = Math.PI / spikes;
+
+              ctx.beginPath();
+              ctx.moveTo(starX, starY - outerRad);
+              for (let i = 0; i < spikes; i++) {
+                ctx.lineTo(starX + Math.cos(starRot) * outerRad, starY + Math.sin(starRot) * outerRad);
+                starRot += step;
+                ctx.lineTo(starX + Math.cos(starRot) * innerRad, starY + Math.sin(starRot) * innerRad);
+                starRot += step;
+              }
+              ctx.closePath();
+              ctx.fillStyle = '#ffffff';
+              ctx.fill();
+
+              ctx.restore();
+            }
+
             // Groundwater hydration ripples
             if (bonsai.wateredTimer && bonsai.wateredTimer > 0) {
               const ripTime = Date.now() * 0.005;
@@ -18312,8 +21609,8 @@ export default function App() {
         });
 
         // =========================================================================
-        // LAYER 3: Bonsai Level Badges & Growth Progress Bars
-        // (Guaranteed to be above ALL Layer 2 trees and decors!)
+        // LAYER 3: Bonsai Growth Progress Bars
+        // (Overworld information pill completely removed; info displayed in lower HUD)
         // =========================================================================
         plantedBonsaisRef.current.forEach((bonsai) => {
           ctx.save();
@@ -18321,21 +21618,13 @@ export default function App() {
           const by = bonsai.y + 4;
           const rating = getBonsaiMaturityRating(bonsai);
           const is2x2 = (bonsai.width === 2 && bonsai.height === 2) || (rating === 5);
-          const badgeY = by + (is2x2 ? 22 : 14);
 
-          // Draw the floating level badge tag: Lv.X | BA X.XX
-          drawBonsaiPotTag(ctx, bx, badgeY, bonsai.maturity, bonsai.level, bonsai);
-
-          // Draw growth progress bar
+          // Draw growth progress bar strictly constrained to inner plot width
           if (bonsai.level < 100) {
             const target = getBonsaiLevelGrowthNeeded(bonsai.level, bonsai.maturity);
             const pct = Math.min(1.0, bonsai.progressSeconds / target);
-            const barY = badgeY + 11;
-            const ba = calculateBaseAesthetic(bonsai).total;
-            const badgeText = `Lv.${bonsai.level} | BA ${ba.toFixed(2)}`;
-            ctx.font = 'bold 9.5px system-ui, sans-serif';
-            const badgeW = ctx.measureText(badgeText).width + 14;
-            const barW = Math.max(badgeW, is2x2 ? 56 : 44);
+            const barY = by + (is2x2 ? 20 : 14);
+            const barW = is2x2 ? 64 : Math.min(SANCTUARY_GRID.cellW - 12, 44);
 
             ctx.fillStyle = 'rgba(2, 6, 23, 0.85)';
             ctx.beginPath();
@@ -20365,6 +23654,40 @@ export default function App() {
               cy + Math.sin(midAngle) * (dialRadius + TRACK_WIDTH / 2),
             );
             ctx.stroke();
+          } else if (dig.isCrystal) {
+            // Elemental Crystal: Solid vibrant emerald green strike zone (any strike inside is a clean hit!)
+            ctx.lineCap = 'butt';
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = TRACK_WIDTH;
+            ctx.beginPath();
+            ctx.arc(cx, cy, dialRadius, sec.startAngle, sec.startAngle + sec.arcLength);
+            ctx.stroke();
+
+            // Vibrant emerald highlight arcs bounding the strike zone
+            ctx.strokeStyle = '#34d399';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, dialRadius - TRACK_WIDTH / 2, sec.startAngle, sec.startAngle + sec.arcLength);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(cx, cy, dialRadius + TRACK_WIDTH / 2, sec.startAngle, sec.startAngle + sec.arcLength);
+            ctx.stroke();
+
+            // Crisp radial boundary lines at start and end angles
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2.5;
+            [sec.startAngle, sec.startAngle + sec.arcLength].forEach((ang) => {
+              ctx.beginPath();
+              ctx.moveTo(
+                cx + Math.cos(ang) * (dialRadius - TRACK_WIDTH / 2 - 1),
+                cy + Math.sin(ang) * (dialRadius - TRACK_WIDTH / 2 - 1),
+              );
+              ctx.lineTo(
+                cx + Math.cos(ang) * (dialRadius + TRACK_WIDTH / 2 + 1),
+                cy + Math.sin(ang) * (dialRadius + TRACK_WIDTH / 2 + 1),
+              );
+              ctx.stroke();
+            });
           } else {
             // Unhit active digging zone: render discrete bands mirroring the 16 tiers (mirrored left and right of center)
             const steadyHandsRank = zenSkillsRef.current.steady_hands || 0;
@@ -20661,9 +23984,12 @@ export default function App() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const inspectingBonsai = plantedBonsaisRef.current.find(
+  const isInspectingStored = storedPottedBonsaisRef.current.some(
     (b) => b.id === inspectingBonsaiId,
   );
+  const inspectingBonsai =
+    plantedBonsaisRef.current.find((b) => b.id === inspectingBonsaiId) ||
+    (storedPottedBonsaisRef.current.find((b) => b.id === inspectingBonsaiId) as PlantedBonsai | undefined);
 
   const inv = sanctuaryInventoryRef.current;
   const rover = roverRef.current;
@@ -21003,26 +24329,35 @@ export default function App() {
                 if (simSynergies.isStalled) {
                   haloParts.push(`⛔ Stalling Surroundings (>4 ${simSynergies.stalledEntityLabel || 'identical neighbors'})`);
                 } else {
+                  if (simSynergies.hasToriiGate) {
+                    haloParts.push(`⛩️ Doubling Down (2x All Halos)`);
+                  }
                   if (simSynergies.bonsaiCount > 0) {
-                    haloParts.push(`Growing Together x${simSynergies.bonsaiCount} (+${simSynergies.bonsaiCount * 10}% Hydration)`);
+                    haloParts.push(`Growing Together x${simSynergies.bonsaiCount} (+${(simSynergies.bonsaiCount * 10 * simSynergies.haloMultiplier)}% Hydration)`);
                   }
                   if (simSynergies.wallCount > 0) {
-                    haloParts.push(`Gentle Waters x${simSynergies.wallCount} (+${simSynergies.wallCount * 10}% Hydration)`);
+                    haloParts.push(`Gentle Waters x${simSynergies.wallCount} (+${(simSynergies.wallCount * 10 * simSynergies.haloMultiplier)}% Hydration)`);
                   }
                   if (simSynergies.rockCount > 0) {
-                    haloParts.push(`XP Boosted x${simSynergies.rockCount} (+${simSynergies.rockCount * 15}% EXP)`);
+                    haloParts.push(`XP Boosted x${simSynergies.rockCount} (+${(simSynergies.rockCount * 15 * simSynergies.haloMultiplier)}% EXP)`);
                   }
                   if (simSynergies.bambooCount > 0) {
-                    haloParts.push(`Quick Prune x${simSynergies.bambooCount} (+${(simSynergies.bambooCount * 0.25).toFixed(2)}s Prune)`);
+                    haloParts.push(`Quick Prune x${simSynergies.bambooCount} (+${(simSynergies.bambooCount * 0.25 * simSynergies.haloMultiplier).toFixed(2)}s Prune)`);
                   }
                   if (simSynergies.fernBallCount > 0) {
-                    haloParts.push(`Efficient Pruning x${simSynergies.fernBallCount} (+${simSynergies.fernBallCount * 15}% Extra Waste Chance)`);
+                    haloParts.push(`Efficient Pruning x${simSynergies.fernBallCount} (+${Math.round(simSynergies.fernBallCount * 15 * simSynergies.haloMultiplier)}% Extra Waste Chance)`);
+                  }
+                  if (simSynergies.sevenLuckyGodsCount > 0) {
+                    haloParts.push(`Fortunate Blessings x${simSynergies.sevenLuckyGodsCount} (+${simSynergies.basePriceBonusRate.toFixed(2)} Baseprice/lvl)`);
+                  }
+                  if (simSynergies.stoneLanternCount > 0) {
+                    haloParts.push(`Skilled Knowledge x${simSynergies.stoneLanternCount} (${(simSynergies.zenPointChance * 100).toFixed(1)}% Zen/lvl)`);
                   }
                   if (simSynergies.crystalPedestals && simSynergies.crystalPedestals.total > 0) {
                     haloParts.push(`Cultivating Potential (${formatCrystalPedestalBonus(simSynergies.crystalPedestals)})`);
                   }
-                  if (simSynergies.energyCount > 0) {
-                    haloParts.push(`Disrupted Zen x${simSynergies.energyCount} (-${simSynergies.energyCount * 10}% Growth)`);
+                  if (simSynergies.isDisruptedZen) {
+                    haloParts.push(`⚠️ Disrupted Zen (-${simSynergies.totalDisruptedZenPenalty}% Growth Speed)`);
                   }
                 }
                 haloText = haloParts.length > 0 ? haloParts.join(' • ') : 'No adjacent halos active';
@@ -21225,8 +24560,8 @@ export default function App() {
                 </button>
               </>
             ) : nearbyStructure ? (() => {
-              const isSolar = nearbyStructure.type === 'solar_panel';
-              const isTurbine = nearbyStructure.type === 'wind_turbine';
+              const isSolar = nearbyStructure.type === 'solar_panel' || nearbyStructure.type === 'solar_farm_2x2' || nearbyStructure.type === 'solar_farm_3x3';
+              const isTurbine = nearbyStructure.type === 'wind_turbine' || nearbyStructure.type === 'wind_farm_2x2' || nearbyStructure.type === 'wind_farm_3x3';
               const isCompost = nearbyStructure.type === 'tool_compost_heap';
               const isFertilizer = nearbyStructure.type === 'fertilizer_station';
               const isWell = nearbyStructure.type === 'tool_garden_well';
@@ -21246,8 +24581,8 @@ export default function App() {
                 nearbyStructure.type.startsWith('crystal_pedestal');
               const isEnergy = isSolar || isTurbine;
 
-              const solarInfo = isSolar ? getSolarPanelOutput(nearbyStructure, deployedStructuresRef.current) : null;
-              const turbineInfo = isTurbine ? getWindTurbineOutput(nearbyStructure, deployedStructuresRef.current) : null;
+              const solarInfo = isSolar ? getSolarStructureOutput(nearbyStructure, deployedStructuresRef.current) : null;
+              const turbineInfo = isTurbine ? getWindStructureOutput(nearbyStructure, deployedStructuresRef.current) : null;
 
               const hasBonus = isSolar ? (solarInfo?.count || 0) > 0 : isTurbine ? (turbineInfo?.count || 0) > 0 : false;
               const resonanceLabel = isSolar
@@ -21310,39 +24645,35 @@ export default function App() {
                         {isCompost ? (
                           <div className="flex items-center gap-1.5">
                             <span>Compost Heap</span>
-                            <div className={`relative overflow-hidden bg-slate-950 border px-2.5 py-0.5 rounded-lg text-[10px] font-bold min-w-[72px] text-center ${
-                              compostReady > 0 ? 'border-lime-400/80 shadow-[0_0_8px_rgba(163,230,53,0.3)]' : compostWaste >= 2 ? 'border-lime-500/50' : 'border-slate-700'
+                            <span className={`text-[10px] px-2 py-0.5 rounded-lg font-bold border ${
+                              compostReady > 0
+                                ? 'bg-lime-950 text-lime-300 border-lime-500/80 shadow-[0_0_8px_rgba(163,230,53,0.3)]'
+                                : (nearbyStructure.timer || 0) > 0 || compostWaste >= 2
+                                ? 'bg-amber-950 text-amber-300 border-amber-500/50'
+                                : 'bg-slate-950 text-slate-400 border-slate-700'
                             }`}>
-                              {compostWaste >= 2 && (
-                                <div
-                                  style={{width: `${compostProgress * 100}%`}}
-                                  className="absolute inset-0 bg-lime-600/40 transition-all duration-200 pointer-events-none"
-                                />
-                              )}
-                              <span className="relative z-10 text-lime-300">
-                                {compostReady > 0
-                                  ? `${compostReady} Compost`
-                                  : compostWaste > 0
-                                  ? 'Composting'
-                                  : 'Empty'}
-                              </span>
-                            </div>
+                              {compostReady > 0
+                                ? `${compostReady} Ready`
+                                : (nearbyStructure.timer || 0) > 0 || compostWaste >= 2
+                                ? 'Composting'
+                                : 'Empty'}
+                            </span>
                           </div>
                         ) : isFertilizer ? (
                           <div className="flex items-center gap-1.5">
                             <span>Fertilizer Station</span>
                             <span className={`text-[10px] px-2 py-0.5 rounded-lg font-bold border ${
                               (nearbyStructure.readyFertilizer || 0) > 0
-                                ? 'bg-emerald-950 text-emerald-300 border-emerald-500/80 shadow-[0_0_8px_rgba(52,211,153,0.3)] animate-pulse'
-                                : (nearbyStructure.isDistilling && (nearbyStructure.timer || 0) > 0)
+                                ? 'bg-emerald-950 text-emerald-300 border-emerald-500/80 shadow-[0_0_8px_rgba(52,211,153,0.3)]'
+                                : (nearbyStructure.timer || 0) > 0 || ((nearbyStructure.depositedWaste || 0) >= 3 && (nearbyStructure.depositedBiochemicals || 0) >= 1)
                                 ? 'bg-amber-950 text-amber-300 border-amber-500/50'
                                 : 'bg-slate-950 text-slate-400 border-slate-700'
                             }`}>
                               {(nearbyStructure.readyFertilizer || 0) > 0
-                                ? `${nearbyStructure.readyFertilizer} Ready!`
-                                : (nearbyStructure.isDistilling && (nearbyStructure.timer || 0) > 0)
-                                ? `${Math.ceil(nearbyStructure.timer || 0)}s Distilling`
-                                : 'Idle (3 Waste + 1 Bio)'}
+                                ? `${nearbyStructure.readyFertilizer} Ready`
+                                : (nearbyStructure.timer || 0) > 0 || ((nearbyStructure.depositedWaste || 0) >= 3 && (nearbyStructure.depositedBiochemicals || 0) >= 1)
+                                ? 'Brewing'
+                                : 'Empty'}
                             </span>
                           </div>
                         ) : isManualIrrigation ? (
@@ -21403,9 +24734,17 @@ export default function App() {
                               </div>
                             </div>
                           );
-                        })() : (
+                        })(                        ) : (
                           <span>
-                            {isSolar
+                            {nearbyStructure.type === 'solar_farm_2x2'
+                              ? `☀️ Solar Panel Farm (2x2 • +${totalStructKw.toFixed(1)} kW)`
+                              : nearbyStructure.type === 'solar_farm_3x3'
+                              ? `☀️ Big Solar Panel Farm (3x3 • +${totalStructKw.toFixed(1)} kW)`
+                              : nearbyStructure.type === 'wind_farm_2x2'
+                              ? `💨 Wind Turbine Farm (2x2 • +${totalStructKw.toFixed(1)} kW)`
+                              : nearbyStructure.type === 'wind_farm_3x3'
+                              ? `💨 Big Wind Turbine Farm (3x3 • +${totalStructKw.toFixed(1)} kW)`
+                              : isSolar
                               ? `☀️ Solar Panel Array (+${totalStructKw.toFixed(1)} kW)`
                               : isTurbine
                               ? `💨 Wind Turbine Generator (+${totalStructKw.toFixed(1)} kW)`
@@ -21413,6 +24752,10 @@ export default function App() {
                               ? 'Water Feature'
                               : isBambooFence
                               ? 'Bamboo Fence'
+                              : nearbyStructure.type === 'seven_lucky_gods'
+                              ? `✨ Seven Lucky Gods (${SEVEN_LUCKY_GODS_INFO[(nearbyStructure.variant || 0) % 7].name})`
+                              : nearbyStructure.type === 'stone_lantern'
+                              ? '🏮 Stone Lantern (Kasuga-dōrō)'
                               : isPedestal
                               ? (nearbyStructure.socketedCrystal ? `Pedestal (${nearbyStructure.socketedCrystal.name})` : 'Empty Pedestal')
                               : nearbyStructure.type === 'torii_gate'
@@ -21450,15 +24793,43 @@ export default function App() {
                           : isSprinkler
                           ? '[Q / Y] Store to Bag'
                           : isFertilizer
-                          ? '[E / A] Deposit / Collect • 60s Distillation • [Q / Y] Store to Bag'
+                          ? (() => {
+                              const fertWaste = nearbyStructure.depositedWaste || 0;
+                              const fertBio = nearbyStructure.depositedBiochemicals || 0;
+                              const fertReady = nearbyStructure.readyFertilizer || 0;
+                              const fertTimer = nearbyStructure.timer || 0;
+                              const isBrewing = (fertTimer > 0) || ((fertWaste >= 3) && (fertBio >= 1));
+                              const remainingFertBatches = Math.min(Math.floor(fertWaste / 3), fertBio);
+                              const totalFertBatches = nearbyStructure.totalBatchCount && nearbyStructure.totalBatchCount > 0
+                                ? nearbyStructure.totalBatchCount
+                                : Math.max(1, fertReady + remainingFertBatches);
+                              const curFertBatch = nearbyStructure.currentBatchIndex && nearbyStructure.currentBatchIndex > 0
+                                ? nearbyStructure.currentBatchIndex
+                                : (isBrewing ? Math.min(totalFertBatches, fertReady + 1) : 0);
+                              const fertSec = Math.ceil(fertTimer);
+
+                              if (fertReady === 0 && !isBrewing) {
+                                return '[E / A] Deposit Waste & Biochemicals (Max 10) • [Q / Y] Store to Bag';
+                              } else if (fertReady === 0 && isBrewing) {
+                                return `Brewing (${curFertBatch}/${totalFertBatches}) ${fertSec}s • [E / A] Add More Ingredients • [Q / Y] Store to Bag`;
+                              } else if (fertReady > 0 && isBrewing && fertTimer > 0) {
+                                return `${fertReady} Fertilizer and Brewing (${curFertBatch}/${totalFertBatches}) ${fertSec}s • [E / A] Collect Fertilizer • [Q / Y] Store to Bag`;
+                              } else {
+                                return `${fertReady} Fertilizer Ready • [E / A] Collect Fertilizer • [Q / Y] Store to Bag`;
+                              }
+                            })()
                           : isWaterFeature
                           ? '[E / A] Inspect • [Q / Y] Store to Bag • Halo: +10% Hydration Growth Speed to adjacent plots'
                           : isBambooFence
                           ? '[Q / Y] Pick Up Fence • Physical Barrier (Blocks Halo Synergies)'
+                          : nearbyStructure.type === 'seven_lucky_gods'
+                          ? `[E / A] Cycle Deity (${SEVEN_LUCKY_GODS_INFO[(nearbyStructure.variant || 0) % 7].name}) • [Q / Y] Store to Bag • Halo: +0.01 Baseprice per Level Up`
+                          : nearbyStructure.type === 'stone_lantern'
+                          ? '[E / A] Inspect • [Q / Y] Store to Bag • Halo: +0.5% Chance for Zen Point on Level Up (Skilled Knowledge)'
                           : isPedestal
                           ? '[E / A] Inspect / Socket Crystal • [Q / Y] Store to Bag'
                           : nearbyStructure.type === 'torii_gate'
-                          ? `Torii Gate (${nearbyStructure.orientation === 'vertical' ? '1x3' : '3x1'}) • [E / A] Inspect • [Q / Y] Store`
+                          ? `Torii Gate (${nearbyStructure.orientation === 'vertical' ? '1x3' : '3x1'}) • [E / A] Inspect • [Q / Y] Store • Halo: Doubles other Halo Effects applied to Bonsai (Doubling Down)`
                           : nearbyStructure.type === 'zen_rock_formation' || nearbyStructure.type === 'decor_rock_formation'
                           ? '[E / A] Inspect • [Q / Y] Store to Bag • Halo: +15% Level Up Experience (XP Boosted)'
                           : nearbyStructure.type === 'growing_bamboo_formation' || nearbyStructure.type === 'decor_shrubbery_bush'
@@ -21466,11 +24837,28 @@ export default function App() {
                           : nearbyStructure.type === 'asparagus_fern_ball'
                           ? '[E / A] Inspect • [Q / Y] Store to Bag • Halo: +15% Chance for Extra Organic Waste on Level Up (Efficient Pruning)'
                           : isCompost
-                          ? compostReady > 0
-                            ? '[E / A] Collect Compost | [Q / Y] Store to Bag'
-                            : compostWaste > 0
-                            ? `[E / A] Add Waste (${inv.organic_waste || 0} avail) | [Q / Y] Store to Bag`
-                            : '[E / A] Deposit Waste | [Q / Y] Store to Bag'
+                          ? (() => {
+                              const compostTimer = nearbyStructure.timer || 0;
+                              const isComposting = (compostTimer > 0) || (compostWaste >= 2);
+                              const remainingBatches = Math.floor(compostWaste / 2);
+                              const totalBatches = nearbyStructure.totalBatchCount && nearbyStructure.totalBatchCount > 0
+                                ? nearbyStructure.totalBatchCount
+                                : Math.max(1, compostReady + remainingBatches);
+                              const curBatch = nearbyStructure.currentBatchIndex && nearbyStructure.currentBatchIndex > 0
+                                ? nearbyStructure.currentBatchIndex
+                                : (isComposting ? Math.min(totalBatches, compostReady + 1) : 0);
+                              const compostSec = Math.ceil(compostTimer);
+
+                              if (compostReady === 0 && !isComposting) {
+                                return '[E / A] Deposit Organic Waste (Max 20) • [Q / Y] Store to Bag';
+                              } else if (compostReady === 0 && isComposting) {
+                                return `Composting (${curBatch}/${totalBatches}) ${compostSec}s • [E / A] Add More Waste • [Q / Y] Store to Bag`;
+                              } else if (compostReady > 0 && isComposting && compostTimer > 0) {
+                                return `${compostReady} Compost and Composting (${curBatch}/${totalBatches}) ${compostSec}s • [E / A] Collect Compost • [Q / Y] Store to Bag`;
+                              } else {
+                                return `${compostReady} Compost Ready • [E / A] Collect Compost • [Q / Y] Store to Bag`;
+                              }
+                            })()
                           : isWell
                           ? isWatering
                             ? '[Q / Y] Store to Bag'
@@ -21497,16 +24885,20 @@ export default function App() {
                     {isCompost && (
                       <button
                         onClick={() => interactCompostHeapDirect(nearbyStructure.id)}
-                        className={`font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1 shadow transition-transform active:scale-95 min-h-[38px] cursor-pointer ${
+                        className={`font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition-transform active:scale-95 min-h-[38px] cursor-pointer ${
                           compostReady > 0
                             ? 'bg-lime-600 hover:bg-lime-500 text-white animate-pulse'
+                            : (nearbyStructure.timer || 0) > 0
+                            ? 'bg-emerald-700 hover:bg-emerald-600 text-white'
                             : 'bg-emerald-600 hover:bg-emerald-500 text-white'
                         }`}>
                         <span>{compostReady > 0 ? '🌾' : '🍂'}</span>
                         <span>
                           {compostReady > 0
-                            ? `[E / A] Collect (${compostReady})`
-                            : `[E / A] Deposit Waste (${inv.organic_waste || 0})`}
+                            ? '[E / A] Collect Compost'
+                            : (nearbyStructure.timer || 0) > 0
+                            ? '[E / A] Add More Waste'
+                            : '[E / A] Deposit Waste'}
                         </span>
                       </button>
                     )}
@@ -21514,20 +24906,20 @@ export default function App() {
                     {isFertilizer && (
                       <button
                         onClick={() => interactFertilizerStationDirect(nearbyStructure.id)}
-                        className={`font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1 shadow transition-transform active:scale-95 min-h-[38px] cursor-pointer ${
+                        className={`font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition-transform active:scale-95 min-h-[38px] cursor-pointer ${
                           (nearbyStructure.readyFertilizer || 0) > 0
                             ? 'bg-emerald-600 hover:bg-emerald-500 text-white animate-pulse'
-                            : (nearbyStructure.isDistilling && (nearbyStructure.timer || 0) > 0)
+                            : (nearbyStructure.timer || 0) > 0
                             ? 'bg-amber-600 hover:bg-amber-500 text-white'
                             : 'bg-cyan-700 hover:bg-cyan-600 text-white'
                         }`}>
                         <span>🧪</span>
                         <span>
                           {(nearbyStructure.readyFertilizer || 0) > 0
-                            ? `[E / A] Collect (${nearbyStructure.readyFertilizer})`
-                            : (nearbyStructure.isDistilling && (nearbyStructure.timer || 0) > 0)
-                            ? `Distilling (${Math.ceil(nearbyStructure.timer || 0)}s)`
-                            : `[E / A] Deposit (3 Waste + 1 Bio)`}
+                            ? '[E / A] Collect Fertilizer'
+                            : (nearbyStructure.timer || 0) > 0
+                            ? '[E / A] Add More Ingredients'
+                            : '[E / A] Deposit Ingredients'}
                         </span>
                       </button>
                     )}
@@ -21541,7 +24933,16 @@ export default function App() {
                       </button>
                     )}
 
-                    {(isEnergy || isWaterFeature) && (
+                    {nearbyStructure.type === 'seven_lucky_gods' && (
+                      <button
+                        onClick={() => cycleSevenLuckyGods(nearbyStructure.id)}
+                        className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition-transform active:scale-95 min-h-[38px] cursor-pointer">
+                        <span>🔄</span>
+                        <span>[E / A] Cycle Deity ({SEVEN_LUCKY_GODS_INFO[(nearbyStructure.variant || 0) % 7].name})</span>
+                      </button>
+                    )}
+
+                    {(isEnergy || isWaterFeature || nearbyStructure.type === 'torii_gate' || nearbyStructure.type === 'stone_lantern') && (
                       <button
                         onClick={() => {
                           setInspectingStructureId(nearbyStructure.id);
@@ -21647,29 +25048,44 @@ export default function App() {
                           </span>
                         ) : (
                           <>
+                            {bSyn.hasToriiGate && (
+                              <span className="bg-red-950 text-red-200 border border-red-500/60 text-[10px] px-1.5 py-0.2 rounded font-bold">
+                                ⛩️ Doubling Down (2x All Halo Effects)
+                              </span>
+                            )}
                             {bSyn.hasAdjacentBonsai && (
                               <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/50 text-[10px] px-1.5 py-0.2 rounded font-bold">
-                                🌿 Growing Together x{bSyn.bonsaiCount} (+{bSyn.bonsaiCount * 10}% Hydration Growth Speed)
+                                🌿 Growing Together x{bSyn.bonsaiCount} (+{(bSyn.bonsaiCount * 10 * bSyn.haloMultiplier)}% Hydration Growth Speed)
                               </span>
                             )}
                             {bSyn.hasAdjacentWall && (
                               <span className="bg-cyan-950 text-cyan-300 border border-cyan-500/50 text-[10px] px-1.5 py-0.2 rounded font-bold">
-                                🌊 Gentle Waters x{bSyn.wallCount} (+{bSyn.wallCount * 10}% Hydration Growth Speed)
+                                🌊 Gentle Waters x{bSyn.wallCount} (+{(bSyn.wallCount * 10 * bSyn.haloMultiplier)}% Hydration Growth Speed)
                               </span>
                             )}
                             {bSyn.hasAdjacentRock && (
                               <span className="bg-amber-950 text-amber-300 border border-amber-500/50 text-[10px] px-1.5 py-0.2 rounded font-bold">
-                                🪨 XP Boosted x{bSyn.rockCount} (+{bSyn.rockCount * 15}% Level Up EXP)
+                                🪨 XP Boosted x{bSyn.rockCount} (+{(bSyn.rockCount * 15 * bSyn.haloMultiplier)}% Level Up EXP)
                               </span>
                             )}
                             {bSyn.hasAdjacentBamboo && (
                               <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/50 text-[10px] px-1.5 py-0.2 rounded font-bold">
-                                🎋 Quick Prune x{bSyn.bambooCount} (+{(bSyn.bambooCount * 0.25).toFixed(2)}s Pruning Effect)
+                                🎋 Quick Prune x{bSyn.bambooCount} (+{(bSyn.bambooCount * 0.25 * bSyn.haloMultiplier).toFixed(2)}s Pruning Effect)
                               </span>
                             )}
                             {bSyn.hasAdjacentFernBall && (
                               <span className="bg-lime-950 text-lime-300 border border-lime-500/50 text-[10px] px-1.5 py-0.2 rounded font-bold">
-                                🪴 Efficient Pruning x{bSyn.fernBallCount} (+{bSyn.fernBallCount * 15}% Extra Waste Chance)
+                                🪴 Efficient Pruning x{bSyn.fernBallCount} (+{Math.round(bSyn.fernBallCount * 15 * bSyn.haloMultiplier)}% Extra Waste Chance)
+                              </span>
+                            )}
+                            {bSyn.sevenLuckyGodsCount > 0 && (
+                              <span className="bg-amber-950 text-amber-300 border border-amber-500/50 text-[10px] px-1.5 py-0.2 rounded font-bold">
+                                🌟 Fortunate Blessings x{bSyn.sevenLuckyGodsCount} (+{bSyn.basePriceBonusRate.toFixed(2)} Baseprice/lvl)
+                              </span>
+                            )}
+                            {bSyn.stoneLanternCount > 0 && (
+                              <span className="bg-cyan-950 text-cyan-300 border border-cyan-500/50 text-[10px] px-1.5 py-0.2 rounded font-bold">
+                                🏮 Skilled Knowledge x{bSyn.stoneLanternCount} ({(bSyn.zenPointChance * 100).toFixed(1)}% Zen Point/lvl)
                               </span>
                             )}
                             {bSyn.crystalPedestals && bSyn.crystalPedestals.total > 0 && (
@@ -21677,9 +25093,9 @@ export default function App() {
                                 🔮 Cultivating Potential ({formatCrystalPedestalBonus(bSyn.crystalPedestals)})
                               </span>
                             )}
-                            {bSyn.hasAdjacentEnergy && (
+                            {bSyn.isDisruptedZen && (
                               <span className="bg-amber-950 text-amber-300 border border-amber-500/50 text-[10px] px-1.5 py-0.2 rounded font-bold">
-                                ⚠️ Disrupted Zen x{bSyn.energyCount} (-{bSyn.energyCount * 10}% Growth Penalty)
+                                ⚠️ Disrupted Zen (-{bSyn.totalDisruptedZenPenalty}% Growth Speed)
                               </span>
                             )}
                           </>
@@ -21990,22 +25406,24 @@ export default function App() {
       />
 
       {/* ========================================================================= */}
-      {/* MODAL: INSPECT DEPLOYED GENERATOR STRUCTURE (SOLAR / TURBINE) */}
+      {/* MODAL: INSPECT DEPLOYED GENERATOR STRUCTURE (SOLAR / TURBINE / DECOR) */}
       {/* ========================================================================= */}
       {inspectingStructureId && (() => {
         const struct = deployedStructuresRef.current.find((s) => s.id === inspectingStructureId);
         if (!struct) return null;
 
-        const isSolar = struct.type === 'solar_panel';
-        const isTurbine = struct.type === 'wind_turbine';
+        const isSolar = struct.type === 'solar_panel' || struct.type === 'solar_farm_2x2' || struct.type === 'solar_farm_3x3';
+        const isTurbine = struct.type === 'wind_turbine' || struct.type === 'wind_farm_2x2' || struct.type === 'wind_farm_3x3';
         const isWaterFeature = struct.type === 'water_feature' || struct.type === 'decor_woven_wall';
+        const isStoneLantern = struct.type === 'stone_lantern';
+        const isToriiGate = struct.type === 'torii_gate';
         const isEnergy = isSolar || isTurbine;
-        if (!isEnergy && !isWaterFeature) return null;
+        if (!isEnergy && !isWaterFeature && !isStoneLantern && !isToriiGate) return null;
 
-        const solarInfo = isSolar ? getSolarPanelOutput(struct, deployedStructuresRef.current) : null;
-        const turbineInfo = isTurbine ? getWindTurbineOutput(struct, deployedStructuresRef.current) : null;
+        const solarInfo = isSolar ? getSolarStructureOutput(struct, deployedStructuresRef.current) : null;
+        const turbineInfo = isTurbine ? getWindStructureOutput(struct, deployedStructuresRef.current) : null;
 
-        const baseKw = isSolar ? 3 : 6;
+        const baseKw = isSolar ? (struct.type === 'solar_farm_3x3' ? 87 : struct.type === 'solar_farm_2x2' ? 24 : 3) : (struct.type === 'wind_farm_3x3' ? 134 : struct.type === 'wind_farm_2x2' ? 42 : 6);
         const resonanceKw = isSolar ? (solarInfo?.resonance || 0) : (turbineInfo?.resonance || 0);
         const neighborCount = isSolar ? (solarInfo?.count || 0) : (turbineInfo?.count || 0);
         const totalOutput = isSolar ? (solarInfo?.total || 3) : (turbineInfo?.total || 6);
@@ -22017,10 +25435,30 @@ export default function App() {
             icon: '☀️',
             desc: 'Crystalline photovoltaic array capturing greenhouse sunlight. Base Output: 3 kW. Stackable Resonance: +0.5 kW per adjacent Solar Panel in the surrounding 3x3 zone.',
           },
+          solar_farm_2x2: {
+            name: `Solar Panel Farm (2x2 • +${totalOutput.toFixed(1)} kW)`,
+            icon: '☀️',
+            desc: 'Interconnected 2x2 cluster of 4 high-tech solar panels. Base Output: 24 kW (+1.0 kW per adjacent solar panel unit). Radiates Disrupted Zen 1 tile outwards unless fenced.',
+          },
+          solar_farm_3x3: {
+            name: `Big Solar Panel Farm (3x3 • +${totalOutput.toFixed(1)} kW)`,
+            icon: '☀️',
+            desc: 'Interconnected 3x3 mega cluster of 9 high-tech solar panels. Base Output: 87 kW (+1.5 kW per adjacent solar panel unit). Radiates Disrupted Zen 1 tile outwards unless fenced.',
+          },
           wind_turbine: {
             name: `Wind Turbine Generator (+${totalOutput.toFixed(1)} kW)`,
             icon: '💨',
             desc: 'Brass aero-helix micro-turbine harnessing ventilation airflow. Base Output: 6 kW. Stackable Resonance: +1.0 kW per adjacent Wind Turbine in the surrounding 3x3 zone.',
+          },
+          wind_farm_2x2: {
+            name: `Wind Turbine Farm (2x2 • +${totalOutput.toFixed(1)} kW)`,
+            icon: '💨',
+            desc: 'Interconnected 2x2 cluster of 4 aero-helix turbines. Base Output: 42 kW (+1.5 kW per adjacent wind turbine unit). Radiates Disrupted Zen 1 tile outwards unless fenced.',
+          },
+          wind_farm_3x3: {
+            name: `Big Wind Turbine Farm (3x3 • +${totalOutput.toFixed(1)} kW)`,
+            icon: '💨',
+            desc: 'Interconnected 3x3 mega cluster of 9 aero-helix turbines. Base Output: 134 kW (+2.0 kW per adjacent wind turbine unit). Radiates Disrupted Zen 1 tile outwards unless fenced.',
           },
           water_feature: {
             name: 'Water Feature (Shishi-Odoshi)',
@@ -22032,9 +25470,19 @@ export default function App() {
             icon: '🌊',
             desc: 'An authentic Japanese garden water feature with a dripping bamboo fountain and carved stone basin. Proximity Halo: Grants +10% Hydration Growth Speed to adjacent bonsais in its halo zone.',
           },
+          stone_lantern: {
+            name: 'Stone Lantern (Tōrō / Kasuga-dōrō)',
+            icon: '🏮',
+            desc: 'Classical Kasuga-dōrō Japanese stone lantern glowing with warm candlelight. Proximity Halo (Skilled Knowledge): When an adjacent bonsai levels up, rolls a 0.5% chance per stone lantern to award +1 Zen Point!',
+          },
+          torii_gate: {
+            name: `Torii Gate (${struct.orientation === 'vertical' ? '1x3' : '3x1'})`,
+            icon: '⛩️',
+            desc: 'Sacred vermilion shinto archway spanning 3 plots with an open central walkway. Proximity Halo (Doubling Down): Doubles (x2) all other positive halo effects applied to any bonsai within its halo zone!',
+          },
         };
 
-        const info = nameMap[struct.type] || {name: 'Water Feature', icon: '🌊', desc: 'Japanese garden water feature.'};
+        const info = nameMap[struct.type] || {name: 'Garden Decoration', icon: '✨', desc: 'Japanese garden decoration.'};
 
         return (
           <div className="fixed top-12 left-0 right-0 bottom-0 z-40 bg-slate-950/95 backdrop-blur-md p-3 sm:p-5 flex flex-col overflow-hidden border-t border-slate-800 text-left">
@@ -22061,7 +25509,37 @@ export default function App() {
               <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-3">
                 <p className="text-xs text-slate-300 leading-relaxed">{info.desc}</p>
 
-                {isWaterFeature ? (
+                {isStoneLantern ? (
+                  <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Proximity Halo Effect:</span>
+                      <strong className="text-cyan-300 font-bold">+0.5% Chance for Zen Point on Level Up</strong>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Synergy Category:</span>
+                      <strong className="text-cyan-400">Skilled Knowledge (Stackable)</strong>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Style:</span>
+                      <strong className="text-slate-200">Kasuga-dōrō (Hexagonal Pagoda Roof)</strong>
+                    </div>
+                  </div>
+                ) : isToriiGate ? (
+                  <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Proximity Halo Effect:</span>
+                      <strong className="text-red-300 font-bold">Doubles other Halo Effects (2x Multiplier)</strong>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Synergy Category:</span>
+                      <strong className="text-red-400">Doubling Down (Exclusive Limit 1)</strong>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Footprint:</span>
+                      <strong className="text-slate-200">3x1 Multi-Plot with Walkable Center</strong>
+                    </div>
+                  </div>
+                ) : isWaterFeature ? (
                   <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-2 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="text-slate-400">Proximity Halo Effect:</span>
@@ -22304,6 +25782,7 @@ export default function App() {
       <InventoryModal
         isOpen={isUnifiedStorageOpen}
         onClose={() => setIsUnifiedStorageOpen(false)}
+        isInspecting={Boolean(inspectingBonsaiId)}
         inventory={sanctuaryInventoryRef.current}
         storageTab={storageTab}
         setStorageTab={setStorageTab}
@@ -22314,6 +25793,7 @@ export default function App() {
         deployedStructures={deployedStructuresRef.current}
         installedCraftingArms={installedCraftingArmsRef.current}
         autoFabricatorLanesCount={autoFabricatorLanesRef.current.length}
+        autoFabricatorLanes={autoFabricatorLanesRef.current}
         onPlantStoredBonsai={plantStoredPottedBonsai}
         onPlantSaplingClick={(sap) => {
           setIsUnifiedStorageOpen(false);
@@ -22321,6 +25801,13 @@ export default function App() {
           setIsPlantingModalOpen(true);
           gameAudio.playCrispClick();
         }}
+        onInspectBonsai={(id) => {
+          setInspectingBonsaiId(id);
+          gameAudio.playCrispClick();
+        }}
+        onDonateStoredBonsai={donateStoredPottedBonsai}
+        activeEcoRequestIndex={masterQuestsRef.current.eco.activeRequestIndex}
+        ecoRequestCounts={masterQuestsRef.current.eco.requestCounts}
       />
 
       {/* ========================================================================= */}
@@ -23044,358 +26531,439 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 3: GARDEN DECORATIONS (🎋 DECOR) */}
-          {shopTab === 'DECOR' && (
-            <div className="flex-1 space-y-2.5 mb-3 overflow-y-auto pr-1">
-              <div className="text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800 flex items-center gap-2">
-                <span className="text-base">🎋</span>
-                <span>
-                  Purchase decorative zen fixtures and garden structures to place on open nursery plots. Placeable via [P] and dismantlable via [Q]!
-                </span>
+          {/* TAB 3: GARDEN DECORATIONS (🎋 DECOR) - 10 ITEMS SORTED ASCENDING BY PRICE */}
+          {shopTab === 'DECOR' && (() => {
+            const hasToriiGate =
+              (inv.torii_gate_inv ?? 0) > 0 ||
+              (inv.decorations?.toriiGate ?? 0) > 0 ||
+              (inv.decorations?.['torii_gate'] ?? 0) > 0 ||
+              deployedStructuresRef.current.some((s) => s.type === 'torii_gate');
+
+            return (
+              <div className="flex-1 space-y-2.5 mb-3 overflow-y-auto pr-1">
+                <div className="text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800 flex items-center gap-2">
+                  <span className="text-base">🎋</span>
+                  <span>
+                    Decorative fixtures and sacred garden architecture. Sorted by price from lowest to highest. Placeable on open plots via [P] or [E]!
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* 1. Bamboo Fence (3 Verdure) */}
+                  <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                    focusedShopIdx === 0
+                      ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+                      : 'bg-slate-900/80 border-emerald-600/40'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2.5">
+                          <ItemVectorPreview itemKey="bamboo_fence" width={44} height={44} />
+                          <div>
+                            <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                              {focusedShopIdx === 0 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
+                              <span>Bamboo Fence (Takegaki)</span>
+                            </h4>
+                            <span className="text-[10px] text-emerald-400 font-bold">Boundary Edge Barrier • Blocks Halos</span>
+                          </div>
+                        </div>
+                        <span className="text-xs bg-slate-950 text-emerald-300 border border-emerald-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                          Owned: {inv.bamboo_fence_inv || 0}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        Slender bamboo stalks lashed with hemp cords. Placed on plot borders (Top, Right, Bottom, Left). Physically cuts off and isolates halos between separated plots!
+                      </p>
+                    </div>
+
+                    <button
+                      disabled={inv.coins < 3}
+                      onClick={() => buyDecoration('bamboo_fence', 3, 'Bamboo Fence (Takegaki)')}
+                      className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        inv.coins >= 3
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <VerdureIcon className="w-3.5 h-3.5" />
+                      <span>Purchase (3 Verdure)</span>
+                    </button>
+                  </div>
+
+                  {/* 2. Zen Pebble Path (5 Verdure) */}
+                  <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                    focusedShopIdx === 1
+                      ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+                      : 'bg-slate-900/80 border-slate-700'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2.5">
+                          <ItemVectorPreview itemKey="decor_pebble_path" width={44} height={44} />
+                          <div>
+                            <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                              {focusedShopIdx === 1 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
+                              <span>Zen Pebble Stepping Path</span>
+                            </h4>
+                            <span className="text-[10px] text-emerald-400 font-bold">+35% Movement Speed • 5 Dynamic Variations</span>
+                          </div>
+                        </div>
+                        <span className="text-xs bg-slate-950 text-emerald-300 border border-slate-700 px-2 py-0.5 rounded-lg font-mono font-bold">
+                          Owned: {inv.decor_pebble_path_inv || 0}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        Smooth river stones and moss cushions. Grants +35% movement speed when walked on. Cycles through 5 path variations. Pure pathway tile (does not stall).
+                      </p>
+                    </div>
+
+                    <button
+                      disabled={inv.coins < 5}
+                      onClick={() => buyDecoration('decor_pebble_path', 5, 'Zen Pebble Stepping Path')}
+                      className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        inv.coins >= 5
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <VerdureIcon className="w-3.5 h-3.5" />
+                      <span>Purchase (5 Verdure)</span>
+                    </button>
+                  </div>
+
+                  {/* 3. Growing Bamboo Formation (10 Verdure) */}
+                  <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                    focusedShopIdx === 2
+                      ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+                      : 'bg-slate-900/80 border-emerald-500/30'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2.5">
+                          <ItemVectorPreview itemKey="growing_bamboo_formation" width={44} height={44} />
+                          <div>
+                            <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                              {focusedShopIdx === 2 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
+                              <span>Growing Bamboo Formation</span>
+                            </h4>
+                            <span className="text-[10px] text-emerald-300 font-bold">+0.25s Pruning Effect (Quick Prune)</span>
+                          </div>
+                        </div>
+                        <span className="text-xs bg-slate-950 text-emerald-300 border border-emerald-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                          Owned: {getStructureInventoryCount(inv, 'growing_bamboo_formation')}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        A cluster of growing bamboo shoots and culms sprouting with joint rings and feathered leaves. Halo Effect: Grants +0.25s Pruning Effect to adjacent trees.
+                      </p>
+                    </div>
+
+                    <button
+                      disabled={inv.coins < 10}
+                      onClick={() => buyDecoration('growing_bamboo_formation', 10, 'Growing Bamboo Formation')}
+                      className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        inv.coins >= 10
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <VerdureIcon className="w-3.5 h-3.5" />
+                      <span>Purchase (10 Verdure)</span>
+                    </button>
+                  </div>
+
+                  {/* 4. Asparagus Fern Ball (15 Verdure) */}
+                  <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                    focusedShopIdx === 3
+                      ? 'bg-slate-850 ring-4 ring-lime-400 border-lime-300 scale-[1.01] shadow-[0_0_20px_rgba(163,230,53,0.5)]'
+                      : 'bg-slate-900/80 border-lime-500/30'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2.5">
+                          <ItemVectorPreview itemKey="asparagus_fern_ball" width={44} height={44} />
+                          <div>
+                            <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                              {focusedShopIdx === 3 && <span className="text-lime-400 text-xs">► [E/A]</span>}
+                              <span>Asparagus Fern Ball</span>
+                            </h4>
+                            <span className="text-[10px] text-lime-300 font-bold">+15% Extra Waste Chance (Efficient Pruning)</span>
+                          </div>
+                        </div>
+                        <span className="text-xs bg-slate-950 text-lime-300 border border-lime-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                          Owned: {getStructureInventoryCount(inv, 'asparagus_fern_ball')}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        An authentic Kokedama moss ball pot on a dark coaster dish with feathery Asparagus Fern fronds. Halo Effect: Grants +15% chance to drop extra Organic Waste on level up.
+                      </p>
+                    </div>
+
+                    <button
+                      disabled={inv.coins < 15}
+                      onClick={() => buyDecoration('asparagus_fern_ball', 15, 'Asparagus Fern Ball')}
+                      className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        inv.coins >= 15
+                          ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <VerdureIcon className="w-3.5 h-3.5" />
+                      <span>Purchase (15 Verdure)</span>
+                    </button>
+                  </div>
+
+                  {/* 5. Zen Rock Formation (20 Verdure) */}
+                  <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                    focusedShopIdx === 4
+                      ? 'bg-slate-850 ring-4 ring-amber-400 border-amber-300 scale-[1.01] shadow-[0_0_20px_rgba(245,158,11,0.5)]'
+                      : 'bg-slate-900/80 border-amber-500/30'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2.5">
+                          <ItemVectorPreview itemKey="zen_rock_formation" width={44} height={44} />
+                          <div>
+                            <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                              {focusedShopIdx === 4 && <span className="text-amber-400 text-xs">► [E/A]</span>}
+                              <span>Zen Rock Formation</span>
+                            </h4>
+                            <span className="text-[10px] text-amber-300 font-bold">+15% Level Up EXP (XP Boosted)</span>
+                          </div>
+                        </div>
+                        <span className="text-xs bg-slate-950 text-amber-300 border border-amber-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                          Owned: {getStructureInventoryCount(inv, 'zen_rock_formation')}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        Raked concentric sand ripples and natural granite boulders with lichen accents. Halo Effect: Grants +15% Level Up Experience (XP Boosted) to adjacent trees.
+                      </p>
+                    </div>
+
+                    <button
+                      disabled={inv.coins < 20}
+                      onClick={() => buyDecoration('zen_rock_formation', 20, 'Zen Rock Formation')}
+                      className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        inv.coins >= 20
+                          ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <VerdureIcon className="w-3.5 h-3.5" />
+                      <span>Purchase (20 Verdure)</span>
+                    </button>
+                  </div>
+
+                  {/* 6. Water Feature (30 Verdure) */}
+                  <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                    focusedShopIdx === 5
+                      ? 'bg-slate-850 ring-4 ring-cyan-400 border-cyan-300 scale-[1.01] shadow-[0_0_20px_rgba(6,182,212,0.5)]'
+                      : 'bg-slate-900/80 border-cyan-500/30'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2.5">
+                          <ItemVectorPreview itemKey="water_feature" width={44} height={44} />
+                          <div>
+                            <h4 className="font-bold text-xs sm:text-sm text-cyan-200 flex items-center gap-1.5">
+                              {focusedShopIdx === 5 && <span className="text-cyan-400 text-xs">► [E/A]</span>}
+                              <span>Water Feature (Shishi-Odoshi)</span>
+                            </h4>
+                            <span className="text-[10px] text-cyan-300 font-bold">+10% Growth Speed (Gentle Waters)</span>
+                          </div>
+                        </div>
+                        <span className="text-xs bg-slate-950 text-cyan-300 border border-cyan-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                          Owned: {getStructureInventoryCount(inv, 'water_feature')}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        Authentic Japanese shishi-odoshi bamboo fountain dripping water into a carved tsukubai stone basin. Halo Effect: Grants +10% Hydration Growth Speed to adjacent trees.
+                      </p>
+                    </div>
+
+                    <button
+                      disabled={inv.coins < 30}
+                      onClick={() => buyDecoration('water_feature', 30, 'Water Feature (Shishi-Odoshi)')}
+                      className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        inv.coins >= 30
+                          ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <VerdureIcon className="w-3.5 h-3.5" />
+                      <span>Purchase (30 Verdure)</span>
+                    </button>
+                  </div>
+
+                  {/* 7. Empty Pedestal (50 Verdure) */}
+                  <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                    focusedShopIdx === 6
+                      ? 'bg-slate-850 ring-4 ring-purple-400 border-purple-300 scale-[1.01] shadow-[0_0_20px_rgba(168,85,247,0.5)]'
+                      : 'bg-slate-900/80 border-purple-500/40'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2.5">
+                          <ItemVectorPreview itemKey="empty_crystal_pedestal" width={44} height={44} />
+                          <div>
+                            <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                              {focusedShopIdx === 6 && <span className="text-purple-400 text-xs">► [E/A]</span>}
+                              <span>Empty Pedestal</span>
+                            </h4>
+                            <span className="text-[10px] text-purple-300 font-semibold">Can Host Crystal Artifacts</span>
+                          </div>
+                        </div>
+                        <span className="text-xs bg-slate-950 text-purple-300 border border-purple-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                          Owned: {getStructureInventoryCount(inv, 'empty_crystal_pedestal')}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        Can Host Crystal Artifacts. Deploy onto any open nursery plot, then interact to socket an elemental crystal artifact from your bag.
+                      </p>
+                    </div>
+
+                    <button
+                      disabled={inv.coins < 50}
+                      onClick={() => buyDecoration('empty_crystal_pedestal', 50, 'Empty Pedestal')}
+                      className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        inv.coins >= 50
+                          ? 'bg-purple-600 hover:bg-purple-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <VerdureIcon className="w-3.5 h-3.5" />
+                      <span>Purchase (50 Verdure)</span>
+                    </button>
+                  </div>
+
+                  {/* 8. Seven Lucky Gods (75 Verdure) */}
+                  <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                    focusedShopIdx === 7
+                      ? 'bg-slate-850 ring-4 ring-amber-400 border-amber-300 scale-[1.01] shadow-[0_0_20px_rgba(251,191,36,0.5)]'
+                      : 'bg-slate-900/80 border-amber-500/40'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2.5">
+                          <ItemVectorPreview itemKey="seven_lucky_gods" width={44} height={44} />
+                          <div>
+                            <h4 className="font-bold text-xs sm:text-sm text-amber-200 flex items-center gap-1.5">
+                              {focusedShopIdx === 7 && <span className="text-amber-400 text-xs">► [E/A]</span>}
+                              <span>Seven Lucky Gods (Shichifukujin)</span>
+                            </h4>
+                            <span className="text-[10px] text-amber-300 font-bold">+0.01 Baseprice/lvl (Fortunate Blessings)</span>
+                          </div>
+                        </div>
+                        <span className="text-xs bg-slate-950 text-amber-300 border border-amber-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                          Owned: {getStructureInventoryCount(inv, 'seven_lucky_gods')}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        7 revered deities of fortune and wealth (Ebisu, Daikokuten, Bishamonten, Benzaiten, Fukurokuju, Jurojin, Hotei). Halo Effect: When an adjacent bonsai levels up, increment its persistent baseprice bonus by +0.01!
+                      </p>
+                    </div>
+
+                    <button
+                      disabled={inv.coins < 75}
+                      onClick={() => buyDecoration('seven_lucky_gods', 75, 'Seven Lucky Gods (Shichifukujin)')}
+                      className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        inv.coins >= 75
+                          ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <VerdureIcon className="w-3.5 h-3.5" />
+                      <span>Purchase (75 Verdure)</span>
+                    </button>
+                  </div>
+
+                  {/* 9. Stone Lantern (125 Verdure) */}
+                  <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                    focusedShopIdx === 8
+                      ? 'bg-slate-850 ring-4 ring-cyan-400 border-cyan-300 scale-[1.01] shadow-[0_0_20px_rgba(56,189,248,0.5)]'
+                      : 'bg-slate-900/80 border-cyan-500/40'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2.5">
+                          <ItemVectorPreview itemKey="stone_lantern" width={44} height={44} />
+                          <div>
+                            <h4 className="font-bold text-xs sm:text-sm text-cyan-200 flex items-center gap-1.5">
+                              {focusedShopIdx === 8 && <span className="text-cyan-400 text-xs">► [E/A]</span>}
+                              <span>Stone Lantern (Tōrō / Kasuga-dōrō)</span>
+                            </h4>
+                            <span className="text-[10px] text-cyan-300 font-bold">+0.5% Zen Point Chance/lvl (Skilled Knowledge)</span>
+                          </div>
+                        </div>
+                        <span className="text-xs bg-slate-950 text-cyan-300 border border-cyan-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                          Owned: {getStructureInventoryCount(inv, 'stone_lantern')}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        Classical Kasuga-dōrō stone lantern with tiered base, fluted column, lotus platform, and firebox glowing with warm candlelight. Halo Effect: Roll 0.5% chance per lantern on level up to award +1 Zen Point!
+                      </p>
+                    </div>
+
+                    <button
+                      disabled={inv.coins < 125}
+                      onClick={() => buyDecoration('stone_lantern', 125, 'Stone Lantern (Tōrō)')}
+                      className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        inv.coins >= 125
+                          ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <VerdureIcon className="w-3.5 h-3.5" />
+                      <span>Purchase (125 Verdure)</span>
+                    </button>
+                  </div>
+
+                  {/* 10. Torii Gate (250 Verdure, Limit 1) */}
+                  <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                    focusedShopIdx === 9
+                      ? 'bg-slate-850 ring-4 ring-red-400 border-red-300 scale-[1.01] shadow-[0_0_20px_rgba(239,68,68,0.5)]'
+                      : 'bg-slate-900/80 border-red-500/40'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2.5">
+                          <ItemVectorPreview itemKey="torii_gate" width={44} height={44} />
+                          <div>
+                            <h4 className="font-bold text-xs sm:text-sm text-red-200 flex items-center gap-1.5">
+                              {focusedShopIdx === 9 && <span className="text-red-400 text-xs">► [E/A]</span>}
+                              <span>Torii Gate (3x1 / 1x3)</span>
+                            </h4>
+                            <span className="text-[10px] text-amber-400 font-bold">2x All Halo Effects (Doubling Down) • Limit 1</span>
+                          </div>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-lg font-mono font-bold border ${
+                          hasToriiGate
+                            ? 'bg-emerald-950 text-emerald-300 border-emerald-500/50'
+                            : 'bg-slate-950 text-red-300 border-red-600/40'
+                        }`}>
+                          {hasToriiGate ? 'Owned (Limit 1)' : 'Stock: 1'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        Doubles other Halo Effects applied to Bonsai (Doubling Down)! In calculateBonsaiHalos(): if a bonsai is in the halo of a Torii Gate, all other positive halo effects (growth speed, XP boost, pruning speed, waste chance, baseprice bonus, etc.) applied to that bonsai are doubled (x2)! Multi-plot rotatable archway with open walkable center.
+                      </p>
+                    </div>
+
+                    {hasToriiGate ? (
+                      <button
+                        disabled
+                        className="w-full py-2 rounded-xl font-bold text-xs bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700 flex items-center justify-center gap-1.5">
+                        <span>Owned (Limit 1)</span>
+                      </button>
+                    ) : (
+                      <button
+                        disabled={inv.coins < 250}
+                        onClick={() => buyDecoration('torii_gate', 250, 'Torii Gate (3x1)')}
+                        className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
+                          inv.coins >= 250
+                            ? 'bg-red-600 hover:bg-red-500 text-white ring-1 ring-red-400/50'
+                            : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        }`}>
+                        <VerdureIcon className="w-3.5 h-3.5" />
+                        <span>Purchase (250 Verdure)</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {/* 1. Zen Pebble Stepping Path (5 Verdure) */}
-                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
-                  focusedShopIdx === 0
-                    ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
-                    : 'bg-slate-900/80 border-slate-800'
-                }`}>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xl shrink-0 overflow-hidden">
-                          {assets['decor_pebble_path']?.src ? (
-                            <img src={assets['decor_pebble_path'].src} alt="Pebble Path" className="w-8 h-8 object-contain" />
-                          ) : (
-                            <span>🪨</span>
-                          )}
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 0 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
-                            <span>Zen Pebble Stepping Path</span>
-                          </h4>
-                          <span className="text-[10px] text-emerald-400 font-bold">+35% player movement speed when traversed</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-emerald-300 border border-slate-700 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {inv.decor_pebble_path_inv || 0}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Grants +35% movement speed when walking on it. Pure pathway tile (does not cause stalling).
-                    </p>
-                  </div>
-
-                  <button
-                    disabled={inv.coins < 5}
-                    onClick={() => buyDecoration('decor_pebble_path', 5, 'Zen Pebble Stepping Path')}
-                    className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
-                      inv.coins >= 5
-                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}>
-                    <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase (5 Verdure)</span>
-                  </button>
-                </div>
-
-                {/* 2. Zen Rock Formation (20 Verdure) */}
-                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
-                  focusedShopIdx === 1
-                    ? 'bg-slate-850 ring-4 ring-amber-400 border-amber-300 scale-[1.01] shadow-[0_0_20px_rgba(245,158,11,0.5)]'
-                    : 'bg-slate-900/80 border-amber-500/30'
-                }`}>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-amber-950/60 border border-amber-500/40 flex items-center justify-center text-xl shrink-0 overflow-hidden">
-                          {assets['decor_rock_formation']?.src ? (
-                            <img src={assets['decor_rock_formation'].src} alt="Rock Formation" className="w-8 h-8 object-contain" />
-                          ) : (
-                            <span>🪨</span>
-                          )}
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 1 && <span className="text-amber-400 text-xs">► [E/A]</span>}
-                            <span>Zen Rock Formation</span>
-                          </h4>
-                          <span className="text-[10px] text-amber-300 font-bold">+15% Level Up Experience (XP Boosted)</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-amber-300 border border-amber-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {getStructureInventoryCount(inv, 'zen_rock_formation')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Raked gravel and natural stone boulders. Grants +15% Level Up Experience (XP Boosted) to adjacent bonsais in halo.
-                    </p>
-                  </div>
-
-                  <button
-                    disabled={inv.coins < 20}
-                    onClick={() => buyDecoration('zen_rock_formation', 20, 'Zen Rock Formation')}
-                    className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
-                      inv.coins >= 20
-                        ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}>
-                    <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase (20 Verdure)</span>
-                  </button>
-                </div>
-
-                {/* 3. Water Feature (30 Verdure) */}
-                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
-                  focusedShopIdx === 2
-                    ? 'bg-slate-850 ring-4 ring-cyan-400 border-cyan-300 scale-[1.01] shadow-[0_0_20px_rgba(6,182,212,0.5)]'
-                    : 'bg-slate-900/80 border-cyan-500/30'
-                }`}>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-cyan-950/60 border border-cyan-500/40 flex items-center justify-center text-xl shrink-0 overflow-hidden">
-                          <span>🌊</span>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-cyan-200 flex items-center gap-1.5">
-                            {focusedShopIdx === 2 && <span className="text-cyan-400 text-xs">► [E/A]</span>}
-                            <span>Water Feature (Shishi-Odoshi)</span>
-                          </h4>
-                          <span className="text-[10px] text-cyan-300 font-bold">+10% Hydration Growth Speed (Gentle Waters)</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-cyan-300 border border-cyan-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {getStructureInventoryCount(inv, 'water_feature')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Soothing Japanese stone water basin fed by a dripping bamboo fountain. Grants +10% Hydration Growth Speed to adjacent bonsais in halo.
-                    </p>
-                  </div>
-
-                  <button
-                    disabled={inv.coins < 30}
-                    onClick={() => buyDecoration('water_feature', 30, 'Water Feature (Shishi-Odoshi)')}
-                    className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
-                      inv.coins >= 30
-                        ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}>
-                    <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase (30 Verdure)</span>
-                  </button>
-                </div>
-
-                {/* 4. Growing Bamboo Formation (10 Verdure) */}
-                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
-                  focusedShopIdx === 3
-                    ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
-                    : 'bg-slate-900/80 border-emerald-500/30'
-                }`}>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-500/40 flex items-center justify-center text-xl shrink-0 overflow-hidden">
-                          <span>🎋</span>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 3 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
-                            <span>Growing Bamboo Formation</span>
-                          </h4>
-                          <span className="text-[10px] text-emerald-300 font-bold">+0.25s Pruning Effect (Quick Prune)</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-emerald-300 border border-emerald-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {getStructureInventoryCount(inv, 'growing_bamboo_formation')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      A cluster of growing bamboo shoots and culms sprouting from the ground with joint rings and feathered bamboo leaves. Grants +0.25s Pruning Effect.
-                    </p>
-                  </div>
-
-                  <button
-                    disabled={inv.coins < 10}
-                    onClick={() => buyDecoration('growing_bamboo_formation', 10, 'Growing Bamboo Formation')}
-                    className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
-                      inv.coins >= 10
-                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}>
-                    <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase (10 Verdure)</span>
-                  </button>
-                </div>
-
-                {/* 5. Asparagus Fern Ball (15 Verdure) */}
-                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
-                  focusedShopIdx === 4
-                    ? 'bg-slate-850 ring-4 ring-lime-400 border-lime-300 scale-[1.01] shadow-[0_0_20px_rgba(163,230,53,0.5)]'
-                    : 'bg-slate-900/80 border-lime-500/30'
-                }`}>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-lime-950/60 border border-lime-500/40 flex items-center justify-center text-xl shrink-0 overflow-hidden">
-                          <span>🪴</span>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 4 && <span className="text-lime-400 text-xs">► [E/A]</span>}
-                            <span>Asparagus Fern Ball</span>
-                          </h4>
-                          <span className="text-[10px] text-lime-300 font-bold">+15% Chance for Extra Organic Waste on Level Up (Efficient Pruning)</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-lime-300 border border-lime-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {getStructureInventoryCount(inv, 'asparagus_fern_ball')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      An authentic Kokedama moss ball pot on a dark coaster dish with delicate feathery Asparagus Fern fronds. Grants +15% chance to drop extra Organic Waste on level up.
-                    </p>
-                  </div>
-
-                  <button
-                    disabled={inv.coins < 15}
-                    onClick={() => buyDecoration('asparagus_fern_ball', 15, 'Asparagus Fern Ball')}
-                    className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
-                      inv.coins >= 15
-                        ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}>
-                    <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase (15 Verdure)</span>
-                  </button>
-                </div>
-
-                {/* 6. Bamboo Fence (3 Verdure) */}
-                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
-                  focusedShopIdx === 5
-                    ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
-                    : 'bg-slate-900/80 border-emerald-600/40'
-                }`}>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-500/40 flex items-center justify-center text-xl shrink-0 overflow-hidden">
-                          <span>🎋</span>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 5 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
-                            <span>Bamboo Fence (Takegaki)</span>
-                          </h4>
-                          <span className="text-[10px] text-emerald-400 font-bold">Edge Barrier • Physically Blocks Halos</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-emerald-300 border border-emerald-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {inv.bamboo_fence_inv || 0}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Boundary fence placed on plot borders (Top, Right, Bottom, Left). Physically cuts off and isolates halos between separated plots!
-                    </p>
-                  </div>
-
-                  <button
-                    disabled={inv.coins < 3}
-                    onClick={() => buyDecoration('bamboo_fence', 3, 'Bamboo Fence (Takegaki)')}
-                    className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 ${
-                      inv.coins >= 3
-                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}>
-                    <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase (3 Verdure)</span>
-                  </button>
-                </div>
-
-                {/* 7. Torii Gate (0 Verdure / Free) */}
-                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
-                  focusedShopIdx === 6
-                    ? 'bg-slate-850 ring-4 ring-red-400 border-red-300 scale-[1.01] shadow-[0_0_20px_rgba(239,68,68,0.5)]'
-                    : 'bg-slate-900/80 border-red-500/30'
-                }`}>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-red-950/80 border border-red-500/50 flex items-center justify-center text-xl shrink-0 shadow-inner">
-                          <span>⛩️</span>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-red-200 flex items-center gap-1.5">
-                            {focusedShopIdx === 6 && <span className="text-red-400 text-xs">► [E/A]</span>}
-                            <span>Torii Gate (3x1 / 1x3)</span>
-                          </h4>
-                          <span className="text-[10px] text-amber-400 font-bold">3x1 / 1x3 Multi-Plot • Open Center Walkway</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-red-300 border border-red-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {inv.torii_gate_inv || 0}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Majestic vermilion shinto archway spanning 3 plots. Outer pillars anchor the sides, while the central archway plot remains open, walkable, and placeable!
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={() => buyDecoration('torii_gate', 0, 'Torii Gate (3x1)')}
-                    className="w-full py-2 rounded-xl font-bold text-xs bg-red-600 hover:bg-red-500 text-white transition-all shadow flex items-center justify-center gap-1.5 active:scale-95 ring-1 ring-red-400/50 cursor-pointer">
-                    <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
-                    <span>Claim Free Torii Gate (0 Verdure)</span>
-                  </button>
-                </div>
-
-                {/* 8. Empty Pedestal (50 Verdure) */}
-                <div className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
-                  focusedShopIdx === 7
-                    ? 'bg-slate-850 ring-4 ring-purple-400 border-purple-300 scale-[1.01] shadow-[0_0_20px_rgba(168,85,247,0.5)]'
-                    : 'bg-slate-900/80 border-purple-500/40'
-                }`}>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-purple-950/80 border border-purple-500/60 flex items-center justify-center text-xl shrink-0 shadow-inner">
-                          <span>🔮</span>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 7 && <span className="text-purple-400 text-xs">► [E/A]</span>}
-                            <span>Empty Pedestal</span>
-                          </h4>
-                          <span className="text-[10px] text-purple-300 font-semibold">Can Host Crystal Artifacts</span>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-950 text-purple-300 border border-purple-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                        Owned: {getStructureInventoryCount(inv, 'empty_crystal_pedestal')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Can Host Crystal Artifacts. Deploy onto any open nursery plot and socket an elemental crystal artifact onto it to project cultivation potential onto neighboring bonsais.
-                    </p>
-                  </div>
-
-                  <button
-                    disabled={inv.coins < 50}
-                    onClick={() => buyDecoration('empty_crystal_pedestal', 50, 'Empty Pedestal')}
-                    className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                      inv.coins >= 50
-                        ? 'bg-purple-600 hover:bg-purple-500 text-white active:scale-95'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}>
-                    <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>Purchase (50 Verdure)</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* TAB 4: GUIDEBOOKS & BLUEPRINTS */}
           {shopTab === 'GUIDES' && (
@@ -23403,58 +26971,284 @@ export default function App() {
               <div className="text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800 flex items-center gap-2">
                 <Info className="w-4 h-4 text-lime-400 shrink-0" />
                 <span>
-                  Acquire ancient manuscripts and engineering blueprints to unlock advanced irrigation automatons and automated fabrication assembly!
+                  Acquire blueprints and schematics to unlock Assembly Bench and Overclock modules at the Workbench, plus irrigation and automation guides!
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {/* 1. Compost Guidebook (Index 0) */}
+                {/* 1. Assembly Blueprint I */}
                 <div className={`border p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
                   focusedShopIdx === 0
-                    ? 'ring-4 ring-lime-400 border-lime-300 scale-[1.01] bg-slate-850 shadow-[0_0_20px_rgba(163,230,53,0.5)]'
+                    ? 'ring-4 ring-sky-400 border-sky-300 scale-[1.01] bg-slate-850 shadow-[0_0_20px_rgba(56,189,248,0.5)]'
                     : 'bg-slate-900/80 border-slate-800'
                 }`}>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-xl bg-lime-950/80 border border-lime-500/50 flex items-center justify-center overflow-hidden shrink-0">
-                          {assets['compost_guide']?.src ? (
-                            <img src={assets['compost_guide'].src} alt="Guidebook" className="w-7 h-7 object-contain" />
-                          ) : (
-                            <BookOpen className="w-4 h-4 text-lime-400" />
-                          )}
+                        <div className="w-9 h-9 rounded-xl bg-sky-950/80 border border-sky-500/50 flex items-center justify-center text-lg shrink-0">
+                          🦾
                         </div>
                         <div>
                           <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                            {focusedShopIdx === 0 && <span className="text-lime-400 text-xs">► [E/A]</span>}
-                            <span>Compost Guidebook</span>
+                            {focusedShopIdx === 0 && <span className="text-sky-400 text-xs">► [E/A]</span>}
+                            <span>Assembly Blueprint I</span>
                           </h4>
-                          <span className="text-[10px] text-lime-300 font-semibold">Organic Waste Recycling Guide</span>
+                          <span className="text-[10px] text-sky-300 font-semibold">T1 Assembly Module (+1 Queue Slot)</span>
                         </div>
                       </div>
-                      {inv.has_compost_guide && (
+                      {inv.has_assembly_blueprint_1 && (
                         <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
                           ✓ Owned
                         </span>
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Unlocks the <strong>Enriched Compost</strong> recipe at the Artisan Workbench (Refine 2 Organic Waste &rarr; 1 Enriched Compost in 5s).
+                      Unlocks crafting the T1 Assembly Bench Module (+1 Queue Slot) at the Artisan Workbench.
                     </p>
                   </div>
 
                   <button
-                    disabled={inv.has_compost_guide || inv.coins < 35}
-                    onClick={() => buyGuidebook('has_compost_guide', 35, 'Compost Guidebook')}
+                    disabled={inv.has_assembly_blueprint_1 || inv.coins < 15}
+                    onClick={() => buyGuidebook('has_assembly_blueprint_1', 15, 'Assembly Blueprint I')}
                     className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
-                      inv.has_compost_guide
+                      inv.has_assembly_blueprint_1
                         ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
-                        : inv.coins >= 35
-                        ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
+                        : inv.coins >= 15
+                        ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                     }`}>
                     <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>{inv.has_compost_guide ? 'Studied' : 'Purchase (35 Verdure)'}</span>
+                    <span>{inv.has_assembly_blueprint_1 ? 'Studied' : 'Purchase (15 Verdure)'}</span>
+                  </button>
+                </div>
+
+                {/* 2. Assembly Blueprint II */}
+                <div className={`border p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
+                  focusedShopIdx === 1
+                    ? 'ring-4 ring-sky-400 border-sky-300 scale-[1.01] bg-slate-850 shadow-[0_0_20px_rgba(56,189,248,0.5)]'
+                    : 'bg-slate-900/80 border-slate-800'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-sky-950/80 border border-sky-500/50 flex items-center justify-center text-lg shrink-0">
+                          🦾
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 1 && <span className="text-sky-400 text-xs">► [E/A]</span>}
+                            <span>Assembly Blueprint II</span>
+                          </h4>
+                          <span className="text-[10px] text-sky-300 font-semibold">T2 Assembly Module (+2 Queue Slots)</span>
+                        </div>
+                      </div>
+                      {inv.has_assembly_blueprint_2 && (
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                          ✓ Owned
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Unlocks crafting the T2 Assembly Bench Module (+2 Queue Slots) at the Artisan Workbench.
+                    </p>
+                  </div>
+
+                  <button
+                    disabled={inv.has_assembly_blueprint_2 || inv.coins < 35}
+                    onClick={() => buyGuidebook('has_assembly_blueprint_2', 35, 'Assembly Blueprint II')}
+                    className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
+                      inv.has_assembly_blueprint_2
+                        ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
+                        : inv.coins >= 35
+                        ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}>
+                    <VerdureIcon className="w-3.5 h-3.5" />
+                    <span>{inv.has_assembly_blueprint_2 ? 'Studied' : 'Purchase (35 Verdure)'}</span>
+                  </button>
+                </div>
+
+                {/* 3. Assembly Blueprint III */}
+                <div className={`border p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
+                  focusedShopIdx === 2
+                    ? 'ring-4 ring-sky-400 border-sky-300 scale-[1.01] bg-slate-850 shadow-[0_0_20px_rgba(56,189,248,0.5)]'
+                    : 'bg-slate-900/80 border-slate-800'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-sky-950/80 border border-sky-500/50 flex items-center justify-center text-lg shrink-0">
+                          🦾
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 2 && <span className="text-sky-400 text-xs">► [E/A]</span>}
+                            <span>Assembly Blueprint III</span>
+                          </h4>
+                          <span className="text-[10px] text-sky-300 font-semibold">T3 Assembly Module (+3 Queue Slots)</span>
+                        </div>
+                      </div>
+                      {inv.has_assembly_blueprint_3 && (
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                          ✓ Owned
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Unlocks crafting the T3 Assembly Bench Module (+3 Queue Slots) at the Artisan Workbench.
+                    </p>
+                  </div>
+
+                  <button
+                    disabled={inv.has_assembly_blueprint_3 || inv.coins < 60}
+                    onClick={() => buyGuidebook('has_assembly_blueprint_3', 60, 'Assembly Blueprint III')}
+                    className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
+                      inv.has_assembly_blueprint_3
+                        ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
+                        : inv.coins >= 60
+                        ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}>
+                    <VerdureIcon className="w-3.5 h-3.5" />
+                    <span>{inv.has_assembly_blueprint_3 ? 'Studied' : 'Purchase (60 Verdure)'}</span>
+                  </button>
+                </div>
+
+                {/* 4. Overclock Schematic I */}
+                <div className={`border p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
+                  focusedShopIdx === 3
+                    ? 'ring-4 ring-amber-400 border-amber-300 scale-[1.01] bg-slate-850 shadow-[0_0_20px_rgba(245,158,11,0.5)]'
+                    : 'bg-slate-900/80 border-slate-800'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-amber-950/80 border border-amber-500/50 flex items-center justify-center text-lg shrink-0">
+                          ⚡
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 3 && <span className="text-amber-400 text-xs">► [E/A]</span>}
+                            <span>Overclock Schematic I</span>
+                          </h4>
+                          <span className="text-[10px] text-amber-300 font-semibold">T1 Overclock Module (+5% Speed)</span>
+                        </div>
+                      </div>
+                      {inv.has_overclock_schematic_1 && (
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                          ✓ Owned
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Unlocks crafting the T1 Overclock Workbench Module (+5% Craft Speed) at the Workbench.
+                    </p>
+                  </div>
+
+                  <button
+                    disabled={inv.has_overclock_schematic_1 || inv.coins < 20}
+                    onClick={() => buyGuidebook('has_overclock_schematic_1', 20, 'Overclock Schematic I')}
+                    className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
+                      inv.has_overclock_schematic_1
+                        ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
+                        : inv.coins >= 20
+                        ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}>
+                    <VerdureIcon className="w-3.5 h-3.5" />
+                    <span>{inv.has_overclock_schematic_1 ? 'Studied' : 'Purchase (20 Verdure)'}</span>
+                  </button>
+                </div>
+
+                {/* 5. Overclock Schematic II */}
+                <div className={`border p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
+                  focusedShopIdx === 4
+                    ? 'ring-4 ring-amber-400 border-amber-300 scale-[1.01] bg-slate-850 shadow-[0_0_20px_rgba(245,158,11,0.5)]'
+                    : 'bg-slate-900/80 border-slate-800'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-amber-950/80 border border-amber-500/50 flex items-center justify-center text-lg shrink-0">
+                          ⚡
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 4 && <span className="text-amber-400 text-xs">► [E/A]</span>}
+                            <span>Overclock Schematic II</span>
+                          </h4>
+                          <span className="text-[10px] text-amber-300 font-semibold">T2 Overclock Module (+10% Speed)</span>
+                        </div>
+                      </div>
+                      {inv.has_overclock_schematic_2 && (
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                          ✓ Owned
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Unlocks crafting the T2 Overclock Workbench Module (+10% Craft Speed) at the Workbench.
+                    </p>
+                  </div>
+
+                  <button
+                    disabled={inv.has_overclock_schematic_2 || inv.coins < 45}
+                    onClick={() => buyGuidebook('has_overclock_schematic_2', 45, 'Overclock Schematic II')}
+                    className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
+                      inv.has_overclock_schematic_2
+                        ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
+                        : inv.coins >= 45
+                        ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}>
+                    <VerdureIcon className="w-3.5 h-3.5" />
+                    <span>{inv.has_overclock_schematic_2 ? 'Studied' : 'Purchase (45 Verdure)'}</span>
+                  </button>
+                </div>
+
+                {/* 6. Overclock Schematic III */}
+                <div className={`border p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all ${
+                  focusedShopIdx === 5
+                    ? 'ring-4 ring-amber-400 border-amber-300 scale-[1.01] bg-slate-850 shadow-[0_0_20px_rgba(245,158,11,0.5)]'
+                    : 'bg-slate-900/80 border-slate-800'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-amber-950/80 border border-amber-500/50 flex items-center justify-center text-lg shrink-0">
+                          ⚡
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {focusedShopIdx === 5 && <span className="text-amber-400 text-xs">► [E/A]</span>}
+                            <span>Overclock Schematic III</span>
+                          </h4>
+                          <span className="text-[10px] text-amber-300 font-semibold">T3 Overclock Module (+20% Speed)</span>
+                        </div>
+                      </div>
+                      {inv.has_overclock_schematic_3 && (
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                          ✓ Owned
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Unlocks crafting the T3 Overclock Workbench Module (+20% Craft Speed) at the Workbench.
+                    </p>
+                  </div>
+
+                  <button
+                    disabled={inv.has_overclock_schematic_3 || inv.coins < 80}
+                    onClick={() => buyGuidebook('has_overclock_schematic_3', 80, 'Overclock Schematic III')}
+                    className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
+                      inv.has_overclock_schematic_3
+                        ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
+                        : inv.coins >= 80
+                        ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}>
+                    <VerdureIcon className="w-3.5 h-3.5" />
+                    <span>{inv.has_overclock_schematic_3 ? 'Studied' : 'Purchase (80 Verdure)'}</span>
                   </button>
                 </div>
 
@@ -23650,7 +27444,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Storage Module I Guidebook */}
+                {/* T1 Storage Module Guidebook */}
                 <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col justify-between gap-2">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -23659,7 +27453,7 @@ export default function App() {
                           📦
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Storage Module I Guidebook</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T1 Storage Module Guidebook</h4>
                           <span className="text-[10px] text-emerald-300 font-semibold">+2.5 kg Cargo Module</span>
                         </div>
                       </div>
@@ -23670,13 +27464,13 @@ export default function App() {
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Unlocks crafting Storage Module I (+2.5 kg cargo) at the Workbench. Modules can be attached/detached in the Rover Loadout bay.
+                      Unlocks crafting T1 Storage Module (+2.5 kg cargo) at the Workbench. Modules can be attached/detached in the Rover Loadout bay.
                     </p>
                   </div>
 
                   <button
                     disabled={inv.has_storage_module_1_guide || inv.coins < 25}
-                    onClick={() => buyGuidebook('has_storage_module_1_guide', 25, 'Storage Module I Guidebook')}
+                    onClick={() => buyGuidebook('has_storage_module_1_guide', 25, 'T1 Storage Module Guidebook')}
                     className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
                       inv.has_storage_module_1_guide
                         ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
@@ -23689,7 +27483,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Storage Module II Guidebook */}
+                {/* T2 Storage Module Guidebook */}
                 <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col justify-between gap-2">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -23698,7 +27492,7 @@ export default function App() {
                           📦
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Storage Module II Guidebook</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T2 Storage Module Guidebook</h4>
                           <span className="text-[10px] text-emerald-300 font-semibold">+5.0 kg Cargo Module</span>
                         </div>
                       </div>
@@ -23709,13 +27503,13 @@ export default function App() {
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Unlocks crafting Storage Module II (+5.0 kg cargo) at the Workbench. Modules can be attached/detached in the Rover Loadout bay.
+                      Unlocks crafting T2 Storage Module (+5.0 kg cargo) at the Workbench. Modules can be attached/detached in the Rover Loadout bay.
                     </p>
                   </div>
 
                   <button
                     disabled={inv.has_storage_module_2_guide || inv.coins < 50}
-                    onClick={() => buyGuidebook('has_storage_module_2_guide', 50, 'Storage Module II Guidebook')}
+                    onClick={() => buyGuidebook('has_storage_module_2_guide', 50, 'T2 Storage Module Guidebook')}
                     className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
                       inv.has_storage_module_2_guide
                         ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
@@ -23728,7 +27522,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Storage Module III Guidebook */}
+                {/* T3 Storage Module Guidebook */}
                 <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col justify-between gap-2">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -23737,7 +27531,7 @@ export default function App() {
                           🚜
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Storage Module III Guidebook</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T3 Storage Module Guidebook</h4>
                           <span className="text-[10px] text-emerald-300 font-semibold">+7.5 kg Cargo Module</span>
                         </div>
                       </div>
@@ -23748,13 +27542,13 @@ export default function App() {
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Unlocks crafting high-capacity Storage Module III (+7.5 kg cargo) at the Workbench. Modules can be attached/detached in Rover Loadout.
+                      Unlocks crafting high-capacity T3 Storage Module (+7.5 kg cargo) at the Workbench. Modules can be attached/detached in Rover Loadout.
                     </p>
                   </div>
 
                   <button
                     disabled={inv.has_storage_module_3_guide || inv.coins < 100}
-                    onClick={() => buyGuidebook('has_storage_module_3_guide', 100, 'Storage Module III Guidebook')}
+                    onClick={() => buyGuidebook('has_storage_module_3_guide', 100, 'T3 Storage Module Guidebook')}
                     className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
                       inv.has_storage_module_3_guide
                         ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
@@ -23767,7 +27561,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Battery Module I Guidebook */}
+                {/* T1 Battery Module Guidebook */}
                 <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col justify-between gap-2">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -23776,7 +27570,7 @@ export default function App() {
                           🔋
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Battery Module I Guidebook</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T1 Battery Module Guidebook</h4>
                           <span className="text-[10px] text-amber-300 font-semibold">+25 kWh Battery Module</span>
                         </div>
                       </div>
@@ -23787,13 +27581,13 @@ export default function App() {
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Unlocks crafting Battery Module I (+25 kWh energy) at the Workbench. Modules can be attached/detached in the Rover Loadout bay.
+                      Unlocks crafting T1 Battery Module (+25 kWh energy) at the Workbench. Modules can be attached/detached in the Rover Loadout bay.
                     </p>
                   </div>
 
                   <button
                     disabled={inv.has_battery_module_1_guide || inv.coins < 25}
-                    onClick={() => buyGuidebook('has_battery_module_1_guide', 25, 'Battery Module I Guidebook')}
+                    onClick={() => buyGuidebook('has_battery_module_1_guide', 25, 'T1 Battery Module Guidebook')}
                     className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
                       inv.has_battery_module_1_guide
                         ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
@@ -23806,7 +27600,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Battery Module II Guidebook */}
+                {/* T2 Battery Module Guidebook */}
                 <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col justify-between gap-2">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -23815,7 +27609,7 @@ export default function App() {
                           ⚡
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Battery Module II Guidebook</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T2 Battery Module Guidebook</h4>
                           <span className="text-[10px] text-amber-300 font-semibold">+50 kWh Battery Module</span>
                         </div>
                       </div>
@@ -23826,13 +27620,13 @@ export default function App() {
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Unlocks crafting Battery Module II (+50 kWh energy) at the Workbench. Modules can be attached/detached in the Rover Loadout bay.
+                      Unlocks crafting T2 Battery Module (+50 kWh energy) at the Workbench. Modules can be attached/detached in the Rover Loadout bay.
                     </p>
                   </div>
 
                   <button
                     disabled={inv.has_battery_module_2_guide || inv.coins < 50}
-                    onClick={() => buyGuidebook('has_battery_module_2_guide', 50, 'Battery Module II Guidebook')}
+                    onClick={() => buyGuidebook('has_battery_module_2_guide', 50, 'T2 Battery Module Guidebook')}
                     className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
                       inv.has_battery_module_2_guide
                         ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
@@ -23845,7 +27639,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Battery Module III Guidebook */}
+                {/* T3 Battery Module Guidebook */}
                 <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col justify-between gap-2">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -23854,7 +27648,7 @@ export default function App() {
                           ✨
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Battery Module III Guidebook</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T3 Battery Module Guidebook</h4>
                           <span className="text-[10px] text-amber-300 font-semibold">+75 kWh Battery Module</span>
                         </div>
                       </div>
@@ -23865,13 +27659,13 @@ export default function App() {
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Unlocks crafting high-density Battery Module III (+75 kWh energy) at the Workbench. Modules can be attached/detached in Rover Loadout.
+                      Unlocks crafting high-density T3 Battery Module (+75 kWh energy) at the Workbench. Modules can be attached/detached in Rover Loadout.
                     </p>
                   </div>
 
                   <button
                     disabled={inv.has_battery_module_3_guide || inv.coins < 100}
-                    onClick={() => buyGuidebook('has_battery_module_3_guide', 100, 'Battery Module III Guidebook')}
+                    onClick={() => buyGuidebook('has_battery_module_3_guide', 100, 'T3 Battery Module Guidebook')}
                     className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
                       inv.has_battery_module_3_guide
                         ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
@@ -23884,7 +27678,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Radar Module I Guidebook */}
+                {/* T1 Radar Module Guidebook */}
                 <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col justify-between gap-2">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -23893,7 +27687,7 @@ export default function App() {
                           📡
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Radar Module I Guidebook</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T1 Radar Module Guidebook</h4>
                           <span className="text-[10px] text-sky-300 font-semibold">+1 Step Vision (Radius 2 + 1 = 3)</span>
                         </div>
                       </div>
@@ -23904,13 +27698,13 @@ export default function App() {
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Unlocks crafting Radar Module I at the Workbench (+1 step Fog of War vision). Physical module attachable in Rover Loadout.
+                      Unlocks crafting T1 Radar Module at the Workbench (+1 step Fog of War vision). Physical module attachable in Rover Loadout.
                     </p>
                   </div>
 
                   <button
                     disabled={inv.has_radar_module_1_guide || inv.coins < 30}
-                    onClick={() => buyGuidebook('has_radar_module_1_guide', 30, 'Radar Module I Guidebook')}
+                    onClick={() => buyGuidebook('has_radar_module_1_guide', 30, 'T1 Radar Module Guidebook')}
                     className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
                       inv.has_radar_module_1_guide
                         ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
@@ -23923,7 +27717,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Radar Module II Guidebook */}
+                {/* T2 Radar Module Guidebook */}
                 <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col justify-between gap-2">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -23932,7 +27726,7 @@ export default function App() {
                           📡
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Radar Module II Guidebook</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T2 Radar Module Guidebook</h4>
                           <span className="text-[10px] text-sky-300 font-semibold">+2 Steps Vision (Radius 2 + 2 = 4)</span>
                         </div>
                       </div>
@@ -23943,13 +27737,13 @@ export default function App() {
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Unlocks crafting Radar Module II at the Workbench (+2 steps Fog of War vision). Physical module attachable in Rover Loadout.
+                      Unlocks crafting T2 Radar Module at the Workbench (+2 steps Fog of War vision). Physical module attachable in Rover Loadout.
                     </p>
                   </div>
 
                   <button
                     disabled={inv.has_radar_module_2_guide || inv.coins < 65}
-                    onClick={() => buyGuidebook('has_radar_module_2_guide', 65, 'Radar Module II Guidebook')}
+                    onClick={() => buyGuidebook('has_radar_module_2_guide', 65, 'T2 Radar Module Guidebook')}
                     className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
                       inv.has_radar_module_2_guide
                         ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
@@ -23962,7 +27756,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Radar Module III Guidebook */}
+                {/* T3 Radar Module Guidebook */}
                 <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col justify-between gap-2">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -23971,7 +27765,7 @@ export default function App() {
                           📡
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Radar Module III Guidebook</h4>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T3 Radar Module Guidebook</h4>
                           <span className="text-[10px] text-sky-300 font-semibold">+3 Steps Vision (Radius 2 + 3 = 5)</span>
                         </div>
                       </div>
@@ -23982,13 +27776,13 @@ export default function App() {
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Unlocks crafting Radar Module III at the Workbench (+3 steps Fog of War vision). Quantum bio-resonance radar unit.
+                      Unlocks crafting T3 Radar Module at the Workbench (+3 steps Fog of War vision). Quantum bio-resonance radar unit.
                     </p>
                   </div>
 
                   <button
                     disabled={inv.has_radar_module_3_guide || inv.coins < 120}
-                    onClick={() => buyGuidebook('has_radar_module_3_guide', 120, 'Radar Module III Guidebook')}
+                    onClick={() => buyGuidebook('has_radar_module_3_guide', 120, 'T3 Radar Module Guidebook')}
                     className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
                       inv.has_radar_module_3_guide
                         ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
@@ -24044,46 +27838,132 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 5. Auto-Automaton Guidebook (Auto-Fabrication) */}
+                {/* Auto-Fabrication Schematic I */}
                 <div className="bg-slate-900/80 border border-cyan-500/40 p-3 rounded-2xl flex flex-col justify-between gap-2 shadow">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
                         <div className="w-9 h-9 rounded-xl bg-cyan-950/80 border border-cyan-500/50 flex items-center justify-center overflow-hidden shrink-0">
                           {assets['auto_fabricator_guide']?.src ? (
-                            <img src={assets['auto_fabricator_guide'].src} alt="Auto Fabricator Guide" className="w-7 h-7 object-contain" />
+                            <img src={assets['auto_fabricator_guide'].src} alt="Auto Fabricator Guide I" className="w-7 h-7 object-contain" />
                           ) : (
                             <BookOpen className="w-4 h-4 text-cyan-400" />
                           )}
                         </div>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Auto-Automaton Guidebook</h4>
-                          <span className="text-[10px] text-cyan-300 font-semibold">Continuous Assembly (10 kW)</span>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Auto-Fabrication Schematic I</h4>
+                          <span className="text-[10px] text-cyan-300 font-semibold">T1 Module (50% Speed • 6 kW)</span>
                         </div>
                       </div>
-                      {inv.has_auto_fabricator_guide && (
+                      {inv.has_auto_fab_book_1 && (
                         <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
                           ✓ Owned
                         </span>
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Blueprints for dedicated automated fabrication lanes. Synthesizes continuous production loops independently on Workbench.
+                      Unlocks the recipe for T1 Auto-Fabrication Module at the Workbench. Crafts at 50% speed.
                     </p>
                   </div>
 
                   <button
-                    disabled={inv.has_auto_fabricator_guide || inv.coins < 300}
-                    onClick={() => buyGuidebook('has_auto_fabricator_guide', 300, 'Auto-Fabrication Blueprint Guidebook')}
+                    disabled={inv.has_auto_fab_book_1 || inv.coins < 20}
+                    onClick={() => buyGuidebook('has_auto_fab_book_1', 20, 'Auto-Fabrication Schematic I')}
                     className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
-                      inv.has_auto_fabricator_guide
+                      inv.has_auto_fab_book_1
                         ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
-                        : inv.coins >= 300
+                        : inv.coins >= 20
                         ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                     }`}>
                     <VerdureIcon className="w-3.5 h-3.5" />
-                    <span>{inv.has_auto_fabricator_guide ? 'Studied' : 'Purchase (300 Verdure)'}</span>
+                    <span>{inv.has_auto_fab_book_1 ? 'Studied' : 'Purchase (20 Verdure)'}</span>
+                  </button>
+                </div>
+
+                {/* Auto-Fabrication Schematic II */}
+                <div className="bg-slate-900/80 border border-cyan-500/40 p-3 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-cyan-950/80 border border-cyan-500/50 flex items-center justify-center overflow-hidden shrink-0">
+                          {assets['auto_fabricator_guide']?.src ? (
+                            <img src={assets['auto_fabricator_guide'].src} alt="Auto Fabricator Guide II" className="w-7 h-7 object-contain" />
+                          ) : (
+                            <BookOpen className="w-4 h-4 text-cyan-400" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Auto-Fabrication Schematic II</h4>
+                          <span className="text-[10px] text-cyan-300 font-semibold">T2 Module (100% Speed • 10 kW)</span>
+                        </div>
+                      </div>
+                      {inv.has_auto_fab_book_2 && (
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                          ✓ Owned
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Unlocks the recipe for T2 Auto-Fabrication Module at the Workbench. Crafts at 100% speed (workbench speed).
+                    </p>
+                  </div>
+
+                  <button
+                    disabled={inv.has_auto_fab_book_2 || inv.coins < 50}
+                    onClick={() => buyGuidebook('has_auto_fab_book_2', 50, 'Auto-Fabrication Schematic II')}
+                    className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
+                      inv.has_auto_fab_book_2
+                        ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
+                        : inv.coins >= 50
+                        ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}>
+                    <VerdureIcon className="w-3.5 h-3.5" />
+                    <span>{inv.has_auto_fab_book_2 ? 'Studied' : 'Purchase (50 Verdure)'}</span>
+                  </button>
+                </div>
+
+                {/* Auto-Fabrication Schematic III */}
+                <div className="bg-slate-900/80 border border-cyan-500/40 p-3 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-cyan-950/80 border border-cyan-500/50 flex items-center justify-center overflow-hidden shrink-0">
+                          {assets['auto_fabricator_guide']?.src ? (
+                            <img src={assets['auto_fabricator_guide'].src} alt="Auto Fabricator Guide III" className="w-7 h-7 object-contain" />
+                          ) : (
+                            <BookOpen className="w-4 h-4 text-cyan-400" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Auto-Fabrication Schematic III</h4>
+                          <span className="text-[10px] text-cyan-300 font-semibold">T3 Module (150% Speed • 14 kW)</span>
+                        </div>
+                      </div>
+                      {inv.has_auto_fab_book_3 && (
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                          ✓ Owned
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Unlocks the recipe for T3 Auto-Fabrication Module at the Workbench. Crafts at 150% speed (1.5x faster).
+                    </p>
+                  </div>
+
+                  <button
+                    disabled={inv.has_auto_fab_book_3 || inv.coins < 90}
+                    onClick={() => buyGuidebook('has_auto_fab_book_3', 90, 'Auto-Fabrication Schematic III')}
+                    className={`w-full py-1.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1 ${
+                      inv.has_auto_fab_book_3
+                        ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
+                        : inv.coins >= 90
+                        ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}>
+                    <VerdureIcon className="w-3.5 h-3.5" />
+                    <span>{inv.has_auto_fab_book_3 ? 'Studied' : 'Purchase (90 Verdure)'}</span>
                   </button>
                 </div>
 
@@ -24182,11 +28062,132 @@ export default function App() {
               <div className="text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800 flex items-center gap-2">
                 <Wrench className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>
-                  Acquire functional deployable nursery equipment, fertilizer stations &amp; irrigation systems! Deploy onto unlocked plots via [P] or [E].
+                  Acquire engineering licenses, deployable nursery tools, fertilizer stations &amp; irrigation systems!
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Engineering Licenses Section */}
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <span>📜</span>
+                    <span>Engineering Licenses (Required for Advanced Crafting)</span>
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    T1: {inv.license_t1 || inv.licenseT1 || 0} • T2: {inv.license_t2 || inv.licenseT2 || 0} • T3: {inv.license_t3 || inv.licenseT3 || 0}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {/* T1 License */}
+                  <div className="bg-slate-900/90 border border-amber-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-9 h-9 rounded-xl bg-amber-950/80 border border-amber-500/50 flex items-center justify-center text-lg shrink-0">
+                            📜
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-xs sm:text-sm text-slate-100">T1 License</h4>
+                            <span className="text-[10px] text-amber-300 font-semibold">Tier 1 Engineering</span>
+                          </div>
+                        </div>
+                        <span className="text-xs bg-slate-950 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                          Owned: {inv.license_t1 || inv.licenseT1 || 0}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Official certification required for crafting T1 Sprinklers, T1 Assembly/Overclock/Fabrication Modules, and T1 Rover equipment.
+                      </p>
+                    </div>
+
+                    <button
+                      disabled={inv.coins < 25}
+                      onClick={() => buyEngineeringLicense(1, 25)}
+                      className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        inv.coins >= 25
+                          ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <VerdureIcon className="w-3.5 h-3.5" />
+                      <span>Purchase (25 Verdure)</span>
+                    </button>
+                  </div>
+
+                  {/* T2 License */}
+                  <div className="bg-slate-900/90 border border-sky-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-9 h-9 rounded-xl bg-sky-950/80 border border-sky-500/50 flex items-center justify-center text-lg shrink-0">
+                            📜
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-xs sm:text-sm text-slate-100">T2 License</h4>
+                            <span className="text-[10px] text-sky-300 font-semibold">Tier 2 Engineering</span>
+                          </div>
+                        </div>
+                        <span className="text-xs bg-slate-950 text-sky-300 border border-sky-500/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                          Owned: {inv.license_t2 || inv.licenseT2 || 0}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Advanced certification required for crafting T2 Sprinklers, T2 Precision Workbench Upgrade, T2 Modules, and T2 Chassis.
+                      </p>
+                    </div>
+
+                    <button
+                      disabled={inv.coins < 75}
+                      onClick={() => buyEngineeringLicense(2, 75)}
+                      className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        inv.coins >= 75
+                          ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <VerdureIcon className="w-3.5 h-3.5" />
+                      <span>Purchase (75 Verdure)</span>
+                    </button>
+                  </div>
+
+                  {/* T3 License */}
+                  <div className="bg-slate-900/90 border border-purple-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-9 h-9 rounded-xl bg-purple-950/80 border border-purple-500/50 flex items-center justify-center text-lg shrink-0">
+                            📜
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-xs sm:text-sm text-slate-100">T3 License</h4>
+                            <span className="text-[10px] text-purple-300 font-semibold">Tier 3 Master Engineering</span>
+                          </div>
+                        </div>
+                        <span className="text-xs bg-slate-950 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                          Owned: {inv.license_t3 || inv.licenseT3 || 0}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Master certification required for crafting T3 Sprinklers, T3 Master Foundry Upgrade, T3 Modules, and T3 Vanguard Chassis.
+                      </p>
+                    </div>
+
+                    <button
+                      disabled={inv.coins < 200}
+                      onClick={() => buyEngineeringLicense(3, 200)}
+                      className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                        inv.coins >= 200
+                          ? 'bg-purple-600 hover:bg-purple-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <VerdureIcon className="w-3.5 h-3.5" />
+                      <span>Purchase (200 Verdure)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Nursery Equipment Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800">
                 {/* 1. Compost Heap (20 Verdure) */}
                 <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
                   focusedShopIdx === 0
@@ -24472,7 +28473,7 @@ export default function App() {
         onClose={() => setInspectingBonsaiId(null)}
         bonsai={inspectingBonsai || null}
         synergies={
-          inspectingBonsai
+          inspectingBonsai && !isInspectingStored
             ? getCachedBonsaiSynergies(inspectingBonsai)
             : DEFAULT_BONSAI_SYNERGIES
         }
@@ -24488,11 +28489,20 @@ export default function App() {
               ).matches
             : false
         }
-        onDonate={donatePlantedBonsai}
-        onStore={pickUpBonsaiToInventory}
-        onCompost={applyOrganicCompost}
-        onFertilize={applyFertilizer}
-        onPrune={manualPruneBonsai}
+        isStored={isInspectingStored}
+        onDonate={(id) => {
+          if (isInspectingStored) {
+            donateStoredPottedBonsai(id);
+            setInspectingBonsaiId(null);
+          } else {
+            donatePlantedBonsai(id);
+          }
+        }}
+        onStore={isInspectingStored ? undefined : pickUpBonsaiToInventory}
+        onCompost={isInspectingStored ? undefined : applyOrganicCompost}
+        onFertilize={isInspectingStored ? undefined : applyFertilizer}
+        onPrune={isInspectingStored ? undefined : manualPruneBonsai}
+        onToggleFavorite={toggleBonsaiFavorite}
         onAttachAutomaton={attachAutomatonTier}
         onDetachAutomaton={detachAutomaton}
       />
@@ -24650,7 +28660,7 @@ export default function App() {
                     </button>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Manual Queue: <strong>{getTotalQueuedCount()} / {getMaxCraftingQueueCapacity()} Slots</strong> • Craft Speed: <strong className="text-emerald-300">+{installedCraftingArmsRef.current * 25}%</strong> • Attached Load: <strong className="text-amber-300">{power.craftingPowerDrain + power.autoFabricatorPowerDrain} kW</strong>
+                    Manual Queue: <strong>{getTotalQueuedCount()} / {getMaxCraftingQueueCapacity()} Slots</strong> (Base 1 + {getAssemblyBonusQueueSlots()}) • Craft Speed: <strong className="text-emerald-300">+{((getOverclockBonusSpeed()) * 100).toFixed(0)}%</strong> • Attached Load: <strong className="text-amber-300">{power.craftingPowerDrain + power.autoFabricatorPowerDrain} kW</strong>
                   </p>
                 </div>
               </div>
@@ -24663,6 +28673,7 @@ export default function App() {
 
             {/* Inventory Materials Strip */}
             <div className="bg-slate-900/90 border border-slate-800 px-3 py-2 rounded-2xl mb-3 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
+              <span>📜 Lic: <strong className="text-amber-300 font-mono">T1:{inv.license_t1 || inv.licenseT1 || 0} T2:{inv.license_t2 || inv.licenseT2 || 0} T3:{inv.license_t3 || inv.licenseT3 || 0}</strong></span>
               <span>🔩 Scrap: <strong className="text-slate-200 font-mono">{inv.scrap_metal ?? inv.scrapMetal ?? 0}</strong></span>
               <span>⚡ Wire: <strong className="text-orange-400 font-mono">{inv.copper_wire ?? inv.copperWire ?? 0}</strong></span>
               <span>⚙️ Gears: <strong className="text-yellow-400 font-mono">{inv.brass_gears ?? inv.gears ?? 0}</strong></span>
@@ -24812,267 +28823,346 @@ export default function App() {
             </div>
 
             {/* TAB: INSTALLED MODULES & AUTOMATED PRODUCTION LANES (ACCESSED VIA HEADER BUTTON) */}
-            {workbenchTab === 'modules' && (
-              <div className="flex-1 space-y-3 mb-3 overflow-y-auto pr-1">
-                {/* Back to Recipes Header Strip */}
-                <div className="flex items-center justify-between bg-cyan-950/60 border border-cyan-500/40 p-3 rounded-2xl">
-                  <div>
-                    <h4 className="font-bold text-sm text-cyan-200 flex items-center gap-1.5">
-                      <span>⚙️ Workbench Modular Loadout Manager</span>
-                    </h4>
-                    <p className="text-[11px] text-cyan-300/80">
-                      Capacity: <strong>{totalAttached} / {maxCapacity} Units</strong> • Attached Drain: <strong>{power.craftingPowerDrain + power.autoFabricatorPowerDrain} kW</strong>
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setWorkbenchTab('workbench');
-                      gameAudio.playCrispClick();
-                    }}
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-3 py-1.5 rounded-xl border border-slate-600 transition-all flex items-center gap-1">
-                    <span>← Back to Recipes</span>
-                  </button>
-                </div>
+            {workbenchTab === 'modules' && (() => {
+              const ALL_WB_MODULE_KEYS: WorkbenchModuleType[] = [
+                'assembly_module_t1',
+                'assembly_module_t2',
+                'assembly_module_t3',
+                'overclock_module_t1',
+                'overclock_module_t2',
+                'overclock_module_t3',
+              ];
+              const attachedWb = inv.attached_workbench_modules || [];
+              const totalUnattached = ALL_WB_MODULE_KEYS.reduce(
+                (acc, k) => acc + ((inv[`${k}_inv` as keyof SanctuaryInventory] as number) || 0),
+                0,
+              );
 
-                {/* 1. Crafting Assembly Arms Manager */}
-                <div className="bg-slate-900/90 border border-slate-800 p-3.5 rounded-2xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Wrench className="w-5 h-5 text-sky-400" />
-                      <div>
-                        <h4 className="font-bold text-xs sm:text-sm text-slate-100">
-                          Installed Crafting Assembly Arms ({installedCraftingArmsRef.current})
-                        </h4>
-                        <span className="text-[11px] text-sky-300">
-                          +{installedCraftingArmsRef.current * 25}% Speed • +{installedCraftingArmsRef.current} Manual Queue Slots • {installedCraftingArmsRef.current * 3} kW Drain
-                        </span>
-                      </div>
+              return (
+                <div className="flex-1 space-y-3 mb-3 overflow-y-auto pr-1">
+                  {/* Back to Recipes Header Strip */}
+                  <div className="flex items-center justify-between bg-cyan-950/60 border border-cyan-500/40 p-3 rounded-2xl">
+                    <div>
+                      <h4 className="font-bold text-sm text-cyan-200 flex items-center gap-1.5">
+                        <span>⚙️ Workbench Modular Loadout Manager</span>
+                      </h4>
+                      <p className="text-[11px] text-cyan-300/80">
+                        Capacity: <strong>{totalAttached} / {maxCapacity} Units</strong> • Queue: <strong>+{getAssemblyBonusQueueSlots()} Slots ({1 + getAssemblyBonusQueueSlots()} Total)</strong> • Speed: <strong className="text-emerald-300">+{((getOverclockBonusSpeed()) * 100).toFixed(0)}%</strong> • Attached Load: <strong>{power.craftingPowerDrain + power.autoFabricatorPowerDrain} kW</strong>
+                      </p>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        disabled={installedCraftingArmsRef.current <= 0}
-                        onClick={detachCraftingArm}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          installedCraftingArmsRef.current > 0
-                            ? 'bg-amber-700 hover:bg-amber-600 text-white shadow active:scale-95'
-                            : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                        }`}>
-                        Detach (-)
-                      </button>
-                      <button
-                        disabled={inv.crafting_automatons_inv <= 0 || totalAttached >= maxCapacity}
-                        onClick={attachCraftingArm}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          inv.crafting_automatons_inv > 0 && totalAttached < maxCapacity
-                            ? 'bg-sky-600 hover:bg-sky-500 text-white shadow active:scale-95'
-                            : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                        }`}>
-                        Attach (+) ({inv.crafting_automatons_inv} in Bag)
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Dedicated Auto-Fabrication Production Lanes */}
-                <div className="bg-slate-900/90 border border-cyan-500/40 p-3.5 rounded-2xl space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-xl">🏭</span>
-                      <div>
-                        <h4 className="font-bold text-xs sm:text-sm text-cyan-200">
-                          Dedicated Automated Production Lanes ({autoFabricatorLanesRef.current.length})
-                        </h4>
-                        <span className="text-[11px] text-cyan-400/80">
-                          Independent continuous synthesis loop • 10 kW Drain per attached lane
-                        </span>
-                      </div>
-                    </div>
-
                     <button
-                      disabled={inv.auto_fabricators_inv <= 0 || totalAttached >= maxCapacity}
-                      onClick={attachAutoFabricatorLane}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                        inv.auto_fabricators_inv > 0 && totalAttached < maxCapacity
-                          ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow active:scale-95'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                      }`}>
-                      + Attach Auto-Lane ({inv.auto_fabricators_inv} in Bag)
+                      onClick={() => {
+                        setWorkbenchTab('workbench');
+                        gameAudio.playCrispClick();
+                      }}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-3 py-1.5 rounded-xl border border-slate-600 transition-all flex items-center gap-1 cursor-pointer">
+                      <span>← Back to Recipes</span>
                     </button>
                   </div>
 
-                  {autoFabricatorLanesRef.current.length === 0 ? (
-                    <div className="p-3 text-center text-xs text-slate-400 bg-slate-950/60 rounded-2xl border border-slate-800">
-                      No automated production lanes attached. Craft an <strong>Auto-Fabrication Automaton</strong> and attach it to run dedicated continuous recipe loops!
+                  {/* 1. Installed Modules Grid */}
+                  <div className="bg-slate-900/90 border border-slate-800 p-3.5 rounded-2xl space-y-2.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 font-bold text-slate-200">
+                        <span>Installed Workbench Modules ({attachedWb.length})</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        {totalAttached} / {maxCapacity} Total Units (incl. Auto-Lanes)
+                      </span>
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {autoFabricatorLanesRef.current.map((lane, laneIdx) => {
-                        const targetRecipe = lane.targetRecipeId !== 'none' ? WORKBENCH_RECIPES[lane.targetRecipeId] : null;
-                        const pct = targetRecipe && lane.progressSeconds > 0 ? Math.min(100, (lane.progressSeconds / targetRecipe.durationSeconds) * 100) : 0;
+
+                    {attachedWb.length === 0 ? (
+                      <div className="p-3 text-center text-xs text-slate-400 bg-slate-950/60 rounded-xl border border-slate-800">
+                        No assembly or overclock modules currently installed. Craft modules in the Workbench tab or attach from inventory below!
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {attachedWb.map((modKey, slotIdx) => {
+                          const cfg = WORKBENCH_MODULE_CONFIGS[modKey];
+                          const isAssembly = cfg.category === 'assembly';
+
+                          return (
+                            <div
+                              key={`${modKey}_${slotIdx}`}
+                              className="bg-slate-950 border border-slate-700/80 p-2.5 rounded-xl flex items-center justify-between gap-2 shadow">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-xl shrink-0">{cfg.icon}</span>
+                                <div className="min-w-0">
+                                  <div className="text-xs font-bold text-slate-100 truncate">{cfg.name}</div>
+                                  <div className={`text-[10px] font-bold ${isAssembly ? 'text-sky-300' : 'text-amber-300'}`}>
+                                    {cfg.bonusLabel}
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => detachWorkbenchModule(slotIdx)}
+                                className="bg-slate-800 hover:bg-red-950 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-500 text-[10px] font-bold px-2 py-1 rounded-lg transition-all shrink-0 cursor-pointer">
+                                Detach
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. Uninstalled Modules in Inventory */}
+                  <div className="bg-slate-900/90 border border-slate-800 p-3.5 rounded-2xl space-y-2.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 font-bold text-emerald-300">
+                        <Package className="w-4 h-4" />
+                        <span>Uninstalled Modules in Inventory ({totalUnattached})</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400">
+                        Craft more in Workbench tab
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {ALL_WB_MODULE_KEYS.map((mKey) => {
+                        const cfg = WORKBENCH_MODULE_CONFIGS[mKey];
+                        const inStock = (inv[`${mKey}_inv` as keyof SanctuaryInventory] as number) || 0;
+                        const isFull = totalAttached >= maxCapacity;
+                        const canAttach = inStock > 0 && !isFull;
+                        const isAssembly = cfg.category === 'assembly';
 
                         return (
                           <div
-                            key={lane.id}
-                            className="bg-slate-950/90 border border-cyan-500/30 p-3 rounded-2xl space-y-2">
-                            <div className="flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-2 font-bold text-cyan-200">
-                                <span className="bg-cyan-950 border border-cyan-500/50 px-2 py-0.5 rounded-lg text-xs">
-                                  Lane {laneIdx + 1}
+                            key={mKey}
+                            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2.5 transition-all ${
+                              inStock > 0
+                                ? 'bg-slate-950/90 border-slate-700 shadow-sm'
+                                : 'bg-slate-950/40 border-slate-850 opacity-60'
+                            }`}>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xl shrink-0">{cfg.icon}</span>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <h5 className="font-bold text-xs text-slate-100 truncate">{cfg.name}</h5>
+                                  <span className={`text-[9px] font-bold px-1 py-0.2 rounded border ${
+                                    isAssembly
+                                      ? 'bg-sky-950/80 text-sky-300 border-sky-500/50'
+                                      : 'bg-amber-950/80 text-amber-300 border-amber-500/50'
+                                  }`}>
+                                    {cfg.bonusLabel}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 block truncate">
+                                  Stock: <strong className={inStock > 0 ? 'text-sky-300 font-mono' : 'text-slate-500 font-mono'}>{inStock}</strong>
                                 </span>
-                                <span className="text-xs sm:text-sm">
-                                  {targetRecipe ? `${targetRecipe.icon} ${targetRecipe.name}` : '🛑 Halted / No Recipe Assigned'}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <span className={`text-xs font-bold ${power.isPowerSufficient ? (lane.progressSeconds > 0 ? 'text-cyan-300' : 'text-slate-400') : 'text-rose-400'}`}>
-                                  {power.isPowerSufficient ? (lane.progressSeconds > 0 ? `⏱️ Active (${lane.progressSeconds.toFixed(1)}s)` : 'Waiting Ingredients') : '⚡ Low Power'}
-                                </span>
-                                <button
-                                  onClick={() => detachAutoFabricatorLane(lane.id)}
-                                  className="bg-red-900/80 hover:bg-red-800 text-red-200 px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all">
-                                  Detach (-)
-                                </button>
                               </div>
                             </div>
 
-                            {/* Live Lane Progress Bar */}
-                            {targetRecipe && (
-                              <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-cyan-900/80">
-                                <div
-                                  style={{width: `${pct}%`}}
-                                  className={`h-full transition-all ${power.isPowerSufficient ? 'bg-cyan-400' : 'bg-amber-400'}`}
-                                />
-                              </div>
-                            )}
-
-                            {/* Recipe Assignment Selector Buttons */}
-                            <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-800/80">
-                              <span className="text-[10px] text-slate-400 font-bold uppercase">Assign Recipe:</span>
-                              <button
-                                onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'none')}
-                                className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                                  lane.targetRecipeId === 'none'
-                                    ? 'bg-slate-700 text-white border border-slate-500'
-                                    : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                                }`}>
-                                🛑 Halt
-                              </button>
-                              <button
-                                onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'craft_copper_wire')}
-                                className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                                  lane.targetRecipeId === 'craft_copper_wire'
-                                    ? 'bg-orange-600 text-white border border-orange-400'
-                                    : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                                }`}>
-                                ⚡ Wire
-                              </button>
-                              <button
-                                onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'craft_gears')}
-                                className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                                  lane.targetRecipeId === 'craft_gears'
-                                    ? 'bg-yellow-600 text-white border border-yellow-400'
-                                    : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                                }`}>
-                                ⚙️ Gears
-                              </button>
-                              <button
-                                onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'craft_microcircuits')}
-                                className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                                  lane.targetRecipeId === 'craft_microcircuits'
-                                    ? 'bg-emerald-600 text-white border border-emerald-400'
-                                    : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                                }`}>
-                                🟩 Circuits
-                              </button>
-                              <button
-                                onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'craft_quantum_chips')}
-                                className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                                  lane.targetRecipeId === 'craft_quantum_chips'
-                                    ? 'bg-purple-600 text-white border border-purple-400'
-                                    : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                                }`}>
-                                💎 Chips
-                              </button>
-                              {inv.has_compost_guide && (
-                                <button
-                                  onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'craft_enriched_compost')}
-                                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                                    lane.targetRecipeId === 'craft_enriched_compost'
-                                      ? 'bg-lime-600 text-white border border-lime-400'
-                                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                                  }`}>
-                                  🌾 Compost
-                                </button>
-                              )}
-                              <button
-                                onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'craft_biochemicals')}
-                                className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                                  lane.targetRecipeId === 'craft_biochemicals'
-                                    ? 'bg-cyan-600 text-white border border-cyan-400'
-                                    : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                                }`}>
-                                🧪 Bio
-                              </button>
-                              <button
-                                onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'solar_panel')}
-                                className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                                  lane.targetRecipeId === 'solar_panel'
-                                    ? 'bg-sky-600 text-white border border-sky-400'
-                                    : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                                }`}>
-                                ☀️ Solar
-                              </button>
-                              <button
-                                onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'wind_turbine')}
-                                className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                                  lane.targetRecipeId === 'wind_turbine'
-                                    ? 'bg-amber-600 text-white border border-amber-400'
-                                    : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                                }`}>
-                                💨 Turbine
-                              </button>
-                              <button
-                                onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'crafting_automaton')}
-                                className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                                  lane.targetRecipeId === 'crafting_automaton'
-                                    ? 'bg-cyan-600 text-white border border-cyan-400'
-                                    : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                                }`}>
-                                🤖 Arm
-                              </button>
-                              {inv.has_tier1_guide && (
-                                <button
-                                  onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'tier1_automaton')}
-                                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                                    lane.targetRecipeId === 'tier1_automaton'
-                                      ? 'bg-sky-600 text-white border border-sky-400'
-                                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                                  }`}>
-                                  💧 T1 Mist
-                                </button>
-                              )}
-                              {inv.has_tier2_guide && (
-                                <button
-                                  onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'tier2_automaton')}
-                                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                                    lane.targetRecipeId === 'tier2_automaton'
-                                      ? 'bg-purple-600 text-white border border-purple-400'
-                                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                                  }`}>
-                                  ⚡ T2 Pulsar
-                                </button>
-                              )}
-                            </div>
+                            <button
+                              disabled={!canAttach}
+                              onClick={() => attachWorkbenchModule(mKey)}
+                              className={`px-3 py-1 rounded-xl text-xs font-bold shrink-0 transition-all shadow cursor-pointer ${
+                                canAttach
+                                  ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
+                                  : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                              }`}>
+                              {inStock <= 0 ? 'No Stock' : isFull ? 'Full' : 'Attach (+)'}
+                            </button>
                           </div>
                         );
                       })}
                     </div>
-                  )}
+                  </div>
+
+                  {/* 3. Dedicated Auto-Fabrication Production Lanes */}
+                  <div className="bg-slate-900/90 border border-cyan-500/40 p-3.5 rounded-2xl space-y-2.5">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xl">🏭</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-cyan-200">
+                            Dedicated Automated Production Lanes ({autoFabricatorLanesRef.current.length})
+                          </h4>
+                          <span className="text-[11px] text-cyan-400/80">
+                            Independent synthesis loop • T1: 50% (6 kW), T2: 100% (10 kW), T3: 150% (14 kW)
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          disabled={(inv.auto_fabrication_t1_inv || 0) <= 0 || totalAttached >= maxCapacity}
+                          onClick={() => attachAutoFabricatorLane(1)}
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            (inv.auto_fabrication_t1_inv || 0) > 0 && totalAttached < maxCapacity
+                              ? 'bg-cyan-700 hover:bg-cyan-600 text-white shadow active:scale-95'
+                              : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                          }`}>
+                          + T1 (50%) [Stock: {inv.auto_fabrication_t1_inv || 0}]
+                        </button>
+                        <button
+                          disabled={((inv.auto_fabrication_t2_inv || 0) + (inv.auto_fabricators_inv || 0)) <= 0 || totalAttached >= maxCapacity}
+                          onClick={() => attachAutoFabricatorLane(2)}
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            ((inv.auto_fabrication_t2_inv || 0) + (inv.auto_fabricators_inv || 0)) > 0 && totalAttached < maxCapacity
+                              ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow active:scale-95'
+                              : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                          }`}>
+                          + T2 (100%) [Stock: {(inv.auto_fabrication_t2_inv || 0) + (inv.auto_fabricators_inv || 0)}]
+                        </button>
+                        <button
+                          disabled={(inv.auto_fabrication_t3_inv || 0) <= 0 || totalAttached >= maxCapacity}
+                          onClick={() => attachAutoFabricatorLane(3)}
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            (inv.auto_fabrication_t3_inv || 0) > 0 && totalAttached < maxCapacity
+                              ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow active:scale-95'
+                              : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                          }`}>
+                          + T3 (150%) [Stock: {inv.auto_fabrication_t3_inv || 0}]
+                        </button>
+                      </div>
+                    </div>
+
+                    {autoFabricatorLanesRef.current.length === 0 ? (
+                      <div className="p-3 text-center text-xs text-slate-400 bg-slate-950/60 rounded-2xl border border-slate-800">
+                        No automated production lanes attached. Craft an <strong>Auto-Fabrication Module (T1, T2, or T3)</strong> and attach it to run dedicated continuous recipe loops!
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {autoFabricatorLanesRef.current.map((lane, laneIdx) => {
+                          const targetRecipe = lane.targetRecipeId !== 'none' ? WORKBENCH_RECIPES[lane.targetRecipeId] : null;
+                          const pct = targetRecipe && lane.progressSeconds > 0 ? Math.min(100, (lane.progressSeconds / targetRecipe.durationSeconds) * 100) : 0;
+                          const laneTier = lane.tier || 1;
+                          const speedText = laneTier === 1 ? '50% Speed (0.5x)' : laneTier === 3 ? '150% Speed (1.5x)' : '100% Speed (1.0x)';
+                          const kwText = laneTier === 1 ? '6 kW' : laneTier === 3 ? '14 kW' : '10 kW';
+
+                          return (
+                            <div
+                              key={lane.id}
+                              className="bg-slate-950/90 border border-cyan-500/30 p-3 rounded-2xl space-y-2">
+                              <div className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-2 font-bold text-cyan-200">
+                                  <span className="bg-cyan-950 border border-cyan-500/50 px-2 py-0.5 rounded-lg text-xs">
+                                    Lane {laneIdx + 1} • T{laneTier} ({speedText}, {kwText})
+                                  </span>
+                                  <span className="text-xs sm:text-sm">
+                                    {targetRecipe ? `${targetRecipe.icon} ${targetRecipe.name}` : '🛑 Halted / No Recipe Assigned'}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <span className={`text-xs font-bold ${power.isPowerSufficient ? (lane.progressSeconds > 0 ? 'text-cyan-300' : 'text-slate-400') : 'text-rose-400'}`}>
+                                    {power.isPowerSufficient ? (lane.progressSeconds > 0 ? `⏱️ Active (${lane.progressSeconds.toFixed(1)}s)` : 'Waiting Ingredients') : '⚡ Low Power'}
+                                  </span>
+                                  <button
+                                    onClick={() => detachAutoFabricatorLane(lane.id)}
+                                    className="bg-red-900/80 hover:bg-red-800 text-red-200 px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer">
+                                    Detach T{laneTier} (-)
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Live Lane Progress Bar */}
+                              {targetRecipe && (
+                                <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-cyan-900/80">
+                                  <div
+                                    style={{width: `${pct}%`}}
+                                    className={`h-full transition-all ${power.isPowerSufficient ? 'bg-cyan-400' : 'bg-amber-400'}`}
+                                  />
+                                </div>
+                              )}
+
+                              {/* Recipe Assignment Selector Buttons */}
+                              <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-800/80">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase">Assign Recipe:</span>
+                                <button
+                                  onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'none')}
+                                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    lane.targetRecipeId === 'none'
+                                      ? 'bg-slate-700 text-white border border-slate-500'
+                                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
+                                  }`}>
+                                  🛑 Halt
+                                </button>
+                                <button
+                                  onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'craft_copper_wire')}
+                                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    lane.targetRecipeId === 'craft_copper_wire'
+                                      ? 'bg-orange-600 text-white border border-orange-400'
+                                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
+                                  }`}>
+                                  ⚡ Wire
+                                </button>
+                                <button
+                                  onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'craft_gears')}
+                                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    lane.targetRecipeId === 'craft_gears'
+                                      ? 'bg-yellow-600 text-white border border-yellow-400'
+                                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
+                                  }`}>
+                                  ⚙️ Gears
+                                </button>
+                                <button
+                                  onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'craft_microcircuits')}
+                                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    lane.targetRecipeId === 'craft_microcircuits'
+                                      ? 'bg-emerald-600 text-white border border-emerald-400'
+                                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
+                                  }`}>
+                                  🟩 Circuits
+                                </button>
+                                <button
+                                  onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'craft_quantum_chips')}
+                                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    lane.targetRecipeId === 'craft_quantum_chips'
+                                      ? 'bg-purple-600 text-white border border-purple-400'
+                                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
+                                  }`}>
+                                  💎 Chips
+                                </button>
+                                {inv.has_compost_guide && (
+                                  <button
+                                    onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'craft_enriched_compost')}
+                                    className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                      lane.targetRecipeId === 'craft_enriched_compost'
+                                        ? 'bg-lime-600 text-white border border-lime-400'
+                                        : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
+                                    }`}>
+                                    🌾 Compost
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'craft_biochemicals')}
+                                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    lane.targetRecipeId === 'craft_biochemicals'
+                                      ? 'bg-cyan-600 text-white border border-cyan-400'
+                                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
+                                  }`}>
+                                  🧪 Bio
+                                </button>
+                                <button
+                                  onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'solar_panel')}
+                                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    lane.targetRecipeId === 'solar_panel'
+                                      ? 'bg-sky-600 text-white border border-sky-400'
+                                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
+                                  }`}>
+                                  ☀️ Solar
+                                </button>
+                                <button
+                                  onClick={() => setAutoFabricatorLaneRecipe(lane.id, 'wind_turbine')}
+                                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    lane.targetRecipeId === 'wind_turbine'
+                                      ? 'bg-amber-600 text-white border border-amber-400'
+                                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
+                                  }`}>
+                                  💨 Turbine
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* RECIPES LIST FILTERED BY ACTIVE SUBMENU TAB (WHEN NOT ON MODULES TAB) */}
             {workbenchTab !== 'modules' && (() => {
@@ -25083,12 +29173,21 @@ export default function App() {
                 const isGuideLocked = recipe.requiresGuide ? !inv[recipe.requiresGuide] : false;
                 const isFocused = cardIdx !== undefined && focusedWbIdx === cardIdx;
 
-                const hasScrap = !costs.scrap_metal || (inv.scrap_metal ?? 0) >= costs.scrap_metal;
-                const hasWire = !costs.copper_wire || (inv.copper_wire ?? 0) >= costs.copper_wire;
-                const hasGears = !costs.brass_gears || (inv.brass_gears ?? 0) >= costs.brass_gears;
-                const hasCircuits = !costs.circuit_boards || (inv.circuit_boards ?? 0) >= costs.circuit_boards;
-                const hasChips = !costs.electronic_chips || (inv.electronic_chips ?? 0) >= costs.electronic_chips;
-                const hasWaste = !costs.organic_waste || (inv.organic_waste ?? 0) >= costs.organic_waste;
+                const curScrap = inv.scrap_metal ?? inv.scrapMetal ?? inv.resources?.scrap_metal ?? inv.resources?.scrapMetal ?? 0;
+                const curWire = inv.copper_wire ?? inv.copperWire ?? inv.resources?.copper_wire ?? inv.resources?.copperWire ?? 0;
+                const curGears = inv.brass_gears ?? inv.gears ?? inv.resources?.brass_gears ?? inv.resources?.gears ?? 0;
+                const curCircuits = inv.circuit_boards ?? inv.microcircuits ?? inv.resources?.circuit_boards ?? inv.resources?.microcircuits ?? 0;
+                const curChips = inv.electronic_chips ?? inv.chips ?? inv.quantumChips ?? inv.resources?.electronic_chips ?? inv.resources?.chips ?? 0;
+                const curWaste = inv.organic_waste ?? inv.organicWaste ?? inv.resources?.organic_waste ?? inv.resources?.organicWaste ?? 0;
+                const curBio = inv.biochemicals ?? inv.resources?.biochemicals ?? 0;
+
+                const hasScrap = !costs.scrap_metal || curScrap >= costs.scrap_metal;
+                const hasWire = !costs.copper_wire || curWire >= costs.copper_wire;
+                const hasGears = !costs.brass_gears || curGears >= costs.brass_gears;
+                const hasCircuits = !costs.circuit_boards || curCircuits >= costs.circuit_boards;
+                const hasChips = !costs.electronic_chips || curChips >= costs.electronic_chips;
+                const hasWaste = !costs.organic_waste || curWaste >= costs.organic_waste;
+                const hasBio = !costs.biochemicals || curBio >= costs.biochemicals;
 
                 const isT2AlreadyActive = recipeId === 'workbench_t2_upgrade' && (inv.workbench_tier || 1) >= 2;
                 const isT3AlreadyActive = recipeId === 'workbench_t3_upgrade' && (inv.workbench_tier || 1) >= 3;
@@ -25108,6 +29207,7 @@ export default function App() {
                   hasCircuits &&
                   hasChips &&
                   hasWaste &&
+                  hasBio &&
                   !isGuideLocked &&
                   !isAlreadyInstalled &&
                   !isPrereqMissing &&
@@ -25116,12 +29216,16 @@ export default function App() {
                 const queueFull = getTotalQueuedCount() >= getMaxCraftingQueueCapacity();
 
                 const costStrings: string[] = [];
+                if (costs.license_t1) costStrings.push(`${costs.license_t1}x T1 License`);
+                if (costs.license_t2) costStrings.push(`${costs.license_t2}x T2 License`);
+                if (costs.license_t3) costStrings.push(`${costs.license_t3}x T3 License`);
                 if (costs.organic_waste) costStrings.push(`${costs.organic_waste} Organic Waste`);
                 if (costs.scrap_metal) costStrings.push(`${costs.scrap_metal} Scrap Metal`);
                 if (costs.copper_wire) costStrings.push(`${costs.copper_wire} Copper Wire`);
-                if (costs.brass_gears) costStrings.push(`${costs.brass_gears} Mechanical Gears`);
-                if (costs.circuit_boards) costStrings.push(`${costs.circuit_boards} Microcircuits`);
-                if (costs.electronic_chips) costStrings.push(`${costs.electronic_chips} Quantum Chips`);
+                if (costs.brass_gears) costStrings.push(`${costs.brass_gears} Gears`);
+                if (costs.circuit_boards) costStrings.push(`${costs.circuit_boards} Circuit Boards`);
+                if (costs.electronic_chips) costStrings.push(`${costs.electronic_chips} Microchips`);
+                if (costs.biochemicals) costStrings.push(`${costs.biochemicals} Biochemicals`);
 
                 // Resource category specific telemetry
                 const isResourceRecipe = recipe.category === 'resources' || recipe.category === 'compost';
@@ -25230,7 +29334,7 @@ export default function App() {
                             </div>
                             {!isGuideLocked && !isAlreadyInstalled && !isPrereqMissing && (
                               <span className="text-[10px] text-sky-400 font-mono">
-                                ⏱️ {recipe.durationSeconds}s Craft Duration
+                                ⏱️ {formatCraftDuration(recipe.durationSeconds)} Craft Duration{recipe.kw ? ` • ⚡ ${recipe.kw} kW` : ''}
                               </span>
                             )}
                           </div>
@@ -25261,13 +29365,13 @@ export default function App() {
                         <div className="space-y-1.5">
                           <div className="text-xs font-semibold text-amber-400 bg-amber-950/40 px-2.5 py-1.5 rounded-xl border border-amber-500/30 flex items-center gap-1.5">
                             <Lock className="w-3.5 h-3.5 shrink-0" />
-                            <span>Requires <strong>{recipe.guideName || 'Guidebook'}</strong> from Botanical Market</span>
+                            <span>Requires: <strong>{recipe.guideName || 'Guidebook'}</strong> (Available at Market)</span>
                           </div>
                           <button
                             disabled
                             className="w-full py-2 rounded-xl font-bold text-xs bg-slate-800 text-slate-500 cursor-not-allowed flex items-center justify-center gap-1.5 border border-slate-700/60">
                             <Lock className="w-3.5 h-3.5" />
-                            <span>Queue Craft (Requires {recipe.guideName || 'Guidebook'})</span>
+                            <span>Requires: {recipe.guideName || 'Guidebook'} (Available at Market)</span>
                           </button>
                         </div>
                       ) : isPrereqMissing ? (
@@ -25292,7 +29396,7 @@ export default function App() {
                             ? '✓ Installed'
                             : queueFull
                             ? 'Queue Full'
-                            : `Queue Craft (${recipe.durationSeconds}s)`}
+                            : `Queue Craft (${formatCraftDuration(recipe.durationSeconds)})`}
                         </button>
                       )}
                     </div>
@@ -25348,91 +29452,98 @@ export default function App() {
                                     ✓
                                   </div>
                                   <div>
-                                    <h4 className="font-bold text-xs sm:text-sm text-slate-100">Precision Workbench (Tier 2)</h4>
-                                    <span className="text-[10px] text-sky-400 font-bold">Active: 5 Units Capacity</span>
-                                  </div>
+                                  <h4 className="font-bold text-xs sm:text-sm text-slate-100">T2 Precision Workbench</h4>
+                                  <span className="text-[10px] text-sky-400 font-bold">Active: 5 Units Capacity</span>
                                 </div>
-                                <div className="text-[11px] text-slate-400">Reinforced chassis frame with precision brass rails.</div>
                               </div>
-                              {renderRecipeCard('workbench_t3_upgrade', 1)}
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Sub-header 2: Workbench Modules */}
-                      <div className="pt-2 border-t border-slate-800">
-                        <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5">
-                            <Package className="w-3.5 h-3.5" />
-                            <span>Workbench Modules (Craft & Install in Manage Modules)</span>
-                          </span>
-                          <span className="text-[11px] text-slate-400 font-normal">
-                            Installed: {totalAttached} / {maxCapacity} Units
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                          {renderRecipeCard('crafting_automaton', 2)}
-                          {renderRecipeCard('auto_fabricator', 3)}
-                        </div>
+                              <div className="text-[11px] text-slate-400">Reinforced chassis frame with precision brass rails.</div>
+                            </div>
+                            {renderRecipeCard('workbench_t3_upgrade', 1)}
+                          </>
+                        )}
                       </div>
                     </div>
-                  ) : workbenchTab === 'rover' ? (
-                    <div className="space-y-3">
-                      {/* Chassis Tier Section */}
-                      <div>
-                        <div className="text-xs font-bold text-sky-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5">
-                            <Truck className="w-3.5 h-3.5" />
-                            <span>Rover Chassis Upgrades (Current: Tier {inv.rover_chassis_tier || 1} - {getRoverChassisName(inv.rover_chassis_tier || 1)})</span>
-                          </span>
-                          <span className="text-[11px] text-slate-400 font-normal">
-                            Slots: {getRoverChassisMaxSlots(inv.rover_chassis_tier || 1)} Modules Max
-                          </span>
-                        </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                          {(inv.rover_chassis_tier || 1) >= 3 ? (
-                            <div className="p-3.5 rounded-2xl border bg-amber-950/40 border-amber-500/50 flex flex-col justify-between gap-2.5 shadow col-span-1 sm:col-span-2">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-amber-950 border border-amber-400 flex items-center justify-center text-xl text-amber-300">
-                                  👑
-                                </div>
-                                <div>
-                                  <h4 className="font-bold text-sm text-slate-100">Vanguard Heavy Chassis (Tier 3 Max)</h4>
-                                  <span className="text-xs text-amber-400 font-bold">10 Module Slots Active • Maximum Chassis Frame</span>
-                                </div>
+                    {/* Sub-header 2: Workbench Modules */}
+                    <div className="pt-2 border-t border-slate-800">
+                      <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Package className="w-3.5 h-3.5" />
+                          <span>Assembly Bench &amp; Overclock Modules</span>
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-normal">
+                          Installed: {totalAttached} / {maxCapacity} Units (Manage in Modules tab)
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {renderRecipeCard('assembly_module_t1', 2)}
+                        {renderRecipeCard('assembly_module_t2', 3)}
+                        {renderRecipeCard('assembly_module_t3', 4)}
+                        {renderRecipeCard('overclock_module_t1', 5)}
+                        {renderRecipeCard('overclock_module_t2', 6)}
+                        {renderRecipeCard('overclock_module_t3', 7)}
+                        {renderRecipeCard('auto_fabrication_t1', 8)}
+                        {renderRecipeCard('auto_fabrication_t2', 9)}
+                        {renderRecipeCard('auto_fabrication_t3', 10)}
+                      </div>
+                    </div>
+                  </div>
+                ) : workbenchTab === 'rover' ? (
+                  <div className="space-y-3">
+                    {/* Chassis Tier Section */}
+                    <div>
+                      <div className="text-xs font-bold text-sky-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Truck className="w-3.5 h-3.5" />
+                          <span>Rover Chassis Upgrades (Current: Tier {inv.rover_chassis_tier || 1} - {getRoverChassisName(inv.rover_chassis_tier || 1)})</span>
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-normal">
+                          Slots: {getRoverChassisMaxSlots(inv.rover_chassis_tier || 1)} Modules Max
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {(inv.rover_chassis_tier || 1) >= 3 ? (
+                          <div className="p-3.5 rounded-2xl border bg-amber-950/40 border-amber-500/50 flex flex-col justify-between gap-2.5 shadow col-span-1 sm:col-span-2">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-amber-950 border border-amber-400 flex items-center justify-center text-xl text-amber-300">
+                                👑
                               </div>
-                              <p className="text-xs text-slate-400 leading-relaxed">
-                                Heavy titanium vanguard frame installed. Maximum Rover module outfitting capacity unlocked (10 slots).
-                              </p>
-                              <div className="w-full py-2 bg-amber-950/80 border border-amber-500/50 rounded-xl text-center text-xs font-black text-amber-300">
-                                ★ Maximum Chassis Tier Achieved ★
+                              <div>
+                                <h4 className="font-bold text-sm text-slate-100">T3 Vanguard Heavy Chassis (Tier 3 Max)</h4>
+                                <span className="text-xs text-amber-400 font-bold">10 Module Slots Active • Maximum Chassis Frame</span>
                               </div>
                             </div>
-                          ) : (inv.rover_chassis_tier || 1) === 1 ? (
-                            <>
-                              {renderRecipeCard('rover_chassis_t2', 0)}
-                              {renderRecipeCard('rover_chassis_t3', 1)}
-                            </>
-                          ) : (
-                            <>
-                              <div className="p-3.5 rounded-2xl border bg-sky-950/40 border-sky-500/50 flex flex-col justify-between gap-2 shadow">
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-xl bg-sky-950 border border-sky-400 flex items-center justify-center text-lg text-sky-300">
-                                    ✓
-                                  </div>
-                                  <div>
-                                    <h4 className="font-bold text-xs sm:text-sm text-slate-100">Surveyor Chassis (Tier 2)</h4>
-                                    <span className="text-[10px] text-sky-400 font-bold">Active: 5 Module Slots</span>
-                                  </div>
+                            <p className="text-xs text-slate-400 leading-relaxed">
+                              Heavy titanium vanguard frame installed. Maximum Rover module outfitting capacity unlocked (10 slots).
+                            </p>
+                            <div className="w-full py-2 bg-amber-950/80 border border-amber-500/50 rounded-xl text-center text-xs font-black text-amber-300">
+                              ★ Maximum Chassis Tier Achieved ★
+                            </div>
+                          </div>
+                        ) : (inv.rover_chassis_tier || 1) === 1 ? (
+                          <>
+                            {renderRecipeCard('rover_chassis_t2', 0)}
+                            {renderRecipeCard('rover_chassis_t3', 1)}
+                          </>
+                        ) : (
+                          <>
+                            <div className="p-3.5 rounded-2xl border bg-sky-950/40 border-sky-500/50 flex flex-col justify-between gap-2 shadow">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-xl bg-sky-950 border border-sky-400 flex items-center justify-center text-lg text-sky-300">
+                                  ✓
                                 </div>
-                                <div className="text-[11px] text-slate-400">Current active chassis frame with 5 module bays.</div>
+                                <div>
+                                  <h4 className="font-bold text-xs sm:text-sm text-slate-100">T2 Surveyor Chassis</h4>
+                                  <span className="text-[10px] text-sky-400 font-bold">Active: 5 Module Slots</span>
+                                </div>
                               </div>
-                              {renderRecipeCard('rover_chassis_t3', 1)}
-                            </>
-                          )}
+                              <div className="text-[11px] text-slate-400">Current active chassis frame with 5 module bays.</div>
+                            </div>
+                            {renderRecipeCard('rover_chassis_t3', 1)}
+                          </>
+                        )}
                         </div>
                       </div>
 
@@ -25473,7 +29584,11 @@ export default function App() {
                           'tier2_automaton',
                           'tier3_automaton',
                           'solar_panel',
+                          'solar_farm_2x2',
+                          'solar_farm_3x3',
                           'wind_turbine',
+                          'wind_farm_2x2',
+                          'wind_farm_3x3',
                         ] as CraftingRecipeId[]
                       )
                         .filter((recipeId) => {
@@ -25940,8 +30055,9 @@ export default function App() {
                       <span>Modular Workbench Loadout</span>
                     </h4>
                     <ul className="list-disc list-inside space-y-1 text-slate-400 pl-1 text-xs">
-                      <li><strong>Crafting Assembly Automatons:</strong> Modular arm units that attach to the Workbench. Each unit grants <strong>+1 manual queue slot</strong> and <strong>+25% craft speed</strong> (3 kW load).</li>
-                      <li><strong>Auto-Fabrication Automatons:</strong> Dedicated continuous automated synthesis lanes (10 kW). Runs independent production loops continuously without occupying manual queue slots!</li>
+                      <li><strong>Assembly Bench Modules (T1-T3):</strong> Precision fixtures that expand the Workbench's 1 baseline queue slot by +1 (T1), +2 (T2), or +3 (T3) slots (up to 7 slots total).</li>
+                      <li><strong>Overclock Modules (T1-T3):</strong> Conduits that accelerate craft speed by +5% (T1), +10% (T2), or +20% (T3).</li>
+                      <li><strong>Auto-Fabrication Modules (T1-T3):</strong> Dedicated continuous automated synthesis lanes (T1: 50% speed, T2: 100% speed, T3: 150% speed). Runs independent production loops continuously without occupying manual queue slots!</li>
                       <li><strong>Workbench Tier Upgrades:</strong> Upgrade from Artisan (T1, 3 units) to Precision (T2, 5 units) and Master Foundry (T3, 10 units).</li>
                     </ul>
                   </div>

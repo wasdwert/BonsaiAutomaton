@@ -51,9 +51,14 @@
   ],
   "sections": [
     {
+      "title": "Core Mechanics",
+      "content": "1. Additive Disrupted Zen Environmental Penalty: Soil degradation compounds additively onto botanical specimens: a tree planted on degraded soil incurs a baseline -10% Growth Speed penalty, with an additional -10% Growth Speed accumulated for each degraded soil tile within its 3x3 halo that is not physically sealed off by a Bamboo Fence (e.g. planted on degraded soil with 2 degraded halo neighbors yields a cumulative -30% Growth Speed penalty). Telemetry consolidates into a single status badge: '\u26a0\ufe0f Disrupted Zen (-X% Growth Speed)'. 2. Calibrated Fabrication Matrix: Standardized recipe durations, energy consumption metrics, and resource costs across all 30 electrical and industrial workbench recipes, aligning fabrication timelines and power draw with engineering tiers.",
+      "summary": "Additive Disrupted Zen Degradation Dynamics and Calibrated Electrical Crafting."
+    },
+    {
       "title": "Economy and Progression",
-      "content": "1. Consolidated Empty Pedestal Catalog Entry: Removed all individual pre-socketed crystal pedestal entries from the Botanical Market Decor tab and consolidated them into a singular 'Empty Pedestal' for 50 Verdure (Description: 'Can Host Crystal Artifacts'). 2. Dynamic Overworld Socketing: Deployed Empty Pedestals appear as carved standalone stone plinths. Approaching the installation and pressing E / Button A opens an interactive socketing modal allowing players to mount or swap discovered expedition crystals (Foliage Emerald, Branch Amber, Trunk Coral, Root Azure), immediately transforming the vector graphic to display the mounted glowing gem and radiating its cultivation halo to adjacent plots.",
-      "summary": "Consolidated Empty Pedestal Architecture and Crystal Socketing Economy."
+      "content": "1. Industrial Engineering Licenses: Introduced three state-certified fabrication licenses available under the Botanical Market Equipment catalog: T1 License (25 Verdure), T2 License (75 Verdure), and T3 License (200 Verdure). These licenses serve as essential consumable certification components required alongside raw mechanical resources to fabricate advanced automated machinery, sprinkler systems, workbench modules, and rover expedition modules. 2. Standardized Tier Nomenclature: All chassis modifications, workbench overhauls, and rover attachments follow unified T1/T2/T3 nomenclature (T2 Precision Workbench Upgrade, T3 Master Foundry Upgrade, T2 Surveyor Chassis Upgrade, T3 Vanguard Heavy Chassis Upgrade, T1-T3 Storage, Battery, and Radar Modules).",
+      "summary": "Engineering License Authorization Economy and Standardized Module Nomenclature."
     }
   ]
 }
