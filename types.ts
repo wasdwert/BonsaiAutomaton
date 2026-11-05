@@ -4,6 +4,13 @@ import type {
   MaturityTier,
 } from './bonsaiData';
 
+export {
+  calculateBonsaiDonationValue,
+  calculateDonationValue,
+  calculateAttributeFactor,
+  getBonsaiDonationBreakdown,
+} from './bonsaiData';
+
 export type RoverChassisTier = 1 | 2 | 3;
 
 export type DeployedInfrastructureType =
@@ -13,9 +20,17 @@ export type DeployedInfrastructureType =
   | 'wind_turbine'
   | 'wind_farm_2x2'
   | 'wind_farm_3x3'
+  | 'auto_unloader'
+  | 't1_compost_feeder'
+  | 't2_compost_feeder'
+  | 't3_compost_feeder'
+  | 't1_fertilizer_dripper'
+  | 't2_fertilizer_dripper'
+  | 't3_fertilizer_dripper'
   | 'tool_compost_heap'
   | 'tool_garden_well'
   | 'fertilizer_station'
+  | 'chemical_station'
   | 'automaton_t1'
   | 'automaton_t2'
   | 'automaton_t3'
@@ -35,6 +50,99 @@ export type DeployedInfrastructureType =
   | 'stone_lantern'
   | 'torii_gate';
 
+export interface FeederSettings {
+  allowedTiers: {
+    S: boolean;
+    M: boolean;
+    L: boolean;
+  };
+}
+
+export const DEFAULT_FEEDER_SETTINGS: FeederSettings = {
+  allowedTiers: {
+    S: false,
+    M: false,
+    L: false,
+  },
+};
+
+export interface GlobalCareDispenserLimits {
+  compost_s: number;
+  compost_m: number;
+  compost_l: number;
+  fertilizer_s: number;
+  fertilizer_m: number;
+  fertilizer_l: number;
+  [key: string]: number;
+}
+
+export const DEFAULT_CARE_DISPENSER_LIMITS: GlobalCareDispenserLimits = {
+  compost_s: 0,
+  compost_m: 0,
+  compost_l: 0,
+  fertilizer_s: 0,
+  fertilizer_m: 0,
+  fertilizer_l: 0,
+};
+
+export type LoaderFacing = 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
+
+export interface AutoUnloaderSettings {
+  minimumToKeep: {
+    organic_waste: number;
+    biochemicals: number;
+    condensed_organic_material: number;
+    compost_s: number;
+    compost_m: number;
+    fertilizer_s: number;
+    fertilizer_m: number;
+    [key: string]: number;
+  };
+  targetAmount: {
+    compost_s: number;
+    compost_m: number;
+    compost_l: number;
+    condensed_organic_material: number;
+    fertilizer_s: number;
+    fertilizer_m: number;
+    fertilizer_l: number;
+    speed_grow_xs: number;
+    speed_grow_s: number;
+    speed_grow_m: number;
+    speed_grow_l: number;
+    speed_grow_xl: number;
+    biochemicals: number;
+    [key: string]: number;
+  };
+}
+
+export const DEFAULT_AUTO_UNLOADER_SETTINGS: AutoUnloaderSettings = {
+  minimumToKeep: {
+    organic_waste: 0,
+    biochemicals: 0,
+    condensed_organic_material: 0,
+    compost_s: 0,
+    compost_m: 0,
+    fertilizer_s: 0,
+    fertilizer_m: 0,
+  },
+  targetAmount: {
+    compost_s: 10,
+    compost_m: 10,
+    compost_l: 10,
+    condensed_organic_material: 10,
+    fertilizer_s: 10,
+    fertilizer_m: 10,
+    fertilizer_l: 10,
+    speed_grow_xs: 10,
+    speed_grow_s: 10,
+    speed_grow_m: 10,
+    speed_grow_l: 10,
+    speed_grow_xl: 10,
+    biochemicals: 10,
+  },
+};
+
 export type GameResourceType =
   | 'scrap_metal'
   | 'copper_wire'
@@ -43,11 +151,306 @@ export type GameResourceType =
   | 'electronic_chips'
   | 'organic_waste'
   | 'organic_compost'
+  | 'condensed_organic_material'
   | 'biochemicals'
   | 'fertilizer'
+  | 'compost_s'
+  | 'compost_m'
+  | 'compost_l'
+  | 'fertilizer_s'
+  | 'fertilizer_m'
+  | 'fertilizer_l'
   | 'license_t1'
   | 'license_t2'
   | 'license_t3';
+
+export type StationRecipeId =
+  | 'condensed_organic_material'
+  | 'biochemical'
+  | 'biochemicals'
+  | 'compost_s'
+  | 'compost_m'
+  | 'compost_l'
+  | 'fertilizer_s'
+  | 'fertilizer_m'
+  | 'fertilizer_l'
+  | 'speed_grow_xs'
+  | 'speed_grow_s'
+  | 'speed_grow_m'
+  | 'speed_grow_l'
+  | 'speed_grow_xl';
+
+export interface Inventory {
+  resources?: {
+    condensed_organic_material?: number;
+    condensedOrganicMaterial?: number;
+    organic_waste?: number;
+    biochemicals?: number;
+    biochemical?: number;
+    copper_wire?: number;
+    wire?: number;
+    scrap_metal?: number;
+    brass_gears?: number;
+    circuit_boards?: number;
+    electronic_chips?: number;
+    [key: string]: any;
+  };
+  condensed_organic_material?: number;
+  condensedOrganicMaterial?: number;
+  [key: string]: any;
+}
+
+export interface ActiveBonsaiBuff {
+  multiplier: number; // e.g. 0.15, 0.30, 0.45 for organic; 0.25, 0.50, 0.75 for chemical
+  expiresAt: number; // Date.now() + durationMs
+  tier: 'XS' | 'S' | 'M' | 'L' | 'XL' | 'RAW' | 'BASIC';
+}
+
+export interface StationRecipeDef {
+  id: StationRecipeId;
+  name: string;
+  tier: 'XS' | 'S' | 'M' | 'L' | 'XL' | 'RAW' | 'BASIC';
+  stationType: 'tool_compost_heap' | 'fertilizer_station' | 'chemical_station';
+  durationSeconds: number;
+  effectMultiplier: number;
+  effectDurationSeconds: number;
+  effectInstantSeconds?: number;
+  effectLabel: string;
+  effectCategory: 'organic' | 'chemical' | 'speed_grow' | 'resource';
+  costs: {
+    organic_waste?: number;
+    copper_wire?: number;
+    wire?: number;
+    condensed_organic_material?: number;
+    biochemicals?: number;
+    biochemical?: number;
+    compost_s?: number;
+    compost_m?: number;
+    fertilizer_s?: number;
+    fertilizer_m?: number;
+  };
+  outputItem: string;
+  icon: string;
+  description: string;
+}
+
+export const STATION_RECIPES: Record<StationRecipeId, StationRecipeDef> = {
+  condensed_organic_material: {
+    id: 'condensed_organic_material',
+    name: 'Condensed Organic Material',
+    tier: 'S',
+    stationType: 'tool_compost_heap',
+    durationSeconds: 30,
+    effectMultiplier: 0,
+    effectDurationSeconds: 0,
+    effectLabel: '+1 Condensed Organic Material (Fast-crafting ingredient)',
+    effectCategory: 'organic',
+    costs: { organic_waste: 4 },
+    outputItem: 'condensed_organic_material',
+    icon: '🧱',
+    description: 'High-density refined organic substrate. Refine 4 Organic Waste over 30s. Essential for fast workbench crafting.',
+  },
+  biochemical: {
+    id: 'biochemical',
+    name: 'Biochemical',
+    tier: 'S',
+    stationType: 'chemical_station',
+    durationSeconds: 60,
+    effectMultiplier: 0,
+    effectDurationSeconds: 0,
+    effectLabel: '+1 Biochemical Reagent (Fast-crafting ingredient)',
+    effectCategory: 'chemical',
+    costs: { organic_waste: 2, copper_wire: 1 },
+    outputItem: 'biochemicals',
+    icon: '🧪',
+    description: 'Synthesize 2 Organic Waste & 1 Wire into 1 Biochemical reagent over 60s. Essential for fast workbench crafting.',
+  },
+  biochemicals: {
+    id: 'biochemicals',
+    name: 'Biochemical',
+    tier: 'S',
+    stationType: 'chemical_station',
+    durationSeconds: 60,
+    effectMultiplier: 0,
+    effectDurationSeconds: 0,
+    effectLabel: '+1 Biochemical Reagent (Fast-crafting ingredient)',
+    effectCategory: 'chemical',
+    costs: { organic_waste: 2, copper_wire: 1 },
+    outputItem: 'biochemicals',
+    icon: '🧪',
+    description: 'Synthesize 2 Organic Waste & 1 Wire into 1 Biochemical reagent over 60s. Essential for fast workbench crafting.',
+  },
+  compost_s: {
+    id: 'compost_s',
+    name: 'Compost S',
+    tier: 'S',
+    stationType: 'tool_compost_heap',
+    durationSeconds: 10,
+    effectMultiplier: 0.15,
+    effectDurationSeconds: 30,
+    effectLabel: '+15% Growth Speed for 30s (Organic Boost)',
+    effectCategory: 'organic',
+    costs: { organic_waste: 2 },
+    outputItem: 'compost_s',
+    icon: '🍂',
+    description: 'Fine aerated starter compost. Increases bonsai growth speed by +15% for 30 seconds.',
+  },
+  compost_m: {
+    id: 'compost_m',
+    name: 'Compost M',
+    tier: 'M',
+    stationType: 'tool_compost_heap',
+    durationSeconds: 20,
+    effectMultiplier: 0.30,
+    effectDurationSeconds: 150,
+    effectLabel: '+30% Growth Speed for 150s (Organic Boost²)',
+    effectCategory: 'organic',
+    costs: { organic_waste: 4, compost_s: 1 },
+    outputItem: 'compost_m',
+    icon: '🌾',
+    description: 'Enriched humus blend refined from Compost S. Increases growth speed by +30% for 150 seconds (2.5 mins).',
+  },
+  compost_l: {
+    id: 'compost_l',
+    name: 'Compost L',
+    tier: 'L',
+    stationType: 'tool_compost_heap',
+    durationSeconds: 30,
+    effectMultiplier: 0.45,
+    effectDurationSeconds: 900,
+    effectLabel: '+45% Growth Speed for 900s (Organic Boost³)',
+    effectCategory: 'organic',
+    costs: { organic_waste: 6, compost_m: 1 },
+    outputItem: 'compost_l',
+    icon: '✨',
+    description: 'Masterwork dark mycorrhizal loam. Dramatically elevates growth speed by +45% for 900 seconds (15 mins).',
+  },
+  fertilizer_s: {
+    id: 'fertilizer_s',
+    name: 'Fertilizer S',
+    tier: 'S',
+    stationType: 'chemical_station',
+    durationSeconds: 20,
+    effectMultiplier: 0.25,
+    effectDurationSeconds: 90,
+    effectLabel: '+25% Hydration Growth Speed for 90s (Chemical Boost)',
+    effectCategory: 'chemical',
+    costs: { organic_waste: 4, biochemicals: 1 },
+    outputItem: 'fertilizer_s',
+    icon: '🧪',
+    description: 'Synthesized chemical nutrient elixir. Enhances hydration growth speed by +25% for 90 seconds (1.5 mins).',
+  },
+  fertilizer_m: {
+    id: 'fertilizer_m',
+    name: 'Fertilizer M',
+    tier: 'M',
+    stationType: 'chemical_station',
+    durationSeconds: 40,
+    effectMultiplier: 0.50,
+    effectDurationSeconds: 600,
+    effectLabel: '+50% Hydration Growth Speed for 600s (Chemical Boost²)',
+    effectCategory: 'chemical',
+    costs: { organic_waste: 6, biochemicals: 1, fertilizer_s: 1 },
+    outputItem: 'fertilizer_m',
+    icon: '⚡',
+    description: 'Pressurized catalytic formula refined from Fertilizer S. Enhances hydration growth speed by +50% for 600s (10 mins).',
+  },
+  fertilizer_l: {
+    id: 'fertilizer_l',
+    name: 'Fertilizer L',
+    tier: 'L',
+    stationType: 'chemical_station',
+    durationSeconds: 60,
+    effectMultiplier: 0.75,
+    effectDurationSeconds: 3600,
+    effectLabel: '+75% Hydration Growth Speed for 3600s (Chemical Boost³)',
+    effectCategory: 'chemical',
+    costs: { organic_waste: 10, biochemicals: 1, fertilizer_m: 1 },
+    outputItem: 'fertilizer_l',
+    icon: '🌟',
+    description: 'Ultimate distilled biochemical solution. Supercharges hydration growth speed by +75% for 3600s (1 hour).',
+  },
+  speed_grow_xs: {
+    id: 'speed_grow_xs',
+    name: 'Speed Grow XS',
+    tier: 'XS',
+    stationType: 'chemical_station',
+    durationSeconds: 15,
+    effectMultiplier: 0,
+    effectDurationSeconds: 0,
+    effectInstantSeconds: 30,
+    effectLabel: '+30s Instant Growth of target bonsai',
+    effectCategory: 'speed_grow',
+    costs: { organic_waste: 3, biochemicals: 1 },
+    outputItem: 'speed_grow_xs',
+    icon: '⚡',
+    description: 'Micro growth accelerant. Instantly advances target bonsai growth by 30 seconds.',
+  },
+  speed_grow_s: {
+    id: 'speed_grow_s',
+    name: 'Speed Grow S',
+    tier: 'S',
+    stationType: 'chemical_station',
+    durationSeconds: 30,
+    effectMultiplier: 0,
+    effectDurationSeconds: 0,
+    effectInstantSeconds: 120,
+    effectLabel: '+120s Instant Growth of target bonsai',
+    effectCategory: 'speed_grow',
+    costs: { organic_waste: 5, biochemicals: 2, compost_s: 1 },
+    outputItem: 'speed_grow_s',
+    icon: '⚡',
+    description: 'Catalytic bio-formula. Instantly advances target bonsai growth by 120 seconds (2 minutes).',
+  },
+  speed_grow_m: {
+    id: 'speed_grow_m',
+    name: 'Speed Grow M',
+    tier: 'M',
+    stationType: 'chemical_station',
+    durationSeconds: 45,
+    effectMultiplier: 0,
+    effectDurationSeconds: 0,
+    effectInstantSeconds: 600,
+    effectLabel: '+600s Instant Growth of target bonsai',
+    effectCategory: 'speed_grow',
+    costs: { organic_waste: 7, biochemicals: 2, compost_s: 1, fertilizer_s: 1 },
+    outputItem: 'speed_grow_m',
+    icon: '⚡',
+    description: 'High-potency growth stimulator. Instantly advances target bonsai growth by 600 seconds (10 minutes).',
+  },
+  speed_grow_l: {
+    id: 'speed_grow_l',
+    name: 'Speed Grow L',
+    tier: 'L',
+    stationType: 'chemical_station',
+    durationSeconds: 60,
+    effectMultiplier: 0,
+    effectDurationSeconds: 0,
+    effectInstantSeconds: 3600,
+    effectLabel: '+3600s Instant Growth of target bonsai',
+    effectCategory: 'speed_grow',
+    costs: { organic_waste: 10, biochemicals: 3, compost_m: 1, fertilizer_s: 1 },
+    outputItem: 'speed_grow_l',
+    icon: '✨',
+    description: 'Hyper-accelerated bio-nutrient. Instantly advances target bonsai growth by 3600 seconds (1 hour).',
+  },
+  speed_grow_xl: {
+    id: 'speed_grow_xl',
+    name: 'Speed Grow XL',
+    tier: 'XL',
+    stationType: 'chemical_station',
+    durationSeconds: 90,
+    effectMultiplier: 0,
+    effectDurationSeconds: 0,
+    effectInstantSeconds: 28800,
+    effectLabel: '+28800s Instant Growth of target bonsai',
+    effectCategory: 'speed_grow',
+    costs: { organic_waste: 15, biochemicals: 3, compost_m: 1, fertilizer_m: 1 },
+    outputItem: 'speed_grow_xl',
+    icon: '🌟',
+    description: 'Quantum cellular elongator. Instantly advances target bonsai growth by 28800 seconds (8 hours).',
+  },
+};
 
 export const AREA_EXCAVATION_SPEEDS = {
   FOOTHILLS: 3.2,
@@ -75,6 +478,7 @@ export interface RoverModuleConfig {
   bonusValue: number;
   bonusLabel: string;
   description: string;
+  kw: number;
 }
 
 export type WorkbenchModuleType =
@@ -99,6 +503,7 @@ export interface WorkbenchModuleConfig {
   description: string;
   guideKey: string;
   guideName: string;
+  kw: number;
 }
 
 export const WORKBENCH_MODULE_CONFIGS: Record<WorkbenchModuleType, WorkbenchModuleConfig> = {
@@ -113,6 +518,7 @@ export const WORKBENCH_MODULE_CONFIGS: Record<WorkbenchModuleType, WorkbenchModu
     description: 'Precision mechanical assembly fixture. When installed, adds +1 Queue Slot to the Workbench (2 kW).',
     guideKey: 'has_assembly_blueprint_1',
     guideName: 'Assembly Blueprint I',
+    kw: 2,
   },
   assembly_module_t2: {
     id: 'assembly_module_t2',
@@ -125,6 +531,7 @@ export const WORKBENCH_MODULE_CONFIGS: Record<WorkbenchModuleType, WorkbenchModu
     description: 'Pneumatic dual-action assembly cradle. When installed, adds +2 Queue Slots to the Workbench (3 kW).',
     guideKey: 'has_assembly_blueprint_2',
     guideName: 'Assembly Blueprint II',
+    kw: 3,
   },
   assembly_module_t3: {
     id: 'assembly_module_t3',
@@ -137,6 +544,7 @@ export const WORKBENCH_MODULE_CONFIGS: Record<WorkbenchModuleType, WorkbenchModu
     description: 'Master multi-axis robotic assembly gantry. When installed, adds +3 Queue Slots to the Workbench (4 kW).',
     guideKey: 'has_assembly_blueprint_3',
     guideName: 'Assembly Blueprint III',
+    kw: 4,
   },
   overclock_module_t1: {
     id: 'overclock_module_t1',
@@ -149,6 +557,7 @@ export const WORKBENCH_MODULE_CONFIGS: Record<WorkbenchModuleType, WorkbenchModu
     description: 'Supercharged power conduit busbar. When installed, accelerates craft speed by +5% (3 kW).',
     guideKey: 'has_overclock_schematic_1',
     guideName: 'Overclock Schematic I',
+    kw: 3,
   },
   overclock_module_t2: {
     id: 'overclock_module_t2',
@@ -161,6 +570,7 @@ export const WORKBENCH_MODULE_CONFIGS: Record<WorkbenchModuleType, WorkbenchModu
     description: 'High-frequency harmonic resonance capacitor. When installed, accelerates craft speed by +10% (5 kW).',
     guideKey: 'has_overclock_schematic_2',
     guideName: 'Overclock Schematic II',
+    kw: 5,
   },
   overclock_module_t3: {
     id: 'overclock_module_t3',
@@ -173,6 +583,7 @@ export const WORKBENCH_MODULE_CONFIGS: Record<WorkbenchModuleType, WorkbenchModu
     description: 'Quantum overclock synthesizer matrix. When installed, accelerates craft speed by +20% (7 kW).',
     guideKey: 'has_overclock_schematic_3',
     guideName: 'Overclock Schematic III',
+    kw: 7,
   },
   auto_fabrication_t1: {
     id: 'auto_fabrication_t1',
@@ -185,6 +596,7 @@ export const WORKBENCH_MODULE_CONFIGS: Record<WorkbenchModuleType, WorkbenchModu
     description: 'Dedicated automated production lane unit. Runs continuous crafting loop at 50% speed (half speed of workbench, 6 kW).',
     guideKey: 'has_auto_fab_book_1',
     guideName: 'Auto-Fabrication Schematic I',
+    kw: 6,
   },
   auto_fabrication_t2: {
     id: 'auto_fabrication_t2',
@@ -197,6 +609,7 @@ export const WORKBENCH_MODULE_CONFIGS: Record<WorkbenchModuleType, WorkbenchModu
     description: 'Dedicated automated production lane unit. Runs continuous crafting loop at 100% speed (standard workbench speed, 10 kW).',
     guideKey: 'has_auto_fab_book_2',
     guideName: 'Auto-Fabrication Schematic II',
+    kw: 10,
   },
   auto_fabrication_t3: {
     id: 'auto_fabrication_t3',
@@ -209,6 +622,7 @@ export const WORKBENCH_MODULE_CONFIGS: Record<WorkbenchModuleType, WorkbenchModu
     description: 'Advanced automated production lane unit. Runs continuous crafting loop at 150% speed (1.5x workbench speed, 14 kW).',
     guideKey: 'has_auto_fab_book_3',
     guideName: 'Auto-Fabrication Schematic III',
+    kw: 14,
   },
 };
 
@@ -609,6 +1023,11 @@ export interface GridPlacementPreview {
   width: number;
   height: number;
   orientation: 'horizontal' | 'vertical'; // default 'horizontal'
+  loaderFacing?: LoaderFacing;
+  facing?: LoaderFacing;
+  dispenserFacing?: LoaderFacing;
+  dispenserOrientation?: 'horizontal' | 'vertical';
+  feederSettings?: FeederSettings;
   edgeSide?: 'top' | 'right' | 'bottom' | 'left';
   fenceEdge?: 'top' | 'right' | 'bottom' | 'left';
   edgeKey?: string;
@@ -740,6 +1159,8 @@ export interface Bonsai {
   basePriceBonus?: number;
   lastLevelUpTime?: number;
   isFavorite?: boolean;
+  organicBuff?: ActiveBonsaiBuff | null;
+  chemicalBuff?: ActiveBonsaiBuff | null;
   [key: string]: any;
 }
 

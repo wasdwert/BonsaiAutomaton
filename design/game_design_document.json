@@ -51,14 +51,9 @@
   ],
   "sections": [
     {
-      "title": "Core Mechanics",
-      "content": "1. Additive Disrupted Zen Environmental Penalty: Soil degradation compounds additively onto botanical specimens: a tree planted on degraded soil incurs a baseline -10% Growth Speed penalty, with an additional -10% Growth Speed accumulated for each degraded soil tile within its 3x3 halo that is not physically sealed off by a Bamboo Fence (e.g. planted on degraded soil with 2 degraded halo neighbors yields a cumulative -30% Growth Speed penalty). Telemetry consolidates into a single status badge: '\u26a0\ufe0f Disrupted Zen (-X% Growth Speed)'. 2. Calibrated Fabrication Matrix: Standardized recipe durations, energy consumption metrics, and resource costs across all 30 electrical and industrial workbench recipes, aligning fabrication timelines and power draw with engineering tiers.",
-      "summary": "Additive Disrupted Zen Degradation Dynamics and Calibrated Electrical Crafting."
-    },
-    {
-      "title": "Economy and Progression",
-      "content": "1. Industrial Engineering Licenses: Introduced three state-certified fabrication licenses available under the Botanical Market Equipment catalog: T1 License (25 Verdure), T2 License (75 Verdure), and T3 License (200 Verdure). These licenses serve as essential consumable certification components required alongside raw mechanical resources to fabricate advanced automated machinery, sprinkler systems, workbench modules, and rover expedition modules. 2. Standardized Tier Nomenclature: All chassis modifications, workbench overhauls, and rover attachments follow unified T1/T2/T3 nomenclature (T2 Precision Workbench Upgrade, T3 Master Foundry Upgrade, T2 Surveyor Chassis Upgrade, T3 Vanguard Heavy Chassis Upgrade, T1-T3 Storage, Battery, and Radar Modules).",
-      "summary": "Engineering License Authorization Economy and Standardized Module Nomenclature."
+      "title": "User Interface & Navigation",
+      "content": "1. Full-Screen Modular Layout: Standardized the Bonsai Society menu layout to dock directly below the top telemetry HUD (analogous to the Zen Library, Workbench, and Market), maximizing usable viewport height for submenus. 2. Compact Title Bar: Harmonized the Society header typography to compact standard dimensions, reducing vertical padding. 3. Bonsai Master Quest & Sub-Tab Rank Telemetry: Renamed the quest hub to 'Bonsai Master Quest' and eliminated redundant operational info banners. Replaced all legacy 'Tier' references with 'Rank' across quest branches, badges, and milestones. Sub-tab headers now embed live rank telemetry directly (e.g. 'Discovery \u2013 Rank 1', 'Competition \u2013 Rank 1', 'Eco \u2013 Rank 1'), while removing extraneous status badges from the tab buttons.",
+      "summary": "Standardized Society Full-Screen Frame, Compact Title Architecture, and Integrated Quest Rank Nomenclature."
     }
   ]
 }

@@ -294,17 +294,191 @@ export function getSpeciesFindOdds(leafType?: BonsaiLeafType): number {
 
 /**
  * Exact Formula for Bonsai Valuation with Baseprice = 1:
- * Donation Value = Baseprice * SpeciesFindOddsMultiplier * MaturityRatingMultiplier * LevelMultiplier
- * - Baseprice: 1
+ * Donation Value = Math.floor((rawValue + 1e-9) * 100) / 100
+ * - Baseprice: 1.0 baseline (plus any Seven Lucky Gods blessings)
  * - SpeciesFindOddsMultiplier: 1.8 for 33% odds, +0.1 per -1% odds decrease (up to 5.0 for 1% odds).
  *   Formula: Math.min(5.0, 1.8 + Math.max(0, 33 - oddsPercent) * 0.1).
  * - MaturityRatingMultiplier:
  *   Rating 1: 1.0, Rating 2: 1.2, Rating 3: 1.5, Rating 4: 2.0, Rating 5: 3.0.
- * - LevelMultiplier: level * 0.05 (Level 1 = 0.05, Level 100 = 5.00).
- * - Rounding: Strictly rounded DOWN to two decimal places: Math.floor(value * 100) / 100.
- * (Maximum specimen donation value = 1 * 5.0 * 3.0 * 5.0 = 75.00 Verdure).
+ * - LevelMultiplier: Math.max(0, (bonsai.level || 0) * 0.05)
+ *   (Level 0 = strictly 0.00; Level 1 = 0.05; Level 10 = 0.50; ... Level 100 = 5.00).
+ * - AttributeFactor (Attribute GP/CP):
+ *   1 + Foliage GP + Branches GP + Trunk GP + Roots GP + Foliage CP + Branches CP + Trunk CP + Roots CP
+ *   where each GP is normalized (gp / 100, clamped 0..1) and each CP is normalized (cp / 1000, clamped 0..1).
+ *   Sum of 8 normalized metrics is 0..8, plus 1 yields Attribute GP/CP factor: min 1, max 9.
+ * (Maximum specimen donation value = 1 * 5.0 * 3.0 * 5.0 * 9.0 = 675.00 Verdure).
+ * Total calculated donation value is strictly truncated (floored) down to 2 decimal places.
  */
-export function calculateDonationValue(bonsai: {
+
+export interface AttributeFactorBreakdown {
+  foliageGP: number; // 0..1
+  branchesGP: number; // 0..1
+  trunkGP: number; // 0..1
+  rootsGP: number; // 0..1
+  foliageCP: number; // 0..1
+  branchesCP: number; // 0..1
+  trunkCP: number; // 0..1
+  rootsCP: number; // 0..1
+  totalSum: number; // 0..8
+  attributeFactor: number; // 1..9
+}
+
+export function calculateAttributeFactor(bonsai: any): AttributeFactorBreakdown {
+  if (!bonsai) {
+    return {
+      foliageGP: 0,
+      branchesGP: 0,
+      trunkGP: 0,
+      rootsGP: 0,
+      foliageCP: 0,
+      branchesCP: 0,
+      trunkCP: 0,
+      rootsCP: 0,
+      totalSum: 0,
+      attributeFactor: 1,
+    };
+  }
+
+  const getGP = (attrVal: any, fallbackNum?: any): number => {
+    if (attrVal !== null && attrVal !== undefined) {
+      if (typeof attrVal.growthProgress === 'number') return attrVal.growthProgress;
+      if (typeof attrVal.growthPotential === 'number') return attrVal.growthPotential;
+      if (typeof attrVal.gp === 'number') return attrVal.gp;
+      if (typeof attrVal === 'number') return attrVal;
+    }
+    if (typeof fallbackNum === 'number') return fallbackNum;
+    return 0;
+  };
+
+  const getCP = (attrVal: any, fallbackNum?: any): number => {
+    if (attrVal !== null && attrVal !== undefined && typeof attrVal === 'object') {
+      if (typeof attrVal.carePoints === 'number') return attrVal.carePoints;
+      if (typeof attrVal.craftPoints === 'number') return attrVal.craftPoints;
+      if (typeof attrVal.cp === 'number') return attrVal.cp;
+    }
+    if (typeof fallbackNum === 'number') return fallbackNum;
+    return 0;
+  };
+
+  const rawAttrs = bonsai.attributes || bonsai.geneticPotential || {};
+  const rawCult = bonsai.cultivationPotential || bonsai.cultivation || {};
+
+  const foliageGP = Math.min(1, Math.max(0, getGP(rawAttrs.foliage, rawAttrs.foliage) / 100));
+  const branchesGP = Math.min(1, Math.max(0, getGP(rawAttrs.branches, rawAttrs.branches) / 100));
+  const trunkGP = Math.min(1, Math.max(0, getGP(rawAttrs.trunk, rawAttrs.trunk) / 100));
+  const rootsGP = Math.min(1, Math.max(0, getGP(rawAttrs.roots, rawAttrs.roots) / 100));
+
+  const foliageCP = Math.min(1, Math.max(0, getCP(rawAttrs.foliage, rawCult.foliage) / 1000));
+  const branchesCP = Math.min(1, Math.max(0, getCP(rawAttrs.branches, rawCult.branches) / 1000));
+  const trunkCP = Math.min(1, Math.max(0, getCP(rawAttrs.trunk, rawCult.trunk) / 1000));
+  const rootsCP = Math.min(1, Math.max(0, getCP(rawAttrs.roots, rawCult.roots) / 1000));
+
+  const totalSum = foliageGP + branchesGP + trunkGP + rootsGP + foliageCP + branchesCP + trunkCP + rootsCP;
+  const attributeFactor = Math.min(9, Math.max(1, 1 + totalSum));
+
+  return {
+    foliageGP,
+    branchesGP,
+    trunkGP,
+    rootsGP,
+    foliageCP,
+    branchesCP,
+    trunkCP,
+    rootsCP,
+    totalSum,
+    attributeFactor,
+  };
+}
+
+export interface BonsaiDonationBreakdown {
+  basePrice: number;
+  speciesFindOdds: number;
+  oddsPercent: number;
+  maturityRating: number;
+  ratingRank: number;
+  levelFactor: number;
+  level: number;
+  attributeFactor: number;
+  attributeBreakdown: AttributeFactorBreakdown;
+  rawValue: number;
+  finalValue: number;
+}
+
+export function getBonsaiDonationBreakdown(bonsai: {
+  leafType?: BonsaiLeafType;
+  maturity?: MaturityTier | number;
+  maturityRating?: number;
+  level?: number;
+  findOdds?: number;
+  foundOdds?: number;
+  basePriceBonus?: number;
+  [key: string]: any;
+}): BonsaiDonationBreakdown {
+  if (!bonsai) {
+    const dummyAttr = calculateAttributeFactor(null);
+    return {
+      basePrice: 1,
+      speciesFindOdds: 1.8,
+      oddsPercent: 33,
+      maturityRating: 1,
+      ratingRank: 1,
+      levelFactor: 0.0,
+      level: 0,
+      attributeFactor: 1,
+      attributeBreakdown: dummyAttr,
+      rawValue: 0.0,
+      finalValue: 0.0,
+    };
+  }
+
+  // 1. Baseprice
+  const basePrice = 1.0 + (bonsai.basePriceBonus || 0);
+
+  // 2. Species Find Odds multiplier (1.8 for 33% odds, +0.1 per -1% odds decrease up to 5.0 for 1% odds)
+  const oddsPercent = bonsai.findOdds ?? bonsai.foundOdds ?? getSpeciesFindOdds(bonsai.leafType);
+  const speciesFindOdds = Math.min(5.0, 1.8 + Math.max(0, 33 - oddsPercent) * 0.1);
+
+  // 3. Maturity Rating multiplier (Rating 1: 1.0, Rating 2: 1.2, Rating 3: 1.5, Rating 4: 2.0, Rating 5: 3.0)
+  const ratingRank = getBonsaiMaturityRating(bonsai);
+  const maturityMultipliers: Record<number, number> = {
+    1: 1.0,
+    2: 1.2,
+    3: 1.5,
+    4: 2.0,
+    5: 3.0,
+  };
+  const maturityRating = maturityMultipliers[ratingRank] ?? 1.0;
+
+  // 4. Level of Bonsai multiplier: Level * 0.05 (strictly 0.00 at Level 0, up to 5.00 at Level 100)
+  const level = bonsai.level !== undefined && bonsai.level !== null ? bonsai.level : 0;
+  const levelFactor = Math.max(0, (bonsai.level || 0) * 0.05);
+
+  // 5. Attribute GP/CP factor (1 + sum of 8 normalized metrics, min 1, max 9)
+  const attributeBreakdown = calculateAttributeFactor(bonsai);
+  const attributeFactor = attributeBreakdown.attributeFactor;
+
+  // Final Donation Value formula:
+  // Math.floor((rawValue + 1e-9) * 100) / 100 (always truncated/rounded down to 2 decimal places)
+  // Max possible value = 1 * 5.0 * 3.0 * 5.0 * 9.0 = 675.00 Verdure
+  const rawValue = basePrice * speciesFindOdds * maturityRating * levelFactor * attributeFactor;
+  const finalValue = Math.floor((rawValue + 1e-9) * 100) / 100;
+
+  return {
+    basePrice,
+    speciesFindOdds,
+    oddsPercent,
+    maturityRating,
+    ratingRank,
+    levelFactor,
+    level,
+    attributeFactor,
+    attributeBreakdown,
+    rawValue,
+    finalValue,
+  };
+}
+
+export function calculateBonsaiDonationValue(bonsai: {
   leafType?: BonsaiLeafType;
   maturity?: MaturityTier | number;
   maturityRating?: number;
@@ -314,34 +488,12 @@ export function calculateDonationValue(bonsai: {
   basePriceBonus?: number;
   [key: string]: any;
 }): number {
-  const basePrice = 1.0 + (bonsai.basePriceBonus || 0);
-
-  // Species Find Odds Multiplier
-  const oddsPercent = bonsai.findOdds ?? bonsai.foundOdds ?? getSpeciesFindOdds(bonsai.leafType);
-  const speciesFindOddsMultiplier = Math.min(5.0, 1.8 + Math.max(0, 33 - oddsPercent) * 0.1);
-
-  // Maturity Rating Multiplier
-  const rating = getBonsaiMaturityRating(bonsai);
-  const maturityMultipliers: Record<number, number> = {
-    1: 1.0,
-    2: 1.2,
-    3: 1.5,
-    4: 2.0,
-    5: 3.0,
-  };
-  const maturityRatingMultiplier = maturityMultipliers[rating] ?? 1.0;
-
-  // Level Multiplier (Level 1 = 0.05, +0.05 per level up to 5.00 for Level 100)
-  const level = bonsai.level ?? 1;
-  const levelMultiplier = Math.min(5.0, level * 0.05);
-
-  const rawValue = basePrice * speciesFindOddsMultiplier * maturityRatingMultiplier * levelMultiplier;
-  const roundedValue = Math.floor(rawValue * 100) / 100;
-  return roundedValue;
+  return getBonsaiDonationBreakdown(bonsai).finalValue;
 }
 
-export const calculateBonsaiSellPrice = calculateDonationValue;
-export const calculateBonsaiValue = calculateDonationValue;
+export const calculateDonationValue = calculateBonsaiDonationValue;
+export const calculateBonsaiSellPrice = calculateBonsaiDonationValue;
+export const calculateBonsaiValue = calculateBonsaiDonationValue;
 
 export interface LeafTypeDefinition {
   id: BonsaiLeafType;

@@ -26,6 +26,9 @@ import {
   getMaturityDef,
   getBonsaiLevelGrowthNeeded,
   calculateDonationValue,
+  calculateBonsaiDonationValue,
+  getBonsaiDonationBreakdown,
+  calculateAttributeFactor,
   drawLeafShape,
   drawBonsaiTrunkAndCanopy,
   getStyleAttributeWeights,
@@ -80,8 +83,8 @@ export interface BonsaiInspectionModalProps {
   isStored?: boolean;
   onDonate: (id: string) => void;
   onStore?: (id: string) => void;
-  onCompost?: (id: string) => void;
-  onFertilize?: (id: string) => void;
+  onCompost?: (id: string, tier?: 'S' | 'M' | 'L') => void;
+  onFertilize?: (id: string, tier?: 'S' | 'M' | 'L') => void;
   onPrune?: (id: string) => void;
   onToggleFavorite?: (id: string) => void;
   onAttachAutomaton?: (id: string, tier: 1 | 2 | 3) => void;
@@ -202,17 +205,61 @@ export default function BonsaiInspectionModal({
   // 0: Fertilize, 1: Compost, 2: Donate / Sell, 3: Store in Bag, 4: Favorite Toggle, 5: Close Inspection
   const [focusedBtnIdx, setFocusedBtnIdx] = useState<number>(0);
 
+  const totalCompostStock =
+    (inv.compost_s || 0) + (inv.compost_m || 0) + (inv.compost_l || 0);
+  const totalFertilizerStock =
+    (inv.fertilizer_s || 0) + (inv.fertilizer_m || 0) + (inv.fertilizer_l || 0);
+
+  // Pick best available tier for quick application
+  const bestCompostTier: 'L' | 'M' | 'S' | null =
+    (inv.compost_l || 0) > 0 ? 'L' : (inv.compost_m || 0) > 0 ? 'M' : (inv.compost_s || 0) > 0 ? 'S' : null;
+  const bestFertilizerTier: 'L' | 'M' | 'S' | null =
+    (inv.fertilizer_l || 0) > 0 ? 'L' : (inv.fertilizer_m || 0) > 0 ? 'M' : (inv.fertilizer_s || 0) > 0 ? 'S' : null;
+
+  const [selectedCompostTier, setSelectedCompostTier] = useState<'S' | 'M' | 'L'>('S');
+  const [selectedFertilizerTier, setSelectedFertilizerTier] = useState<'S' | 'M' | 'L'>('S');
+
+  // Sync selected tier to available stock if possible
+  useEffect(() => {
+    if (bestCompostTier) setSelectedCompostTier(bestCompostTier);
+  }, [inv.compost_s, inv.compost_m, inv.compost_l]);
+
+  useEffect(() => {
+    if (bestFertilizerTier) setSelectedFertilizerTier(bestFertilizerTier);
+  }, [inv.fertilizer_s, inv.fertilizer_m, inv.fertilizer_l]);
+
+  // Live timer tick for buff countdowns
+  const [nowTime, setNowTime] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNowTime(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, []);
+
   const activateFocusedButton = () => {
     if (!bonsai) return;
     if (focusedBtnIdx === 0) {
-      if ((inv.fertilizer || inv.resources?.fertilizer || 0) > 0 && bonsai.level < 100) {
-        onFertilize?.(bonsai.id);
+      if (bonsai.chemicalBuff && bonsai.chemicalBuff.expiresAt > nowTime) {
+        gameAudio?.playErrorBuzz?.();
+        return;
+      }
+      const chosenTier = (inv[`fertilizer_${selectedFertilizerTier.toLowerCase()}`] || 0) > 0
+        ? selectedFertilizerTier
+        : bestFertilizerTier;
+      if (chosenTier && bonsai.level < 100) {
+        onFertilize?.(bonsai.id, chosenTier);
       } else {
         gameAudio?.playErrorBuzz?.();
       }
     } else if (focusedBtnIdx === 1) {
-      if (inv.organic_compost > 0 && bonsai.level < 100) {
-        onCompost?.(bonsai.id);
+      if (bonsai.organicBuff && bonsai.organicBuff.expiresAt > nowTime) {
+        gameAudio?.playErrorBuzz?.();
+        return;
+      }
+      const chosenTier = (inv[`compost_${selectedCompostTier.toLowerCase()}`] || 0) > 0
+        ? selectedCompostTier
+        : bestCompostTier;
+      if (chosenTier && bonsai.level < 100) {
+        onCompost?.(bonsai.id, chosenTier);
       } else {
         gameAudio?.playErrorBuzz?.();
       }
@@ -282,15 +329,21 @@ export default function BonsaiInspectionModal({
         gameAudio?.playConfirmSelect?.();
       } else if (e.key === ' ' || e.key === 'x' || e.key === 'X') {
         e.preventDefault();
-        if ((inv.fertilizer || inv.resources?.fertilizer || 0) > 0 && bonsai.level < 100) {
-          onFertilize?.(bonsai.id);
+        const chosenTier = (inv[`fertilizer_${selectedFertilizerTier.toLowerCase()}`] || 0) > 0
+          ? selectedFertilizerTier
+          : bestFertilizerTier;
+        if (chosenTier && bonsai.level < 100) {
+          onFertilize?.(bonsai.id, chosenTier);
         } else {
           gameAudio?.playErrorBuzz?.();
         }
       } else if (e.key === 'c' || e.key === 'C') {
         e.preventDefault();
-        if (inv.organic_compost > 0 && bonsai.level < 100) {
-          onCompost?.(bonsai.id);
+        const chosenTier = (inv[`compost_${selectedCompostTier.toLowerCase()}`] || 0) > 0
+          ? selectedCompostTier
+          : bestCompostTier;
+        if (chosenTier && bonsai.level < 100) {
+          onCompost?.(bonsai.id, chosenTier);
         } else {
           gameAudio?.playErrorBuzz?.();
         }
@@ -309,7 +362,7 @@ export default function BonsaiInspectionModal({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, bonsai, focusedBtnIdx, inv.organic_compost, inv.fertilizer, isStored, onFertilize, onCompost, onDonate, onStore, onToggleFavorite, onClose]);
+  }, [isOpen, bonsai, focusedBtnIdx, inv, isStored, onFertilize, onCompost, onDonate, onStore, onToggleFavorite, onClose, selectedCompostTier, selectedFertilizerTier, bestCompostTier, bestFertilizerTier]);
 
   if (!isOpen || !bonsai) return null;
 
@@ -355,6 +408,8 @@ export default function BonsaiInspectionModal({
       ? getAutomatonConfig(bonsai.automatonTier)?.speedMultiplier || 1.0
       : 1.0;
   const remainingSeconds = Math.max(0, (targetSeconds - bonsai.progressSeconds) / tierSpeed);
+  const donationBreakdown = getBonsaiDonationBreakdown(bonsai);
+  const finalDonationValue = donationBreakdown.finalValue;
 
   return (
     <div className="fixed top-12 left-0 right-0 bottom-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm pointer-events-auto select-none">
@@ -431,12 +486,16 @@ export default function BonsaiInspectionModal({
                 <span>•</span>
                 <span className={`font-bold flex items-center gap-1 ${isEcoRequestMatch ? 'text-amber-300 bg-amber-950/80 border border-amber-500/50 px-2 py-0.5 rounded-lg' : 'text-emerald-300'}`}>
                   <VerdureIcon className="w-3.5 h-3.5" />
-                  <span>+{(calculateDonationValue(bonsai) * (isEcoRequestMatch ? 2 : 1)).toFixed(2)} Verdure</span>
+                  <span>+{(finalDonationValue * (isEcoRequestMatch ? 2 : 1)).toFixed(2)} Verdure</span>
                   {isEcoRequestMatch && (
                     <span className="text-[9px] bg-amber-400 text-slate-950 px-1 py-0.2 rounded font-black">
                       🌟 2x Match!
                     </span>
                   )}
+                </span>
+                <span>•</span>
+                <span className="text-purple-300 font-mono font-bold text-[11px] bg-purple-950/80 border border-purple-500/40 px-2 py-0.5 rounded-lg">
+                  GP/CP: x{donationBreakdown.attributeFactor.toFixed(2)}
                 </span>
               </div>
             </div>
@@ -555,7 +614,7 @@ export default function BonsaiInspectionModal({
                 )}
                 {!bSyn.isStalled && bSyn.bonsaiCount > 0 && (
                   <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/50 px-1.5 py-0.2 rounded font-bold">
-                    🌿 Growing Together x{bSyn.bonsaiCount} (+{(bSyn.bonsaiCount * 10 * (bSyn.haloMultiplier || 1))}% Hydration Growth Speed)
+                    🌿 Growing Together x{bSyn.bonsaiCount} (+{(bSyn.bonsaiCount * 10 * (bSyn.haloMultiplier || 1))}% Growth Speed)
                   </span>
                 )}
                 {!bSyn.isStalled && bSyn.wallCount > 0 && (
@@ -682,6 +741,46 @@ export default function BonsaiInspectionModal({
                     </span>
                   </div>
 
+                  {/* Active Organic Buff Status */}
+                  {bonsai.organicBuff && bonsai.organicBuff.expiresAt > nowTime ? (
+                    <div className="bg-lime-950/70 border border-lime-500/60 p-2.5 rounded-xl flex items-center justify-between shadow-sm animate-pulse">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🍂</span>
+                        <div>
+                          <span className="font-bold text-lime-300 block text-xs">
+                            Organic Boost ({bonsai.organicBuff.tier})
+                          </span>
+                          <span className="text-[10px] text-lime-200/80 font-mono">
+                            +{Math.round(bonsai.organicBuff.multiplier * 100)}% Growth Speed
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-black bg-lime-900 text-lime-200 border border-lime-400 px-2 py-0.5 rounded-lg font-mono">
+                        {Math.max(1, Math.ceil((bonsai.organicBuff.expiresAt - nowTime) / 1000))}s left
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {/* Active Chemical Buff Status */}
+                  {bonsai.chemicalBuff && bonsai.chemicalBuff.expiresAt > nowTime ? (
+                    <div className="bg-cyan-950/70 border border-cyan-500/60 p-2.5 rounded-xl flex items-center justify-between shadow-sm animate-pulse">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🧪</span>
+                        <div>
+                          <span className="font-bold text-cyan-300 block text-xs">
+                            Chemical Boost ({bonsai.chemicalBuff.tier})
+                          </span>
+                          <span className="text-[10px] text-cyan-200/80 font-mono">
+                            +{Math.round(bonsai.chemicalBuff.multiplier * 100)}% Hydration Speed
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-black bg-cyan-900 text-cyan-200 border border-cyan-400 px-2 py-0.5 rounded-lg font-mono">
+                        {Math.max(1, Math.ceil((bonsai.chemicalBuff.expiresAt - nowTime) / 1000))}s left
+                      </span>
+                    </div>
+                  ) : null}
+
                   {/* Pruning Vitality */}
                   <div className="bg-slate-950/80 border border-slate-800/90 p-2.5 rounded-xl flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -700,67 +799,158 @@ export default function BonsaiInspectionModal({
                     </span>
                   </div>
 
-                  {/* Soil Nutrients / Compost */}
-                  <div className="bg-slate-950/80 border border-slate-800/90 p-2.5 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">🌾</span>
-                      <div>
-                        <span className="font-semibold text-slate-200 block text-xs">Soil Nutrients</span>
-                        <span className="text-[10px] text-slate-400">
-                          {inv.organic_compost > 0
-                            ? `${inv.organic_compost} Enriched Compost in Bag`
-                            : '0 Compost in stock (Craft at Workbench)'}
+                  {/* Tiered Consumables Stock Summary */}
+                  <div className="bg-slate-950/80 border border-slate-800/90 p-2.5 rounded-xl space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                        <span>🍂</span>
+                        <span>Compost in Bag:</span>
+                      </span>
+                      <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                        <span className="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 text-lime-300">
+                          S: {inv.compost_s || 0}
+                        </span>
+                        <span className="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 text-emerald-300">
+                          M: {inv.compost_m || 0}
+                        </span>
+                        <span className="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 text-amber-300">
+                          L: {inv.compost_l || 0}
                         </span>
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold bg-lime-950/80 text-lime-300 border border-lime-500/40 px-2 py-0.5 rounded-lg font-mono">
-                      {inv.organic_compost} Available
-                    </span>
+
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/60">
+                      <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                        <span>🧪</span>
+                        <span>Fertilizer in Bag:</span>
+                      </span>
+                      <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                        <span className="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 text-cyan-300">
+                          S: {inv.fertilizer_s || 0}
+                        </span>
+                        <span className="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 text-sky-300">
+                          M: {inv.fertilizer_m || 0}
+                        </span>
+                        <span className="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 text-purple-300">
+                          L: {inv.fertilizer_l || 0}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Action Buttons Grid */}
+            {/* Action Buttons Grid with Tier Selectors */}
             <div className="space-y-2 pt-2 border-t border-slate-800/80">
               <div className="grid grid-cols-2 gap-2">
-                <button
-                  disabled={(inv.fertilizer || inv.resources?.fertilizer || 0) <= 0 || bonsai.level >= 100}
-                  onClick={() => onFertilize?.(bonsai.id)}
-                  className={`font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow active:scale-95 ${
-                    focusedBtnIdx === 0
-                      ? 'ring-4 ring-emerald-400 border-emerald-300 scale-[1.02] shadow-[0_0_15px_rgba(52,211,153,0.7)]'
-                      : ''
-                  } ${
-                    (inv.fertilizer || inv.resources?.fertilizer || 0) > 0 && bonsai.level < 100
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-1 ring-emerald-400/40 hover:ring-emerald-300 cursor-pointer'
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-                  }`}>
-                  <span className="text-sm">🧪</span>
-                  <span>
-                    {focusedBtnIdx === 0 && '► '}
-                    [E / Space] Fertilize (-300s) ({inv.fertilizer || inv.resources?.fertilizer || 0})
-                  </span>
-                </button>
+                {/* FERTILIZER APPLICATION BUTTON */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between px-1 text-[10px] text-slate-400 font-bold">
+                    <span>🧪 FERTILIZER TIER:</span>
+                    <div className="flex items-center gap-1">
+                      {(['S', 'M', 'L'] as const).map((t) => {
+                        const count = inv[`fertilizer_${t.toLowerCase()}`] || 0;
+                        const isChosen = selectedFertilizerTier === t;
+                        return (
+                          <button
+                            key={t}
+                            onClick={() => setSelectedFertilizerTier(t)}
+                            className={`px-1.5 py-0.2 rounded font-mono text-[9px] font-bold border cursor-pointer ${
+                              isChosen
+                                ? 'bg-cyan-600 text-white border-cyan-400'
+                                : count > 0
+                                ? 'bg-slate-900 text-cyan-300 border-slate-700 hover:border-cyan-500'
+                                : 'bg-slate-950 text-slate-600 border-slate-800'
+                            }`}>
+                            {t} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-                <button
-                  disabled={inv.organic_compost <= 0 || bonsai.level >= 100}
-                  onClick={() => onCompost?.(bonsai.id)}
-                  className={`py-2.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow ${
-                    focusedBtnIdx === 1
-                      ? 'ring-4 ring-lime-400 border-lime-300 scale-[1.02] shadow-[0_0_15px_rgba(163,230,53,0.7)]'
-                      : ''
-                  } ${
-                    inv.organic_compost > 0 && bonsai.level < 100
-                      ? 'bg-lime-600 hover:bg-lime-500 text-white ring-1 ring-lime-400/40 active:scale-95'
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                  }`}>
-                  <span>🌾</span>
-                  <span>
-                    {focusedBtnIdx === 1 && '► '}
-                    [E / C] Compost ({inv.organic_compost})
-                  </span>
-                </button>
+                  <button
+                    disabled={
+                      (inv[`fertilizer_${selectedFertilizerTier.toLowerCase()}`] || 0) <= 0 ||
+                      bonsai.level >= 100 ||
+                      Boolean(bonsai.chemicalBuff && bonsai.chemicalBuff.expiresAt > nowTime)
+                    }
+                    onClick={() => onFertilize?.(bonsai.id, selectedFertilizerTier)}
+                    className={`font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow active:scale-95 ${
+                      focusedBtnIdx === 0
+                        ? 'ring-4 ring-cyan-400 border-cyan-300 scale-[1.02] shadow-[0_0_15px_rgba(6,182,212,0.7)]'
+                        : ''
+                    } ${
+                      (inv[`fertilizer_${selectedFertilizerTier.toLowerCase()}`] || 0) > 0 &&
+                      bonsai.level < 100 &&
+                      !(bonsai.chemicalBuff && bonsai.chemicalBuff.expiresAt > nowTime)
+                        ? 'bg-cyan-600 hover:bg-cyan-500 text-white ring-1 ring-cyan-400/40 cursor-pointer'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                    }`}>
+                    <span className="text-sm">🧪</span>
+                    <span>
+                      {focusedBtnIdx === 0 && '► '}
+                      {bonsai.chemicalBuff && bonsai.chemicalBuff.expiresAt > nowTime
+                        ? 'Active Fertilizer Running'
+                        : `Apply Fertilizer ${selectedFertilizerTier} (${inv[`fertilizer_${selectedFertilizerTier.toLowerCase()}`] || 0})`}
+                    </span>
+                  </button>
+                </div>
+
+                {/* COMPOST APPLICATION BUTTON */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between px-1 text-[10px] text-slate-400 font-bold">
+                    <span>🍂 COMPOST TIER:</span>
+                    <div className="flex items-center gap-1">
+                      {(['S', 'M', 'L'] as const).map((t) => {
+                        const count = inv[`compost_${t.toLowerCase()}`] || 0;
+                        const isChosen = selectedCompostTier === t;
+                        return (
+                          <button
+                            key={t}
+                            onClick={() => setSelectedCompostTier(t)}
+                            className={`px-1.5 py-0.2 rounded font-mono text-[9px] font-bold border cursor-pointer ${
+                              isChosen
+                                ? 'bg-lime-600 text-white border-lime-400'
+                                : count > 0
+                                ? 'bg-slate-900 text-lime-300 border-slate-700 hover:border-lime-500'
+                                : 'bg-slate-950 text-slate-600 border-slate-800'
+                            }`}>
+                            {t} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <button
+                    disabled={
+                      (inv[`compost_${selectedCompostTier.toLowerCase()}`] || 0) <= 0 ||
+                      bonsai.level >= 100 ||
+                      Boolean(bonsai.organicBuff && bonsai.organicBuff.expiresAt > nowTime)
+                    }
+                    onClick={() => onCompost?.(bonsai.id, selectedCompostTier)}
+                    className={`font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow active:scale-95 ${
+                      focusedBtnIdx === 1
+                        ? 'ring-4 ring-lime-400 border-lime-300 scale-[1.02] shadow-[0_0_15px_rgba(163,230,53,0.7)]'
+                        : ''
+                    } ${
+                      (inv[`compost_${selectedCompostTier.toLowerCase()}`] || 0) > 0 &&
+                      bonsai.level < 100 &&
+                      !(bonsai.organicBuff && bonsai.organicBuff.expiresAt > nowTime)
+                        ? 'bg-lime-600 hover:bg-lime-500 text-white ring-1 ring-lime-400/40 cursor-pointer'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                    }`}>
+                    <span className="text-sm">🍂</span>
+                    <span>
+                      {focusedBtnIdx === 1 && '► '}
+                      {bonsai.organicBuff && bonsai.organicBuff.expiresAt > nowTime
+                        ? 'Active Compost Running'
+                        : `Apply Compost ${selectedCompostTier} (${inv[`compost_${selectedCompostTier.toLowerCase()}`] || 0})`}
+                    </span>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -796,8 +986,8 @@ export default function BonsaiInspectionModal({
                       <span>
                         {focusedBtnIdx === 2 && '► '}
                         {isEcoRequestMatch
-                          ? `[E / V] Donate (🌟 2x Bonus: +${(calculateDonationValue(bonsai) * 2).toFixed(2)})`
-                          : `[E / V] Donate (+${calculateDonationValue(bonsai).toFixed(2)})`}
+                          ? `[E / V] Donate (🌟 2x Bonus: +${(finalDonationValue * 2).toFixed(2)})`
+                          : `[E / V] Donate (+${finalDonationValue.toFixed(2)})`}
                       </span>
                       {isEcoRequestMatch && (
                         <span className="bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded text-[9px] font-black uppercase">
@@ -826,6 +1016,22 @@ export default function BonsaiInspectionModal({
                     {isStored ? 'In Storage' : '[E] Store in Bag'}
                   </span>
                 </button>
+              </div>
+
+              {/* DONATION VALUE FORMULA BREAKDOWN TELEMETRY CARD */}
+              <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 text-[10px] space-y-1">
+                <div className="flex items-center justify-between text-slate-300 font-bold">
+                  <span className="flex items-center gap-1 text-amber-300">
+                    <VerdureIcon className="w-3.5 h-3.5" />
+                    <span>Donation Value Breakdown:</span>
+                  </span>
+                  <span className="text-emerald-300 font-mono font-black">
+                    +{finalDonationValue.toFixed(2)} Verdure <span className="text-[9px] text-slate-500">(Max: 675.00)</span>
+                  </span>
+                </div>
+                <div className="text-[9px] text-slate-400 font-mono leading-tight">
+                  1.0 (Base) × {donationBreakdown.speciesFindOdds.toFixed(1)}x (Odds) × {donationBreakdown.maturityRating.toFixed(1)}x (Rank {donationBreakdown.ratingRank}) × {donationBreakdown.levelFactor.toFixed(2)}x (Lv.{donationBreakdown.level}) × {donationBreakdown.attributeFactor.toFixed(2)}x (GP/CP)
+                </div>
               </div>
 
               {/* FAVORITE / UNFAVORITE TOGGLE BUTTON */}
@@ -978,6 +1184,30 @@ export default function BonsaiInspectionModal({
                   );
                 })}
               </div>
+            </div>
+
+            {/* Attribute GP/CP Donation Multiplier Summary Card */}
+            <div className="bg-slate-950/85 p-2.5 rounded-xl border border-purple-500/40 space-y-1.5 shadow-sm text-xs">
+              <div className="flex items-center justify-between font-bold">
+                <span className="text-purple-300 flex items-center gap-1 text-xs">
+                  <Award className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Attribute GP/CP Multiplier:</span>
+                </span>
+                <span className="text-purple-300 font-mono text-xs font-black">
+                  x{donationBreakdown.attributeFactor.toFixed(2)} / 9.0x
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-300 font-mono pt-1 border-t border-slate-800">
+                <div className="truncate">
+                  GP Sum: +{(donationBreakdown.attributeBreakdown.foliageGP + donationBreakdown.attributeBreakdown.branchesGP + donationBreakdown.attributeBreakdown.trunkGP + donationBreakdown.attributeBreakdown.rootsGP).toFixed(2)} / 4.0
+                </div>
+                <div className="truncate">
+                  CP Sum: +{(donationBreakdown.attributeBreakdown.foliageCP + donationBreakdown.attributeBreakdown.branchesCP + donationBreakdown.attributeBreakdown.trunkCP + donationBreakdown.attributeBreakdown.rootsCP).toFixed(2)} / 4.0
+                </div>
+              </div>
+              <p className="text-[9.5px] text-slate-400 leading-tight">
+                Formula: 1.0 + Sum of 4 normalized GP (0-1) &amp; 4 normalized CP (0-1). Multiplies Society donation value up to 9x!
+              </p>
             </div>
 
             {/* Subtle Guidance Note */}

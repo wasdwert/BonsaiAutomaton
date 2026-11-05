@@ -1,19 +1,15 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Award,
   BookOpen,
   Check,
   ChevronRight,
   Compass,
-  Eye,
-  Info,
   Layers,
   Lock,
   Sparkles,
   Sprout,
   Trophy,
-  Truck,
-  Wrench,
   X,
   Zap,
 } from 'lucide-react';
@@ -34,13 +30,10 @@ import {
   renderLeafFoliage,
   drawBonsaiTrunkAndCanopy,
 } from './bonsaiData';
-import {gameAudio} from './utils/helper';
+import { gameAudio } from './utils/helper';
 import {
-  ACHIEVEMENTS_LIST,
-  AchievementDef,
   DeployedStructure,
   GameStats,
-  MilestoneCategory,
   PlantedBonsai,
   SKILL_CONFIGS,
   SanctuaryInventory,
@@ -49,9 +42,12 @@ import {
   getBonsaiGroupBadgeClass,
   getBonsaiStyleDef,
   getExpRequiredForLevel,
+  VerdureIcon,
 } from './App';
+import { BlueprintDef } from './blueprints';
+import BlueprintsCatalogView from './BlueprintsCatalogView';
 
-export type ShrineTab = 'bondex' | 'skills' | 'milestones';
+export type ShrineTab = 'bondex' | 'blueprints' | 'skills';
 
 export interface BondexSpeciesEntry {
   num: string;
@@ -59,26 +55,26 @@ export interface BondexSpeciesEntry {
 }
 
 export const BONDEX_SPECIES_LIST: BondexSpeciesEntry[] = [
-  {num: '#001', id: 'circle'},
-  {num: '#002', id: 'oval'},
-  {num: '#003', id: 'circle_hole'},
-  {num: '#004', id: 'raindrop'},
-  {num: '#005', id: 'fire'},
-  {num: '#006', id: 'cloud'},
-  {num: '#007', id: 'hexagon'},
-  {num: '#008', id: 'star'},
-  {num: '#009', id: 'snowflake'},
-  {num: '#010', id: 'feather'},
-  {num: '#011', id: 'snail'},
-  {num: '#012', id: 'eye'},
-  {num: '#013', id: 'triangle'},
-  {num: '#014', id: 'arrow'},
-  {num: '#015', id: 'shield'},
-  {num: '#016', id: 'diamond'},
-  {num: '#017', id: 'cube'},
-  {num: '#018', id: 'rectangle'},
-  {num: '#019', id: 'gear'},
-  {num: '#020', id: 'bell'},
+  { num: '#001', id: 'circle' },
+  { num: '#002', id: 'oval' },
+  { num: '#003', id: 'circle_hole' },
+  { num: '#004', id: 'raindrop' },
+  { num: '#005', id: 'fire' },
+  { num: '#006', id: 'cloud' },
+  { num: '#007', id: 'hexagon' },
+  { num: '#008', id: 'star' },
+  { num: '#009', id: 'snowflake' },
+  { num: '#010', id: 'feather' },
+  { num: '#011', id: 'snail' },
+  { num: '#012', id: 'eye' },
+  { num: '#013', id: 'triangle' },
+  { num: '#014', id: 'arrow' },
+  { num: '#015', id: 'shield' },
+  { num: '#016', id: 'diamond' },
+  { num: '#017', id: 'cube' },
+  { num: '#018', id: 'rectangle' },
+  { num: '#019', id: 'gear' },
+  { num: '#020', id: 'bell' },
 ];
 
 /**
@@ -89,7 +85,7 @@ export function getSpeciesBiomeEncounters(leafType: BonsaiLeafType): {
   name: string;
   percent: number;
 }[] {
-  const encounters: {biomeId: string; name: string; percent: number}[] = [];
+  const encounters: { biomeId: string; name: string; percent: number }[] = [];
   const biomeNames: Record<string, string> = {
     FOOTHILLS: 'Sunlit Foothills',
     HIGHLANDS: 'Misty Highlands',
@@ -112,7 +108,6 @@ export function getSpeciesBiomeEncounters(leafType: BonsaiLeafType): {
 
 /**
  * Vector leaf thumbnail for Bondex species list item (#001 - #020)
- * Renders the vibrant vector leaf shape cleanly and centered inside a 32x32 square
  */
 export function BondexLeafThumbnail({
   leafType,
@@ -143,7 +138,7 @@ export function BondexLeafThumbnail({
   return (
     <canvas
       ref={canvasRef}
-      style={{width: 32, height: 32}}
+      style={{ width: 32, height: 32 }}
       width={64}
       height={64}
       className="pointer-events-none shrink-0"
@@ -153,7 +148,6 @@ export function BondexLeafThumbnail({
 
 /**
  * Live Procedural Canvas Preview for the Bondex Pokédex Display
- * Renders the chosen leaf shape in the selected structural growth style (Chokan, Moyogi, Shakan).
  */
 export function BondexStylePreviewCanvas({
   leafType,
@@ -230,7 +224,6 @@ export function BondexStylePreviewCanvas({
     const trunkThickness = 6.5 * stageScale;
 
     if (isUndiscovered) {
-      // Silhouette Mode: darkened shadow with question mark aperture
       ctx.fillStyle = 'rgba(30, 41, 59, 0.6)';
       ctx.beginPath();
       ctx.ellipse(bx, by + 12, 34, 7, 0, 0, Math.PI * 2);
@@ -241,7 +234,6 @@ export function BondexStylePreviewCanvas({
       ctx.roundRect(bx - 32, by - 4, 64, 16, [3, 3, 6, 6]);
       ctx.fill();
 
-      // Silhouette trunk
       ctx.strokeStyle = '#334155';
       ctx.lineWidth = trunkThickness;
       ctx.lineCap = 'round';
@@ -250,13 +242,11 @@ export function BondexStylePreviewCanvas({
       ctx.lineTo(bx, by - 4 - trunkHeight);
       ctx.stroke();
 
-      // Silhouette canopy orb
       ctx.fillStyle = '#334155';
       ctx.beginPath();
       ctx.arc(bx, by - 4 - trunkHeight - 4, 26, 0, Math.PI * 2);
       ctx.fill();
 
-      // Big question mark on silhouette
       ctx.fillStyle = '#64748b';
       ctx.font = 'bold 36px system-ui';
       ctx.textAlign = 'center';
@@ -280,17 +270,14 @@ export function BondexStylePreviewCanvas({
     ctx.lineWidth = 1.2;
     ctx.stroke();
 
-    // Pot rim stripe
     ctx.fillStyle = isStyleUnlogged ? 'rgba(51, 65, 85, 0.3)' : 'rgba(255, 255, 255, 0.15)';
     ctx.fillRect(bx - 36, by - 4, 72, 3);
 
-    // Dark soil
     ctx.fillStyle = isStyleUnlogged ? '#0f172a' : '#3b1802';
     ctx.beginPath();
     ctx.ellipse(bx, by - 3, 34, 6, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Draw trunk & foliage pads supporting all 7 styles
     drawBonsaiTrunkAndCanopy(
       ctx,
       bx,
@@ -305,7 +292,6 @@ export function BondexStylePreviewCanvas({
       isStyleUnlogged,
     );
 
-    // Astral ambient sparkles for star / fire (ONLY if logged)
     if (!isStyleUnlogged) {
       if (leafType === 'star') {
         ctx.fillStyle = '#fef08a';
@@ -327,7 +313,6 @@ export function BondexStylePreviewCanvas({
         }
       }
     } else {
-      // In-canvas badge label for unlogged style
       ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
       ctx.beginPath();
       ctx.roundRect(w / 2 - 58, 10, 116, 20, 6);
@@ -347,11 +332,36 @@ export function BondexStylePreviewCanvas({
   return (
     <canvas
       ref={canvasRef}
-      style={{width, height}}
+      style={{ width, height }}
       className="rounded-2xl border border-slate-700/80 bg-slate-950/95 shadow-inner"
     />
   );
 }
+
+export const DEFAULT_STATS: GameStats = {
+  leafTypeStylesGrown: {},
+  groupBonsaisGrown: {
+    Raundo: 0,
+    Erementaru: 0,
+    'Roku-men': 0,
+    Seikatsu: 0,
+    Sanmen: 0,
+    Shihen: 0,
+    'Jinkō-teki': 0,
+  },
+  firstLevel100Reached: false,
+  expeditionsPerBiome: { FOOTHILLS: 0, HIGHLANDS: 0, OVERGROWTH: 0 },
+  claimedAchievements: [],
+  totalLevelUps: 0,
+  maxSpecimensGrownLv10: [],
+  maxSpecimensGrownLv25: [],
+  maxSpecimensGrownLv50: [],
+  sproutLv10Ids: [],
+  saplingLv15Ids: [],
+  notableLv20Ids: [],
+  refinedLv25Ids: [],
+  premiumLv30Ids: [],
+};
 
 export interface ZenLibraryModalProps {
   isOpen: boolean;
@@ -361,10 +371,11 @@ export interface ZenLibraryModalProps {
   playerExp: number;
   zenSkills: ZenSkills;
   upgradeZenSkill: (key: keyof ZenSkills) => void;
-  stats: GameStats;
-  claimAchievement: (achId: string, rewardZen: number, title: string) => void;
-  plantedBonsais: PlantedBonsai[];
-  storedPottedBonsais: StoredPottedBonsai[];
+  unlockedBlueprints?: string[];
+  verdureBalance?: number;
+  onPurchaseBlueprint?: (blueprint: BlueprintDef) => void;
+  plantedBonsais?: PlantedBonsai[];
+  storedPottedBonsais?: StoredPottedBonsai[];
   discoveredSpeciesMap: Record<
     string,
     {
@@ -377,6 +388,8 @@ export interface ZenLibraryModalProps {
   deployedStructures?: DeployedStructure[];
   installedCraftingArms?: number;
   discoveredAreaSpecies?: Record<string, BonsaiLeafType[]>;
+  stats?: GameStats;
+  claimAchievement?: (achId: string, rewardZen: number, title: string) => void;
 }
 
 export default function ZenLibraryModal({
@@ -387,17 +400,39 @@ export default function ZenLibraryModal({
   playerExp,
   zenSkills,
   upgradeZenSkill,
-  stats,
-  claimAchievement,
-  plantedBonsais,
-  storedPottedBonsais,
+  unlockedBlueprints = [],
+  verdureBalance = 0,
+  onPurchaseBlueprint,
   discoveredSpeciesMap,
-  inventory,
-  deployedStructures,
-  installedCraftingArms,
   discoveredAreaSpecies,
+  stats = DEFAULT_STATS,
+  claimAchievement,
 }: ZenLibraryModalProps) {
-  // Shrine category tabs: ['bondex', 'skills', 'milestones'] - default is 'bondex'
+  const safeStats: GameStats = useMemo(() => ({
+    leafTypeStylesGrown: stats?.leafTypeStylesGrown ?? {},
+    groupBonsaisGrown: stats?.groupBonsaisGrown ?? {
+      Raundo: 0,
+      Erementaru: 0,
+      'Roku-men': 0,
+      Seikatsu: 0,
+      Sanmen: 0,
+      Shihen: 0,
+      'Jinkō-teki': 0,
+    },
+    firstLevel100Reached: stats?.firstLevel100Reached ?? false,
+    expeditionsPerBiome: stats?.expeditionsPerBiome ?? { FOOTHILLS: 0, HIGHLANDS: 0, OVERGROWTH: 0 },
+    claimedAchievements: stats?.claimedAchievements ?? [],
+    totalLevelUps: stats?.totalLevelUps ?? 0,
+    maxSpecimensGrownLv10: stats?.maxSpecimensGrownLv10 ?? [],
+    maxSpecimensGrownLv25: stats?.maxSpecimensGrownLv25 ?? [],
+    maxSpecimensGrownLv50: stats?.maxSpecimensGrownLv50 ?? [],
+    sproutLv10Ids: stats?.sproutLv10Ids ?? [],
+    saplingLv15Ids: stats?.saplingLv15Ids ?? [],
+    notableLv20Ids: stats?.notableLv20Ids ?? [],
+    refinedLv25Ids: stats?.refinedLv25Ids ?? [],
+    premiumLv30Ids: stats?.premiumLv30Ids ?? [],
+  }), [stats]);
+  // Shrine category tabs: ['bondex', 'blueprints', 'skills']
   const [activeTab, setActiveTab] = useState<ShrineTab>('bondex');
 
   // Bondex Filter and Selected Species State
@@ -405,105 +440,7 @@ export default function ZenLibraryModal({
   const [selectedSpeciesIndex, setSelectedSpeciesIndex] = useState<number>(0);
   const [viewerStyle, setViewerStyle] = useState<BonsaiStyle>('MOYOGI');
 
-  // Milestones Categorized Subcategory Tabs
-  const [milestoneSubTab, setMilestoneSubTab] = useState<
-    'ALL' | 'BONDEX' | 'MATURITY' | 'AUTOMATION' | 'EXPEDITIONS'
-  >('ALL');
-
   const [focusedSkillIdx, setFocusedSkillIdx] = useState<number>(0);
-  const [focusedMilestoneIdx, setFocusedMilestoneIdx] = useState<number>(0);
-
-  // Calculate category completion statistics for Milestones
-  const milestoneCategoryCounts = useMemo(() => {
-    const counts: Record<string, {total: number; completed: number; claimable: number}> = {
-      ALL: {total: ACHIEVEMENTS_LIST.length, completed: 0, claimable: 0},
-      BONDEX: {total: 0, completed: 0, claimable: 0},
-      MATURITY: {total: 0, completed: 0, claimable: 0},
-      AUTOMATION: {total: 0, completed: 0, claimable: 0},
-      EXPEDITIONS: {total: 0, completed: 0, claimable: 0},
-    };
-
-    ACHIEVEMENTS_LIST.forEach((ach) => {
-      const isClaimed = stats.claimedAchievements.includes(ach.id);
-      const isUnlocked = ach.isUnlocked(
-        stats,
-        plantedBonsais,
-        storedPottedBonsais,
-        discoveredSpeciesMap,
-        inventory,
-        deployedStructures,
-        installedCraftingArms,
-      );
-      const cat = ach.category;
-
-      if (!counts[cat]) {
-        counts[cat] = {total: 0, completed: 0, claimable: 0};
-      }
-      counts[cat].total += 1;
-      if (isClaimed) {
-        counts[cat].completed += 1;
-        counts.ALL.completed += 1;
-      } else if (isUnlocked) {
-        counts[cat].claimable += 1;
-        counts.ALL.claimable += 1;
-      }
-    });
-
-    return counts;
-  }, [
-    stats,
-    plantedBonsais,
-    storedPottedBonsais,
-    discoveredSpeciesMap,
-    inventory,
-    deployedStructures,
-    installedCraftingArms,
-  ]);
-
-  // Filtered and Sorted Milestones (Claimable highlighted at top)
-  const filteredAchievements = useMemo(() => {
-    const list = ACHIEVEMENTS_LIST.filter(
-      (ach) => milestoneSubTab === 'ALL' || ach.category === milestoneSubTab,
-    );
-
-    return [...list].sort((a, b) => {
-      const aClaimed = stats.claimedAchievements.includes(a.id);
-      const bClaimed = stats.claimedAchievements.includes(b.id);
-      const aUnlocked = a.isUnlocked(
-        stats,
-        plantedBonsais,
-        storedPottedBonsais,
-        discoveredSpeciesMap,
-        inventory,
-        deployedStructures,
-        installedCraftingArms,
-      );
-      const bUnlocked = b.isUnlocked(
-        stats,
-        plantedBonsais,
-        storedPottedBonsais,
-        discoveredSpeciesMap,
-        inventory,
-        deployedStructures,
-        installedCraftingArms,
-      );
-
-      // Status priority: 0 = Claimable (unlocked but not claimed), 1 = In Progress, 2 = Claimed
-      const aStatus = aClaimed ? 2 : aUnlocked ? 0 : 1;
-      const bStatus = bClaimed ? 2 : bUnlocked ? 0 : 1;
-
-      return aStatus - bStatus;
-    });
-  }, [
-    milestoneSubTab,
-    stats,
-    plantedBonsais,
-    storedPottedBonsais,
-    discoveredSpeciesMap,
-    inventory,
-    deployedStructures,
-    installedCraftingArms,
-  ]);
 
   // Handle Gamepad Bumper tab cycling & Keyboard Navigation
   useEffect(() => {
@@ -522,7 +459,7 @@ export default function ZenLibraryModal({
     const skillKeys = Object.keys(SKILL_CONFIGS);
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      const tabs: ShrineTab[] = ['bondex', 'skills', 'milestones'];
+      const tabs: ShrineTab[] = ['bondex', 'blueprints', 'skills'];
 
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -547,9 +484,6 @@ export default function ZenLibraryModal({
         } else if (activeTab === 'skills') {
           setFocusedSkillIdx((idx) => Math.max(0, idx - 1));
           gameAudio.playHoverMicroTone();
-        } else if (activeTab === 'milestones') {
-          setFocusedMilestoneIdx((idx) => Math.max(0, idx - 1));
-          gameAudio.playHoverMicroTone();
         }
       } else if (e.key === 's' || e.key === 'S') {
         e.preventDefault();
@@ -559,14 +493,10 @@ export default function ZenLibraryModal({
         } else if (activeTab === 'skills') {
           setFocusedSkillIdx((idx) => Math.min(skillKeys.length - 1, idx + 1));
           gameAudio.playHoverMicroTone();
-        } else if (activeTab === 'milestones') {
-          setFocusedMilestoneIdx((idx) => Math.min(filteredAchievements.length - 1, idx + 1));
-          gameAudio.playHoverMicroTone();
         }
       } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'e' || e.key === 'E') {
         e.preventDefault();
         if (activeTab === 'bondex') {
-          // Cycle through the 7 styles for the selected specimen
           setViewerStyle((cur) => {
             const idx = ALL_STYLES.indexOf(cur);
             return ALL_STYLES[(idx + 1) % ALL_STYLES.length];
@@ -575,31 +505,14 @@ export default function ZenLibraryModal({
         } else if (activeTab === 'skills') {
           const key = skillKeys[focusedSkillIdx];
           if (key) upgradeZenSkill(key as keyof ZenSkills);
-        } else if (activeTab === 'milestones') {
-          const ach = filteredAchievements[focusedMilestoneIdx];
-          if (ach) {
-            const isCompleted = ach.isUnlocked(
-              stats,
-              plantedBonsais,
-              storedPottedBonsais,
-              discoveredSpeciesMap,
-              inventory,
-              deployedStructures,
-              installedCraftingArms,
-            );
-            const isClaimed = stats.claimedAchievements.includes(ach.id);
-            if (isCompleted && !isClaimed) {
-              claimAchievement(ach.id, ach.rewardZen, ach.title);
-            }
-          }
         }
       }
     };
 
     const handleBumper = (e: Event) => {
-      const ce = e as CustomEvent<{direction: 'left' | 'right'}>;
+      const ce = e as CustomEvent<{ direction: 'left' | 'right' }>;
       const dir = ce.detail?.direction;
-      const tabs: ShrineTab[] = ['bondex', 'skills', 'milestones'];
+      const tabs: ShrineTab[] = ['bondex', 'blueprints', 'skills'];
       setActiveTab((cur) => {
         const idx = tabs.indexOf(cur);
         const nextIdx = dir === 'right' ? (idx + 1) % tabs.length : (idx - 1 + tabs.length) % tabs.length;
@@ -618,17 +531,7 @@ export default function ZenLibraryModal({
     isOpen,
     activeTab,
     focusedSkillIdx,
-    focusedMilestoneIdx,
-    filteredAchievements,
-    stats,
-    plantedBonsais,
-    storedPottedBonsais,
-    discoveredSpeciesMap,
-    inventory,
-    deployedStructures,
-    installedCraftingArms,
     upgradeZenSkill,
-    claimAchievement,
     onClose,
   ]);
 
@@ -653,14 +556,12 @@ export default function ZenLibraryModal({
   const selectedRaisedStyles = selectedDiscovery?.stylesRaised || [];
   const selectedBiomes = getSpeciesBiomeEncounters(selectedEntry.id);
 
-  // Fog-of-War: Filter biomes to only those where player has actually encountered the species in that area
   const revealedBiomes = selectedBiomes.filter(
     (bio) =>
       discoveredAreaSpecies &&
       (discoveredAreaSpecies[bio.biomeId] || []).includes(selectedEntry.id),
   );
 
-  // Filter list by Tree Type Group
   const filteredList =
     selectedGroupFilter === 'ALL'
       ? BONDEX_SPECIES_LIST
@@ -682,25 +583,32 @@ export default function ZenLibraryModal({
           <div>
             <h3 className="text-base sm:text-lg font-black text-pink-300 tracking-wide">📚 Zen Library</h3>
             <p className="text-[10.5px] text-slate-400">
-              Botanical Bondex Compendium, Mastery Skills &amp; Milestones
+              Botanical Bondex Compendium, Blueprints Catalog &amp; Mastery Skills
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          {/* Verdure Balance for purchasing blueprints */}
+          <div className="bg-emerald-950/85 border border-emerald-500/80 px-3 py-1 rounded-xl text-xs font-black text-emerald-300 flex items-center gap-1.5 shadow">
+            <VerdureIcon className="w-4 h-4" />
+            <span>{verdureBalance.toFixed(2)} Verdure</span>
+          </div>
+
+          {/* Zen Points */}
           <div className="bg-pink-950/80 border border-pink-500 px-3 py-1 rounded-xl text-xs font-black text-pink-300 flex items-center gap-1.5 shadow">
             <span>🌸</span>
             <span>{zenEssence} Zen Points</span>
           </div>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors">
+            className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* THREE PRIMARY TABS: ['Bondex', 'Skills', 'Milestones'] */}
+      {/* THREE PRIMARY TABS: ['Bondex', 'Blueprints', 'Skills'] */}
       <div className="grid grid-cols-3 gap-2 mb-2.5 shrink-0">
         {/* TAB 1: BONDEX */}
         <button
@@ -708,7 +616,7 @@ export default function ZenLibraryModal({
             setActiveTab('bondex');
             gameAudio.playCrispClick();
           }}
-          className={`py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow ${
+          className={`py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow cursor-pointer ${
             activeTab === 'bondex'
               ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white ring-2 ring-emerald-400/50'
               : 'bg-slate-800 text-slate-400 hover:bg-slate-750'
@@ -720,40 +628,37 @@ export default function ZenLibraryModal({
           </span>
         </button>
 
-        {/* TAB 2: SKILLS */}
+        {/* TAB 2: BLUEPRINTS (MOVED FROM MARKET TO ZEN LIBRARY) */}
+        <button
+          onClick={() => {
+            setActiveTab('blueprints');
+            gameAudio.playCrispClick();
+          }}
+          className={`py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow cursor-pointer ${
+            activeTab === 'blueprints'
+              ? 'bg-gradient-to-r from-lime-600 to-emerald-600 text-white ring-2 ring-lime-400/50'
+              : 'bg-slate-800 text-slate-400 hover:bg-slate-750'
+          }`}>
+          <BookOpen className="w-4 h-4 text-lime-300" />
+          <span>📜 Blueprints</span>
+          <span className="text-[10px] bg-slate-950/60 px-1.5 py-0.5 rounded-full font-mono text-lime-300">
+            58 Catalog
+          </span>
+        </button>
+
+        {/* TAB 3: SKILLS */}
         <button
           onClick={() => {
             setActiveTab('skills');
             gameAudio.playCrispClick();
           }}
-          className={`py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow ${
+          className={`py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow cursor-pointer ${
             activeTab === 'skills'
               ? 'bg-pink-600 text-white ring-2 ring-pink-400/50'
               : 'bg-slate-800 text-slate-400 hover:bg-slate-750'
           }`}>
           <Award className="w-4 h-4 text-pink-300" />
           <span>🌸 Skills</span>
-        </button>
-
-        {/* TAB 3: MILESTONES */}
-        <button
-          onClick={() => {
-            setActiveTab('milestones');
-            gameAudio.playCrispClick();
-          }}
-          className={`py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow relative ${
-            activeTab === 'milestones'
-              ? 'bg-gradient-to-r from-amber-600 to-pink-600 text-white ring-2 ring-amber-400/50'
-              : 'bg-slate-800 text-slate-400 hover:bg-slate-750'
-          }`}>
-          <Trophy className="w-4 h-4 text-amber-300" />
-          <span>🏆 Milestones</span>
-          <span className="text-[10px] bg-slate-950/60 px-1.5 py-0.5 rounded-full font-mono text-amber-300">
-            {stats.claimedAchievements.length}/{ACHIEVEMENTS_LIST.length}
-          </span>
-          {milestoneCategoryCounts.ALL.claimable > 0 && (
-            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 animate-ping shadow-[0_0_8px_#f59e0b]" />
-          )}
         </button>
       </div>
 
@@ -762,7 +667,7 @@ export default function ZenLibraryModal({
       {/* ========================================================================= */}
       {activeTab === 'bondex' && (
         <div className="flex-1 flex flex-col min-h-0 space-y-2">
-          {/* 1. COMPACT, STREAMLINED PROGRESS STATUS BAR (SAVES MODAL REAL ESTATE) */}
+          {/* Progress Status Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900/80 border border-emerald-500/40 px-3 py-1.5 rounded-xl text-xs shrink-0 shadow-sm">
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse" />
@@ -785,7 +690,7 @@ export default function ZenLibraryModal({
                 setSelectedGroupFilter('ALL');
                 gameAudio.playCrispClick();
               }}
-              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 border ${
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 border cursor-pointer ${
                 selectedGroupFilter === 'ALL'
                   ? 'bg-slate-100 text-slate-950 border-white shadow'
                   : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700'
@@ -806,7 +711,7 @@ export default function ZenLibraryModal({
                     borderColor: isSelected ? grp.themeColor : undefined,
                     color: isSelected ? grp.themeColor : undefined,
                   }}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 border ${
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 border cursor-pointer ${
                     isSelected
                       ? 'bg-slate-900 font-black shadow'
                       : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:border-slate-700'
@@ -856,7 +761,6 @@ export default function ZenLibraryModal({
                         {entry.num}
                       </span>
 
-                      {/* Mini Thumbnail or Lock Silhouette */}
                       <div
                         style={{
                           backgroundColor: isDiscovered ? `${def.color}25` : '#0f172a',
@@ -910,9 +814,8 @@ export default function ZenLibraryModal({
               })}
             </div>
 
-            {/* RIGHT PANE: SELECTED ENTRY POKÉDEX LCD SCREEN & INTERACTIVE STYLE VIEWER */}
+            {/* RIGHT PANE: SELECTED ENTRY POKÉDEX LCD SCREEN */}
             <div className="md:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 flex flex-col min-h-0 overflow-y-auto space-y-3">
-              {/* Top Pokédex Sensor Bar */}
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono font-black text-emerald-400">
@@ -935,7 +838,7 @@ export default function ZenLibraryModal({
                 )}
               </div>
 
-              {/* POKÉDEX LIVE CANVASES & INTERACTIVE STYLE VIEWER */}
+              {/* Live Canvases */}
               <div className="flex flex-col sm:flex-row items-center gap-3 bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80">
                 <div className="shrink-0 flex flex-col items-center">
                   <BondexStylePreviewCanvas
@@ -956,7 +859,7 @@ export default function ZenLibraryModal({
                   )}
                 </div>
 
-                {/* Interactive Style Selector Buttons */}
+                {/* Style Selector Buttons */}
                 <div className="flex-1 w-full space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 sticky top-0 bg-slate-950/90 py-0.5 z-10">
                     <Sparkles className="w-3 h-3 text-amber-400" />
@@ -986,7 +889,7 @@ export default function ZenLibraryModal({
                           setViewerStyle(stKey);
                           gameAudio.playCrispClick();
                         }}
-                        className={`w-full p-2 rounded-xl text-left border transition-all flex items-center justify-between gap-2 ${
+                        className={`w-full p-2 rounded-xl text-left border transition-all flex items-center justify-between gap-2 cursor-pointer ${
                           !isSelectedDiscovered
                             ? 'bg-slate-900/40 border-slate-800 text-slate-600 cursor-not-allowed'
                             : isSelected
@@ -1018,7 +921,6 @@ export default function ZenLibraryModal({
               {/* SPECIES FIELD DATA & BOTANICAL LORE */}
               {isSelectedDiscovered ? (
                 <div className="space-y-2.5">
-                  {/* Taxonomy & Highest Maturity Achieved */}
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
                       <span className="text-slate-400 block text-[10px] uppercase font-bold">
@@ -1044,7 +946,6 @@ export default function ZenLibraryModal({
                     </div>
                   </div>
 
-                  {/* 3. FOG-OF-WAR: NATURAL BIOME HABITATS (ONLY SHOWN IF ACTUALLY ENCOUNTERED IN THAT AREA) */}
                   <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
                     <span className="text-slate-400 block text-[10px] uppercase font-bold mb-1">
                       Natural Biome Habitats:
@@ -1064,15 +965,9 @@ export default function ZenLibraryModal({
                           <span>Undiscovered Biome Habitat</span>
                         </span>
                       )}
-                      {revealedBiomes.length > 0 && selectedBiomes.length > revealedBiomes.length && (
-                        <span className="bg-slate-900/60 border border-dashed border-slate-700 text-slate-500 text-[11px] px-2 py-0.5 rounded-lg font-mono">
-                          🔒 Undiscovered Biome Habitat ({selectedBiomes.length - revealedBiomes.length})
-                        </span>
-                      )}
                     </div>
                   </div>
 
-                  {/* Botanical Lore Blurb */}
                   <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
                     <span className="text-emerald-400 block text-[10px] uppercase font-bold mb-0.5">
                       Botanical Field Lore:
@@ -1097,7 +992,21 @@ export default function ZenLibraryModal({
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2 CONTENT: SKILLS */}
+      {/* TAB 2 CONTENT: STANDARDIZED BLUEPRINTS CATALOG (MOVED FROM MARKET TO ZEN LIBRARY) */}
+      {/* ========================================================================= */}
+      {activeTab === 'blueprints' && (
+        <div className="flex-1 overflow-hidden pr-1">
+          <BlueprintsCatalogView
+            unlockedBlueprints={unlockedBlueprints}
+            verdureBalance={verdureBalance}
+            onPurchaseBlueprint={onPurchaseBlueprint || (() => {})}
+            accentTone="emerald"
+          />
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 3 CONTENT: SKILLS */}
       {/* ========================================================================= */}
       {activeTab === 'skills' && (
         <div className="flex-1 flex flex-col min-h-0 space-y-2.5">
@@ -1166,7 +1075,7 @@ export default function ZenLibraryModal({
                         <button
                           disabled={isMax || !canAfford}
                           onClick={() => upgradeZenSkill(key as keyof ZenSkills)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow ${
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow cursor-pointer ${
                             isMax
                               ? 'bg-slate-800 text-emerald-400 border border-emerald-500/40 cursor-default'
                               : canAfford
@@ -1193,173 +1102,6 @@ export default function ZenLibraryModal({
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 3 CONTENT: MODERN CATEGORIZED MILESTONES & ACHIEVEMENTS */}
-      {/* ========================================================================= */}
-      {activeTab === 'milestones' && (
-        <div className="flex-1 flex flex-col min-h-0 space-y-2.5">
-          {/* CATEGORY FILTER CHIPS / SUB-TABS */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 shrink-0 scrollbar-none">
-            {[
-              {id: 'ALL', label: 'All', icon: '🏆'},
-              {id: 'BONDEX', label: '🌿 Bondex & Taxonomy', icon: '🌿'},
-              {id: 'MATURITY', label: '🌟 Maturity & Growth', icon: '🌟'},
-              {id: 'AUTOMATION', label: '⚡ Automation & Energy', icon: '⚡'},
-              {id: 'EXPEDITIONS', label: '🚜 Expeditions & Mastery', icon: '🚜'},
-            ].map((cat) => {
-              const isSelected = milestoneSubTab === cat.id;
-              const cData = milestoneCategoryCounts[cat.id] || {total: 0, completed: 0, claimable: 0};
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    setMilestoneSubTab(cat.id as any);
-                    gameAudio.playCrispClick();
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-slate-100 text-slate-950 border-white shadow-md'
-                      : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:border-slate-700'
-                  }`}>
-                  <span>{cat.label}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                      isSelected
-                        ? 'bg-slate-850 text-emerald-400'
-                        : 'bg-slate-950 text-slate-400'
-                    }`}>
-                    {cData.completed}/{cData.total}
-                  </span>
-                  {cData.claimable > 0 && (
-                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping shadow-[0_0_8px_#f59e0b]" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* MILESTONES CARDS LIST (CLAIMABLE AT TOP WITH GLOWING CLAIM PULSE) */}
-          <div className="flex-1 space-y-2.5 overflow-y-auto pr-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {filteredAchievements.map((ach, mIdx) => {
-                const isClaimed = stats.claimedAchievements.includes(ach.id);
-                const isCompleted = ach.isUnlocked(
-                  stats,
-                  plantedBonsais,
-                  storedPottedBonsais,
-                  discoveredSpeciesMap,
-                  inventory,
-                  deployedStructures,
-                  installedCraftingArms,
-                );
-                const isClaimable = isCompleted && !isClaimed;
-                const isFocused = focusedMilestoneIdx === mIdx;
-                const curVal = ach.currentValue(
-                  stats,
-                  plantedBonsais,
-                  storedPottedBonsais,
-                  discoveredSpeciesMap,
-                  inventory,
-                  deployedStructures,
-                  installedCraftingArms,
-                );
-                const pct = Math.min(100, Math.round((curVal / ach.targetValue) * 100));
-
-                const categoryBadgeColor: Record<MilestoneCategory, string> = {
-                  BONDEX: 'bg-emerald-950 text-emerald-300 border-emerald-500/50',
-                  MATURITY: 'bg-amber-950 text-amber-300 border-amber-500/50',
-                  AUTOMATION: 'bg-sky-950 text-sky-300 border-sky-500/50',
-                  EXPEDITIONS: 'bg-purple-950 text-purple-300 border-purple-500/50',
-                };
-
-                const categoryNames: Record<MilestoneCategory, string> = {
-                  BONDEX: '🌿 Bondex',
-                  MATURITY: '🌟 Maturity',
-                  AUTOMATION: '⚡ Automation',
-                  EXPEDITIONS: '🚜 Expeditions',
-                };
-
-                return (
-                  <div
-                    key={ach.id}
-                    className={`p-3.5 rounded-2xl border flex flex-col justify-between gap-2.5 transition-all ${
-                      isFocused
-                        ? 'ring-2 ring-amber-300 border-amber-400 bg-slate-850 scale-[1.01]'
-                        : isClaimable
-                        ? 'bg-gradient-to-br from-amber-950/60 via-slate-900 to-emerald-950/40 border-amber-400 shadow-[0_0_18px_rgba(251,191,36,0.35)] ring-1 ring-amber-400/60'
-                        : isClaimed
-                        ? 'bg-slate-950/50 border-slate-800/80 opacity-70'
-                        : 'bg-slate-900/80 border-slate-800'
-                    }`}>
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">{ach.icon}</span>
-                          <div>
-                            <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
-                              <span>{ach.title}</span>
-                              {isClaimed && <span className="text-emerald-400 text-xs">✓</span>}
-                            </h4>
-                            <span className="text-xs text-amber-300 font-semibold">{ach.subtitle}</span>
-                          </div>
-                        </div>
-
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${categoryBadgeColor[ach.category]}`}>
-                          {categoryNames[ach.category]}
-                        </span>
-                      </div>
-
-                      <p className="text-xs text-slate-400 mb-1.5 leading-relaxed">{ach.description}</p>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-300 mb-1 font-mono">
-                        <span>
-                          Progress: {Math.min(ach.targetValue, curVal)} / {ach.targetValue} {ach.unit}
-                        </span>
-                        <span className={isCompleted ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
-                          {pct}%
-                        </span>
-                      </div>
-
-                      <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800 mb-2">
-                        <div
-                          style={{width: `${pct}%`}}
-                          className={`h-full transition-all duration-300 ${
-                            isCompleted
-                              ? 'bg-gradient-to-r from-emerald-400 to-amber-400'
-                              : 'bg-pink-500'
-                          }`}
-                        />
-                      </div>
-
-                      {isClaimed ? (
-                        <div className="w-full py-1.5 bg-slate-950 border border-emerald-500/30 rounded-xl text-center text-xs font-bold text-emerald-400 flex items-center justify-center gap-1">
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Claimed (+{ach.rewardZen} Zen Points)</span>
-                        </div>
-                      ) : isCompleted ? (
-                        <button
-                          onClick={() => claimAchievement(ach.id, ach.rewardZen, ach.title)}
-                          className="w-full py-2 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 hover:from-amber-300 hover:to-yellow-200 text-slate-950 font-black text-xs rounded-xl shadow-[0_0_15px_rgba(251,191,36,0.5)] transition-transform active:scale-95 flex items-center justify-center gap-1.5 animate-pulse">
-                          <Trophy className="w-3.5 h-3.5 fill-current" />
-                          <span>CLAIM (+{ach.rewardZen} ZEN POINTS)</span>
-                        </button>
-                      ) : (
-                        <div className="w-full py-1.5 bg-slate-950/60 border border-slate-800 rounded-xl text-center text-xs font-medium text-slate-500">
-                          In Progress • Reward: +{ach.rewardZen} 🌸 Zen
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* FOOTER CONTROLLER & KEYBOARD PROMPTS STRIP */}
       <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 shrink-0 mt-1">
         <span className="font-mono text-pink-400 text-[11px] hidden sm:inline">
@@ -1367,7 +1109,7 @@ export default function ZenLibraryModal({
         </span>
         <button
           onClick={onClose}
-          className="px-5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-all border border-slate-700">
+          className="px-5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-all border border-slate-700 cursor-pointer">
           Close [Esc / B]
         </button>
       </div>

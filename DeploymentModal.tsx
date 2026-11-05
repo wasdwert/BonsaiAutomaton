@@ -104,7 +104,264 @@ export interface DeploymentModalProps {
   initialSelectedSeedling?: SeedlingItem | null;
 }
 
-export type DeploymentCategory = 'seedlings' | 'bonsais' | 'infrastructure' | 'decorations';
+export type DeploymentCategory = 'seedlings' | 'bonsais' | 'infrastructure' | 'decorations' | 'care';
+
+export interface DeployableItemConfig {
+  id: string;
+  name: string;
+  category: 'care' | 'infrastructure' | 'decoration';
+  size: '1x1' | '2x2' | '3x3' | '3x1';
+  width: number;
+  height: number;
+  rotatable: boolean;
+  icon: string;
+  kw?: number;
+  description: string;
+}
+
+export const DEPLOYABLE_ITEMS: Record<string, DeployableItemConfig> = {
+  t1_compost_feeder: {
+    id: 't1_compost_feeder',
+    name: 'T1 Compost Feeder',
+    category: 'care',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: true,
+    icon: '🍂',
+    kw: 6,
+    description: 'Rotatable auger feeder (6 kW). Tends 1 bonsai (UP/RIGHT/DOWN/LEFT). Automatically feeds compost without manual application when buff expires!',
+  },
+  t2_compost_feeder: {
+    id: 't2_compost_feeder',
+    name: 'T2 Compost Feeder',
+    category: 'care',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: true,
+    icon: '🌾',
+    kw: 10,
+    description: 'Rotatable dual-chute feeder (10 kW). Tends 2 bonsais horizontally (L/R) or vertically (U/D). Consumes only 1 compost unit total for both!',
+  },
+  t3_compost_feeder: {
+    id: 't3_compost_feeder',
+    name: 'T3 Compost Feeder',
+    category: 'care',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: false,
+    icon: '✨',
+    kw: 16,
+    description: 'Omni-chute auger hopper (16 kW). Tends all 4 cardinal adjacent bonsais. Consumes only 1 compost unit total to nourish all 4 bonsais simultaneously!',
+  },
+  t1_fertilizer_dripper: {
+    id: 't1_fertilizer_dripper',
+    name: 'T1 Fertilizer Dripper',
+    category: 'care',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: true,
+    icon: '🧪',
+    kw: 7,
+    description: 'Rotatable pressurized dripper (7 kW). Tends 1 bonsai (UP/RIGHT/DOWN/LEFT). Automatically injects fertilizer without manual care!',
+  },
+  t2_fertilizer_dripper: {
+    id: 't2_fertilizer_dripper',
+    name: 'T2 Fertilizer Dripper',
+    category: 'care',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: true,
+    icon: '⚡',
+    kw: 12,
+    description: 'Rotatable dual-pipette dripper (12 kW). Tends 2 adjacent bonsais horizontally or vertically. Consumes only 1 fertilizer unit total for both!',
+  },
+  t3_fertilizer_dripper: {
+    id: 't3_fertilizer_dripper',
+    name: 'T3 Fertilizer Dripper',
+    category: 'care',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: false,
+    icon: '🌟',
+    kw: 18,
+    description: 'Omni-channel pressurized micro-injector (18 kW). Tends all 4 cardinal adjacent bonsais simultaneously consuming only 1 fertilizer unit total!',
+  },
+  auto_unloader: {
+    id: 'auto_unloader',
+    name: 'Auto (Un-)Loader',
+    category: 'infrastructure',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: true,
+    icon: '🦾',
+    kw: 2,
+    description: '1x1 automated robotic loader arm (2 kW). Loads ingredients and unloads finished products.',
+  },
+  solar_panel: {
+    id: 'solar_panel',
+    name: 'Solar Panel Array',
+    category: 'infrastructure',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: false,
+    icon: '☀️',
+    description: '+3 kW Clean Electricity (+0.5 kW/neighbor).',
+  },
+  solar_farm_2x2: {
+    id: 'solar_farm_2x2',
+    name: 'Solar Panel Farm (2x2)',
+    category: 'infrastructure',
+    size: '2x2',
+    width: 2,
+    height: 2,
+    rotatable: false,
+    icon: '☀️',
+    description: '+24 kW Clean Power (+1.0 kW/adj unit).',
+  },
+  solar_farm_3x3: {
+    id: 'solar_farm_3x3',
+    name: 'Big Solar Panel Farm (3x3)',
+    category: 'infrastructure',
+    size: '3x3',
+    width: 3,
+    height: 3,
+    rotatable: false,
+    icon: '☀️',
+    description: '+87 kW Clean Power (+1.5 kW/adj unit).',
+  },
+  wind_turbine: {
+    id: 'wind_turbine',
+    name: 'Wind Turbine Generator',
+    category: 'infrastructure',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: false,
+    icon: '💨',
+    description: '+6 kW Clean Electricity (+1.0 kW/neighbor).',
+  },
+  wind_farm_2x2: {
+    id: 'wind_farm_2x2',
+    name: 'Wind Turbine Farm (2x2)',
+    category: 'infrastructure',
+    size: '2x2',
+    width: 2,
+    height: 2,
+    rotatable: false,
+    icon: '💨',
+    description: '+42 kW Clean Power (+1.5 kW/adj unit).',
+  },
+  wind_farm_3x3: {
+    id: 'wind_farm_3x3',
+    name: 'Big Wind Turbine Farm (3x3)',
+    category: 'infrastructure',
+    size: '3x3',
+    width: 3,
+    height: 3,
+    rotatable: false,
+    icon: '💨',
+    description: '+134 kW Clean Power (+2.0 kW/adj unit).',
+  },
+  automaton_t1: {
+    id: 'automaton_t1',
+    name: 'T1 Hydration Sprinkler',
+    category: 'care',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: true,
+    icon: '💧',
+    kw: 4,
+    description: 'Waters Left & Right adjacent plots at 1.0x baseline speed (4 kW).',
+  },
+  automaton_t2: {
+    id: 'automaton_t2',
+    name: 'T2 Hydration Sprinkler',
+    category: 'care',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: false,
+    icon: '⚡',
+    kw: 7,
+    description: 'Waters Up, Down, Left, Right plots at 2.5x speed (7 kW).',
+  },
+  automaton_t3: {
+    id: 'automaton_t3',
+    name: 'T3 Hydration Sprinkler',
+    category: 'care',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: false,
+    icon: '✨',
+    kw: 12,
+    description: 'Waters all 8 surrounding plots in 3x3 at 5.0x ultra speed (12 kW).',
+  },
+  irrigation_t1: {
+    id: 'irrigation_t1',
+    name: 'T1 Manual Irrigation System',
+    category: 'care',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: true,
+    icon: '💧',
+    description: 'Waters Left & Right adjacent plots for 30s upon manual refill.',
+  },
+  irrigation_t2: {
+    id: 'irrigation_t2',
+    name: 'T2 Manual Irrigation System',
+    category: 'care',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: false,
+    icon: '💧',
+    description: 'Waters 4-way cross plots for 90s upon manual refill.',
+  },
+  irrigation_t3: {
+    id: 'irrigation_t3',
+    name: 'T3 Manual Irrigation System',
+    category: 'care',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: false,
+    icon: '💧',
+    description: 'Waters all 8 surrounding plots in 3x3 for 300s upon manual refill.',
+  },
+  tool_compost_heap: {
+    id: 'tool_compost_heap',
+    name: 'Compost Heap',
+    category: 'care',
+    size: '1x1',
+    width: 1,
+    height: 1,
+    rotatable: false,
+    icon: '🍂',
+    description: 'Rustic cedar box decomposing 20 Organic Waste into usable compost.',
+  },
+  fertilizer_station: {
+    id: 'fertilizer_station',
+    name: 'Chemical Station (2x2)',
+    category: 'care',
+    size: '2x2',
+    width: 2,
+    height: 2,
+    rotatable: false,
+    icon: '🧪',
+    description: '2x2 chemical apparatus distilling Waste & Biochemicals into Fertilizer.',
+  },
+};
 
 const STYLES: BonsaiStyle[] = [
   'CHOKAN',
@@ -300,6 +557,7 @@ export default function DeploymentModal({
   const compostCount = getStructureInventoryCount(inv, 'tool_compost_heap');
   const fertilizerStationCount = getStructureInventoryCount(inv, 'fertilizer_station');
   const wellCount = getStructureInventoryCount(inv, 'tool_garden_well');
+  const autoUnloaderCount = getStructureInventoryCount(inv, 'auto_unloader');
   const solarCount = getStructureInventoryCount(inv, 'solar_panel');
   const solarFarm2x2Count = getStructureInventoryCount(inv, 'solar_farm_2x2' as any);
   const solarFarm3x3Count = getStructureInventoryCount(inv, 'solar_farm_3x3' as any);
@@ -318,7 +576,21 @@ export default function DeploymentModal({
     inv.decorations?.['torii_gate'] ||
     0;
 
+  const t1CompostFeederCount = getStructureInventoryCount(inv, 't1_compost_feeder');
+  const t2CompostFeederCount = getStructureInventoryCount(inv, 't2_compost_feeder');
+  const t3CompostFeederCount = getStructureInventoryCount(inv, 't3_compost_feeder');
+  const t1FertilizerDripperCount = getStructureInventoryCount(inv, 't1_fertilizer_dripper');
+  const t2FertilizerDripperCount = getStructureInventoryCount(inv, 't2_fertilizer_dripper');
+  const t3FertilizerDripperCount = getStructureInventoryCount(inv, 't3_fertilizer_dripper');
+
   const infraItems: DeployedStructureType[] = [
+    't1_compost_feeder',
+    't2_compost_feeder',
+    't3_compost_feeder',
+    't1_fertilizer_dripper',
+    't2_fertilizer_dripper',
+    't3_fertilizer_dripper',
+    'auto_unloader',
     'automaton_t1',
     'automaton_t2',
     'automaton_t3',
@@ -445,7 +717,7 @@ export default function DeploymentModal({
               onPlantStoredBonsai(storedBonsais[focusedItemIdx].id);
             }
             onClose();
-          } else if (activeCategory === 'infrastructure') {
+          } else if (activeCategory === 'infrastructure' || (activeCategory as string) === 'care') {
             const item = infraItems[focusedItemIdx];
             if (item) {
               const count = getStructureInventoryCount(inv, item);
@@ -453,13 +725,20 @@ export default function DeploymentModal({
                 gameAudio.playCrispClick();
                 if (onStartPlacementPreview) {
                   const is3x3 = item === 'solar_farm_3x3' || item === 'wind_farm_3x3';
-                  const is2x2 = item === 'solar_farm_2x2' || item === 'wind_farm_2x2';
+                  const is2x2 =
+                    item === 'solar_farm_2x2' ||
+                    item === 'wind_farm_2x2' ||
+                    item === 'fertilizer_station' ||
+                    (item as string) === 'chemical_station';
                   onStartPlacementPreview({
                     category: 'infrastructure',
                     payload: item,
                     width: is3x3 ? 3 : is2x2 ? 2 : 1,
                     height: is3x3 ? 3 : is2x2 ? 2 : 1,
                     orientation: 'horizontal',
+                    loaderFacing: 'UP',
+                    dispenserFacing: 'UP',
+                    dispenserOrientation: 'horizontal',
                   });
                 } else {
                   onDeployStructure(item);
@@ -976,7 +1255,7 @@ export default function DeploymentModal({
               <Wrench className="w-4 h-4 text-amber-300" />
               <span>Infrastructure</span>
               <span className="text-[10px] bg-slate-950/60 px-1.5 py-0.5 rounded-full font-mono text-amber-300">
-                {solarCount + solarFarm2x2Count + solarFarm3x3Count + windCount + windFarm2x2Count + windFarm3x3Count + compostCount + fertilizerStationCount + wellCount + autoT1Count + autoT2Count + autoT3Count + irrigT1Count + irrigT2Count + irrigT3Count}
+                {t1CompostFeederCount + t2CompostFeederCount + t3CompostFeederCount + t1FertilizerDripperCount + t2FertilizerDripperCount + t3FertilizerDripperCount + autoUnloaderCount + solarCount + solarFarm2x2Count + solarFarm3x3Count + windCount + windFarm2x2Count + windFarm3x3Count + compostCount + fertilizerStationCount + wellCount + autoT1Count + autoT2Count + autoT3Count + irrigT1Count + irrigT2Count + irrigT3Count}
               </span>
             </button>
 
@@ -1297,14 +1576,323 @@ export default function DeploymentModal({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* T1 Compost Feeder */}
+                  <div className="bg-slate-900/90 border border-lime-500/50 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">🍂</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T1 Compost Feeder (Rotatable)</h4>
+                          <span className="text-[10px] text-lime-400 font-bold">1 Adjacent Bonsai (UP/RIGHT/DOWN/LEFT) • 6 kW</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-lime-950 text-lime-300 border border-lime-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {t1CompostFeederCount}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Mechanical hopper dispenser with organic auger chute. Automatically feeds 1 facing bonsai with compost if buff is inactive. Rotate via [R] or preview!
+                    </p>
+                    <button
+                      disabled={t1CompostFeederCount <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 't1_compost_feeder',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                            loaderFacing: 'UP',
+                            dispenserFacing: 'UP',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('t1_compost_feeder');
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        t1CompostFeederCount > 0
+                          ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <span>🍂</span>
+                      {t1CompostFeederCount > 0 ? 'Deploy T1 Compost Feeder' : 'Craft in Bonsai Care'}
+                    </button>
+                  </div>
+
+                  {/* T2 Compost Feeder */}
+                  <div className="bg-slate-900/90 border border-lime-500/50 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">🌾</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T2 Compost Feeder (Rotatable)</h4>
+                          <span className="text-[10px] text-lime-400 font-bold">2 Bonsais (Horizontal / Vertical) • 10 kW</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-lime-950 text-lime-300 border border-lime-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {t2CompostFeederCount}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Dual auger chutes tending to 2 bonsais next to it horizontally (L/R) or vertically (U/D). Consumes only 1 compost unit total to nourish both simultaneously!
+                    </p>
+                    <button
+                      disabled={t2CompostFeederCount <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 't2_compost_feeder',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                            dispenserOrientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('t2_compost_feeder');
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        t2CompostFeederCount > 0
+                          ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <span>🌾</span>
+                      {t2CompostFeederCount > 0 ? 'Deploy T2 Compost Feeder' : 'Craft in Bonsai Care'}
+                    </button>
+                  </div>
+
+                  {/* T3 Compost Feeder */}
+                  <div className="bg-slate-900/90 border border-lime-500/50 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">✨</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T3 Compost Feeder</h4>
+                          <span className="text-[10px] text-lime-400 font-bold">4 Cardinal Sides (Up/Down/Left/Right) • 16 kW</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-lime-950 text-lime-300 border border-lime-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {t3CompostFeederCount}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Omni-chute mechanical auger hopper. Tends to all 4 cardinal adjacent bonsais simultaneously using only 1 compost unit total!
+                    </p>
+                    <button
+                      disabled={t3CompostFeederCount <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 't3_compost_feeder',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('t3_compost_feeder');
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        t3CompostFeederCount > 0
+                          ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <span>✨</span>
+                      {t3CompostFeederCount > 0 ? 'Deploy T3 Compost Feeder' : 'Craft in Bonsai Care'}
+                    </button>
+                  </div>
+
+                  {/* T1 Fertilizer Dripper */}
+                  <div className="bg-slate-900/90 border border-cyan-500/50 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">🧪</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T1 Fertilizer Dripper (Rotatable)</h4>
+                          <span className="text-[10px] text-cyan-400 font-bold">1 Adjacent Bonsai (UP/RIGHT/DOWN/LEFT) • 7 kW</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-cyan-950 text-cyan-300 border border-cyan-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {t1FertilizerDripperCount}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Pressurized nutrient reservoir with micro-nozzle pipette. Automatically injects fertilizer into 1 facing bonsai. Rotate via [R] or preview!
+                    </p>
+                    <button
+                      disabled={t1FertilizerDripperCount <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 't1_fertilizer_dripper',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                            loaderFacing: 'UP',
+                            dispenserFacing: 'UP',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('t1_fertilizer_dripper');
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        t1FertilizerDripperCount > 0
+                          ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <span>🧪</span>
+                      {t1FertilizerDripperCount > 0 ? 'Deploy T1 Fertilizer Dripper' : 'Craft in Bonsai Care'}
+                    </button>
+                  </div>
+
+                  {/* T2 Fertilizer Dripper */}
+                  <div className="bg-slate-900/90 border border-cyan-500/50 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">⚡</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T2 Fertilizer Dripper (Rotatable)</h4>
+                          <span className="text-[10px] text-cyan-400 font-bold">2 Bonsais (Horizontal / Vertical) • 12 kW</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-cyan-950 text-cyan-300 border border-cyan-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {t2FertilizerDripperCount}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Dual-pipette nutrient injector tending to 2 adjacent bonsais horizontally or vertically. Consumes only 1 fertilizer unit total for both!
+                    </p>
+                    <button
+                      disabled={t2FertilizerDripperCount <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 't2_fertilizer_dripper',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                            dispenserOrientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('t2_fertilizer_dripper');
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        t2FertilizerDripperCount > 0
+                          ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <span>⚡</span>
+                      {t2FertilizerDripperCount > 0 ? 'Deploy T2 Fertilizer Dripper' : 'Craft in Bonsai Care'}
+                    </button>
+                  </div>
+
+                  {/* T3 Fertilizer Dripper */}
+                  <div className="bg-slate-900/90 border border-cyan-500/50 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">🌟</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T3 Fertilizer Dripper</h4>
+                          <span className="text-[10px] text-cyan-400 font-bold">4 Cardinal Sides (Up/Down/Left/Right) • 18 kW</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-cyan-950 text-cyan-300 border border-cyan-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {t3FertilizerDripperCount}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      High-pressure 4-way micro-injector. Nourishes all 4 cardinal adjacent bonsais simultaneously consuming ONLY 1 fertilizer unit total!
+                    </p>
+                    <button
+                      disabled={t3FertilizerDripperCount <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 't3_fertilizer_dripper',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('t3_fertilizer_dripper');
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        t3FertilizerDripperCount > 0
+                          ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <span>🌟</span>
+                      {t3FertilizerDripperCount > 0 ? 'Deploy T3 Fertilizer Dripper' : 'Craft in Bonsai Care'}
+                    </button>
+                  </div>
+
+                  {/* Auto (Un-)Loader */}
+                  <div className="bg-slate-900/90 border border-indigo-500/50 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">🦾</span>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Auto (Un-)Loader</h4>
+                          <span className="text-[10px] text-indigo-300 font-bold">1x1 Grid Automation • 2 kW Load • 4-Way Facing</span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-indigo-950 text-indigo-300 border border-indigo-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
+                        Stock: {autoUnloaderCount}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Articulated robotic arm. Automatically loads recipes into facing Compost Heap or Chemical Station from player inventory and unloads finished goods every 1 second based on configured buffers!
+                    </p>
+                    <button
+                      disabled={autoUnloaderCount <= 0}
+                      onClick={() => {
+                        if (onStartPlacementPreview) {
+                          onStartPlacementPreview({
+                            category: 'infrastructure',
+                            payload: 'auto_unloader',
+                            width: 1,
+                            height: 1,
+                            orientation: 'horizontal',
+                            loaderFacing: 'UP',
+                            facing: 'UP',
+                          });
+                          onClose();
+                        } else {
+                          onDeployStructure('auto_unloader');
+                        }
+                      }}
+                      className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer ${
+                        autoUnloaderCount > 0
+                          ? 'bg-indigo-600 hover:bg-indigo-500 text-white active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}>
+                      <Wrench className="w-4 h-4" />
+                      {autoUnloaderCount > 0 ? 'Deploy Auto (Un-)Loader' : 'Craft in Workbench'}
+                    </button>
+                  </div>
+
                   {/* T1 Hydration Sprinkler */}
                   <div className="bg-slate-900/90 border border-sky-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <span className="text-2xl">💧</span>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T1 Hydration Sprinkler</h4>
-                          <span className="text-[10px] text-sky-400 font-bold">Left &amp; Right Plots (2 Total) • 2 kW Load</span>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T1 Hydration Sprinkler (Rotatable)</h4>
+                          <span className="text-[10px] text-sky-400 font-bold">2 Adjacent Plots (H: L/R, V: U/D) • 4 kW Load</span>
                         </div>
                       </div>
                       <span className="text-xs bg-sky-950 text-sky-300 border border-sky-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
@@ -1312,7 +1900,7 @@ export default function DeploymentModal({
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      Compact brass ground sprinkler head with dual side nozzles. Waters Left and Right plots continuously when power is sufficient.
+                      Rotatable dual-nozzle ground sprinkler head. Waters 2 adjacent plots (H: Left &amp; Right or V: Up &amp; Down). Rotate via [← / → or R or LB / RB] in preview or on grid!
                     </p>
                     <button
                       disabled={autoT1Count <= 0}
@@ -1336,7 +1924,7 @@ export default function DeploymentModal({
                           : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                       }`}>
                       <Droplets className="w-4 h-4" />
-                      {autoT1Count > 0 ? 'Deploy T1 Sprinkler' : 'Craft at Workbench First'}
+                      {autoT1Count > 0 ? 'Deploy T1 Sprinkler (Rotatable)' : 'Craft at Workbench First'}
                     </button>
                   </div>
 
@@ -1432,8 +2020,8 @@ export default function DeploymentModal({
                       <div className="flex items-center gap-2.5">
                         <span className="text-2xl">💧</span>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T1 Manual Irrigation System</h4>
-                          <span className="text-[10px] text-sky-400 font-bold">Left &amp; Right Plots • 30s Reservoir</span>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">T1 Manual Irrigation (Rotatable)</h4>
+                          <span className="text-[10px] text-sky-400 font-bold">2 Adjacent Plots (H: L/R, V: U/D) • 30s Reservoir</span>
                         </div>
                       </div>
                       <span className="text-xs bg-sky-950 text-sky-300 border border-sky-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
@@ -1441,7 +2029,7 @@ export default function DeploymentModal({
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      Wooden stool with water bucket and 2 outlet pipes. Refill [E] to provide 30s of continuous watering to Left and Right plots.
+                      Wooden stool with water bucket and dual outlet spigots. Refill [E] to provide 30s of watering to 2 adjacent plots (Left &amp; Right or Up &amp; Down). Rotate via [← / → or R]!
                     </p>
                     <button
                       disabled={irrigT1Count <= 0}
@@ -1465,7 +2053,7 @@ export default function DeploymentModal({
                           : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                       }`}>
                       <Droplets className="w-4 h-4" />
-                      {irrigT1Count > 0 ? 'Deploy T1 Irrigation' : 'Buy in Botanical Market'}
+                      {irrigT1Count > 0 ? 'Deploy T1 Irrigation (Rotatable)' : 'Buy in Botanical Market'}
                     </button>
                   </div>
 
@@ -1856,14 +2444,14 @@ export default function DeploymentModal({
                     </button>
                   </div>
 
-                  {/* Fertilizer Station */}
+                  {/* Chemical Station (2x2) */}
                   <div className="bg-slate-900/90 border border-emerald-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 shadow">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <span className="text-2xl">🧪</span>
                         <div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Fertilizer Station</h4>
-                          <span className="text-[10px] text-emerald-400 font-bold">Eco-Chemical Distiller • 60s Cycle</span>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100">Chemical Station (2x2)</h4>
+                          <span className="text-[10px] text-emerald-400 font-bold">2x2 Industrial Apparatus • 60s Cycle</span>
                         </div>
                       </div>
                       <span className="text-xs bg-emerald-950 text-emerald-300 border border-emerald-600/50 px-2 py-0.5 rounded-lg font-bold font-mono">
@@ -1871,7 +2459,7 @@ export default function DeploymentModal({
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      Sophisticated eco-chemical apparatus. Distills 3 Organic Waste + 1 Biochemical into 1 high-potency Fertilizer in 60s (-300s growth boost).
+                      Expanded 2x2 high-tech chemical apparatus. Distills 3 Organic Waste + 1 Biochemical into 1 high-potency Fertilizer in 60s (-300s growth boost). Radiates Disrupted Zen 1 plot outwards (4x4 perimeter) unless fenced.
                     </p>
                     <button
                       disabled={fertilizerStationCount <= 0}
@@ -1880,8 +2468,8 @@ export default function DeploymentModal({
                           onStartPlacementPreview({
                             category: 'infrastructure',
                             payload: 'fertilizer_station',
-                            width: 1,
-                            height: 1,
+                            width: 2,
+                            height: 2,
                             orientation: 'horizontal',
                           });
                           onClose();
@@ -1895,7 +2483,7 @@ export default function DeploymentModal({
                           : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                       }`}>
                       <span>🧪</span>
-                      {fertilizerStationCount > 0 ? 'Deploy Fertilizer Station' : 'Buy in Botanical Market'}
+                      {fertilizerStationCount > 0 ? 'Deploy Chemical Station (2x2)' : 'Buy in Botanical Market'}
                     </button>
                   </div>
                 </div>

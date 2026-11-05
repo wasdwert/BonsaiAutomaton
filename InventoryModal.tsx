@@ -50,7 +50,9 @@ import {
   getBonsaiNature,
   calculateBaseAesthetic,
   checkMatchesEcoRequest,
+  GridPlacementPreview,
 } from './types';
+import { DeployedStructureType } from './App';
 
 export interface EquipmentCardProps {
   icon: React.ReactNode;
@@ -62,6 +64,7 @@ export interface EquipmentCardProps {
   stockCount: number;
   activeCount: number;
   activeLabel: 'Deployed' | 'Attached';
+  onDeploy?: () => void;
 }
 
 /**
@@ -74,9 +77,11 @@ export function EquipmentCard({
   iconBorder = 'border-slate-800',
   title,
   subtitle,
+  description,
   stockCount,
   activeCount,
   activeLabel,
+  onDeploy,
 }: EquipmentCardProps) {
   return (
     <div className="bg-slate-900/80 border border-slate-800 hover:border-slate-700/90 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow transition-all min-h-[76px]">
@@ -88,16 +93,34 @@ export function EquipmentCard({
         <div className="min-w-0">
           <h4 className="font-bold text-xs sm:text-sm text-slate-100 truncate">{title}</h4>
           <p className="text-[10px] sm:text-[11px] text-slate-400 line-clamp-1">{subtitle}</p>
+          {description && (
+            <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">{description}</p>
+          )}
         </div>
       </div>
-      <div className="shrink-0 px-2.5 py-1 rounded-xl bg-slate-950/90 border border-slate-700/80 flex items-center gap-1.5 font-mono text-xs shadow-sm">
-        <span className={stockCount > 0 ? 'text-emerald-400 font-black' : 'text-slate-500 font-semibold'}>
-          {stockCount} in Stock
-        </span>
-        <span className="text-slate-600 font-light">/</span>
-        <span className={activeCount > 0 ? 'text-sky-300 font-bold' : 'text-slate-500 font-semibold'}>
-          {activeCount} {activeLabel}
-        </span>
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="px-2.5 py-1 rounded-xl bg-slate-950/90 border border-slate-700/80 flex items-center gap-1.5 font-mono text-xs shadow-sm">
+          <span className={stockCount > 0 ? 'text-emerald-400 font-black' : 'text-slate-500 font-semibold'}>
+            {stockCount} in Stock
+          </span>
+          <span className="text-slate-600 font-light">/</span>
+          <span className={activeCount > 0 ? 'text-sky-300 font-bold' : 'text-slate-500 font-semibold'}>
+            {activeCount} {activeLabel}
+          </span>
+        </div>
+        {onDeploy && (
+          <button
+            disabled={stockCount <= 0}
+            onClick={onDeploy}
+            className={`font-bold text-xs px-3 py-1.5 rounded-xl transition-all shadow flex items-center gap-1 shrink-0 ${
+              stockCount > 0
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95 cursor-pointer ring-1 ring-emerald-400/50'
+                : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+            }`}>
+            <Sprout className="w-3.5 h-3.5" />
+            <span>Deploy</span>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -121,6 +144,8 @@ export interface InventoryModalProps {
   onPlantSaplingClick: (sap: any) => void;
   onInspectBonsai?: (id: string) => void;
   onDonateStoredBonsai?: (id: string) => void;
+  onDeployStructure?: (type: DeployedStructureType) => void;
+  onStartPlacementPreview?: (preview: GridPlacementPreview) => void;
   activeEcoRequestIndex?: number;
   ecoRequestCounts?: Record<string, number>;
   isInspecting?: boolean;
@@ -144,6 +169,8 @@ export default function InventoryModal({
   onPlantSaplingClick,
   onInspectBonsai,
   onDonateStoredBonsai,
+  onDeployStructure,
+  onStartPlacementPreview,
   activeEcoRequestIndex = 0,
   ecoRequestCounts = {},
   isInspecting = false,
@@ -263,6 +290,24 @@ export default function InventoryModal({
 
   if (!isOpen) return null;
 
+  const handleDeployItem = (type: DeployedStructureType, is3x3 = false, is2x2 = false) => {
+    onClose();
+    if (onStartPlacementPreview) {
+      onStartPlacementPreview({
+        category: 'infrastructure',
+        payload: type,
+        width: is3x3 ? 3 : is2x2 ? 2 : 1,
+        height: is3x3 ? 3 : is2x2 ? 2 : 1,
+        orientation: 'horizontal',
+        loaderFacing: 'UP',
+        dispenserFacing: 'UP',
+        dispenserOrientation: 'horizontal',
+      });
+    } else if (onDeployStructure) {
+      onDeployStructure(type);
+    }
+  };
+
   return (
     <div className="fixed top-12 left-0 right-0 bottom-0 z-40 bg-slate-950/95 backdrop-blur-md p-3 sm:p-5 flex flex-col overflow-hidden border-t border-slate-800 text-left select-none">
       <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-3 shrink-0">
@@ -332,7 +377,7 @@ export default function InventoryModal({
               : 'bg-slate-800 text-slate-400 hover:bg-slate-750'
           }`}>
           <span>🎋</span>
-            <span>Decor ({
+            <span>Decorations ({
             (inv.bamboo_fence_inv || 0) +
             (inv.decor_pebble_path_inv || 0) +
             (inv.zen_rock_formation_inv || inv.decor_rock_formation_inv || 0) +
@@ -667,25 +712,100 @@ export default function InventoryModal({
             <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-lime-500/30">
               <div className="text-xs text-lime-400 font-semibold mb-1">🍂 Organic Waste</div>
               <div className="text-2xl font-black text-lime-400">{inv.organic_waste ?? inv.organicWaste ?? 0}</div>
-              <div className="text-[10px] text-slate-500 mt-0.5">Fallen clippings (+1 per level up)</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Fallen clippings (+1 per level up) • Feed for Compost Heap</div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-amber-600/40">
+              <div className="text-xs text-amber-300 font-semibold mb-1">🧱 Condensed Organic Material</div>
+              <div className="text-2xl font-black text-amber-300">{inv.condensed_organic_material ?? inv.condensedOrganicMaterial ?? inv.resources?.condensed_organic_material ?? 0}</div>
+              <div className="text-[10px] text-amber-400/90 mt-0.5">High-density organic substrate</div>
+              <div className="text-[9px] text-slate-500">Refined at Compost Heap (4 Waste • 30s)</div>
             </div>
 
             <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-cyan-500/30">
               <div className="text-xs text-cyan-400 font-semibold mb-1">🧪 Biochemicals</div>
               <div className="text-2xl font-black text-cyan-400">{inv.biochemicals ?? inv.resources?.biochemicals ?? 0}</div>
-              <div className="text-[10px] text-slate-500 mt-0.5">Eco-catalyst reagent • For fertilizer distillation</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Eco-catalyst reagent • Chemical Station (2 Waste &amp; 1 Wire • 60s)</div>
             </div>
 
-            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-emerald-500/30">
-              <div className="text-xs text-emerald-300 font-semibold mb-1">🧪 Chemical Fertilizer</div>
-              <div className="text-2xl font-black text-emerald-300">{inv.fertilizer ?? inv.resources?.fertilizer ?? 0}</div>
-              <div className="text-[10px] text-slate-500 mt-0.5">Ultra growth booster (-300s / 5 min boost)</div>
+            {/* COMPOST TIERS SECTION */}
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-lime-500/40">
+              <div className="text-xs text-lime-300 font-semibold mb-1">🍂 Compost S (Tier S)</div>
+              <div className="text-2xl font-black text-lime-300">{inv.compost_s || 0}</div>
+              <div className="text-[10px] text-lime-400/90 mt-0.5">+15% Growth Speed for 30s</div>
+              <div className="text-[9px] text-slate-500">Craft at Compost Heap (2 Waste • 10s)</div>
             </div>
 
-            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-amber-500/30 col-span-2 sm:col-span-3">
-              <div className="text-xs text-amber-300 font-semibold mb-1">🌾 Enriched Organic Compost</div>
-              <div className="text-2xl font-black text-amber-300">{inv.organic_compost ?? inv.enrichedCompost ?? 0}</div>
-              <div className="text-[10px] text-slate-500 mt-0.5">High potency growth accelerator (-30s, +15 EXP) • Refine from Organic Waste</div>
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-emerald-500/40">
+              <div className="text-xs text-emerald-300 font-semibold mb-1">🌾 Compost M (Tier M)</div>
+              <div className="text-2xl font-black text-emerald-300">{inv.compost_m || 0}</div>
+              <div className="text-[10px] text-emerald-400/90 mt-0.5">+30% Growth Speed for 150s</div>
+              <div className="text-[9px] text-slate-500">Craft at Compost Heap (4 Waste &amp; 1 Compost S • 20s)</div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-amber-500/40">
+              <div className="text-xs text-amber-300 font-semibold mb-1">✨ Compost L (Tier L)</div>
+              <div className="text-2xl font-black text-amber-300">{inv.compost_l || 0}</div>
+              <div className="text-[10px] text-amber-400/90 mt-0.5">+45% Growth Speed for 900s</div>
+              <div className="text-[9px] text-slate-500">Craft at Compost Heap (6 Waste &amp; 1 Compost M • 30s)</div>
+            </div>
+
+            {/* FERTILIZER TIERS SECTION */}
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-cyan-500/40">
+              <div className="text-xs text-cyan-300 font-semibold mb-1">🧪 Fertilizer S (Tier S)</div>
+              <div className="text-2xl font-black text-cyan-300">{inv.fertilizer_s || 0}</div>
+              <div className="text-[10px] text-cyan-400/90 mt-0.5">+25% Hydration Growth for 90s</div>
+              <div className="text-[9px] text-slate-500">Craft at Chemical Station (4 Waste &amp; 1 Bio • 20s)</div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-sky-500/40">
+              <div className="text-xs text-sky-300 font-semibold mb-1">⚡ Fertilizer M (Tier M)</div>
+              <div className="text-2xl font-black text-sky-300">{inv.fertilizer_m || 0}</div>
+              <div className="text-[10px] text-sky-400/90 mt-0.5">+50% Hydration Growth for 600s</div>
+              <div className="text-[9px] text-slate-500">Craft at Chemical Station (6 Waste, 1 Bio &amp; 1 Fert S • 40s)</div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-purple-500/40">
+              <div className="text-xs text-purple-300 font-semibold mb-1">🌟 Fertilizer L (Tier L)</div>
+              <div className="text-2xl font-black text-purple-300">{inv.fertilizer_l || 0}</div>
+              <div className="text-[10px] text-purple-400/90 mt-0.5">+75% Hydration Growth for 3600s</div>
+              <div className="text-[9px] text-slate-500">Craft at Chemical Station (10 Waste, 1 Bio &amp; 1 Fert M • 60s)</div>
+            </div>
+
+            {/* SPEED GROW INSTANT PROGRESSION SECTION */}
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-emerald-500/40">
+              <div className="text-xs text-emerald-300 font-semibold mb-1">⚡ Speed Grow XS</div>
+              <div className="text-2xl font-black text-emerald-300">{inv.speed_grow_xs || 0}</div>
+              <div className="text-[10px] text-emerald-400/90 mt-0.5">Instant +30s Tree Growth</div>
+              <div className="text-[9px] text-slate-500">Chemical Station (3 Waste &amp; 1 Bio • 15s)</div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-cyan-500/40">
+              <div className="text-xs text-cyan-300 font-semibold mb-1">⚡ Speed Grow S</div>
+              <div className="text-2xl font-black text-cyan-300">{inv.speed_grow_s || 0}</div>
+              <div className="text-[10px] text-cyan-400/90 mt-0.5">Instant +120s Tree Growth</div>
+              <div className="text-[9px] text-slate-500">Chemical Station (5 Waste, 2 Bio, 1 Compost S • 30s)</div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-blue-500/40">
+              <div className="text-xs text-blue-300 font-semibold mb-1">⚡ Speed Grow M</div>
+              <div className="text-2xl font-black text-blue-300">{inv.speed_grow_m || 0}</div>
+              <div className="text-[10px] text-blue-400/90 mt-0.5">Instant +600s Tree Growth</div>
+              <div className="text-[9px] text-slate-500">Chemical Station (7 Waste, 2 Bio, 1 Compost S, 1 Fert S • 45s)</div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-purple-500/40">
+              <div className="text-xs text-purple-300 font-semibold mb-1">⚡ Speed Grow L</div>
+              <div className="text-2xl font-black text-purple-300">{inv.speed_grow_l || 0}</div>
+              <div className="text-[10px] text-purple-400/90 mt-0.5">Instant +3,600s Tree Growth</div>
+              <div className="text-[9px] text-slate-500">Chemical Station (10 Waste, 3 Bio, 1 Compost M, 1 Fert S • 60s)</div>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-amber-500/40">
+              <div className="text-xs text-amber-300 font-semibold mb-1">⚡ Speed Grow XL</div>
+              <div className="text-2xl font-black text-amber-300">{inv.speed_grow_xl || 0}</div>
+              <div className="text-[10px] text-amber-400/90 mt-0.5">Instant +28,800s Tree Growth</div>
+              <div className="text-[9px] text-slate-500">Chemical Station (15 Waste, 3 Bio, 1 Compost M, 1 Fert M • 90s)</div>
             </div>
           </div>
         </div>
@@ -711,22 +831,114 @@ export default function InventoryModal({
                 icon={<span className="text-xl">🍂</span>}
                 iconBg="bg-lime-950/80"
                 iconBorder="border-lime-500/50"
+                title="T1 Compost Feeder"
+                subtitle="1 Adjacent Bonsai (Rotatable) • 6 kW"
+                description="Automatically feeds compost to 1 facing bonsai. Rotatable."
+                stockCount={getStructureInventoryCount(inv, 't1_compost_feeder')}
+                activeCount={deployedStructures.filter((s) => s.type === 't1_compost_feeder').length}
+                activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('t1_compost_feeder')}
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">🌾</span>}
+                iconBg="bg-lime-950/80"
+                iconBorder="border-lime-500/50"
+                title="T2 Compost Feeder"
+                subtitle="2 Adjacent Bonsais (Rotatable) • 10 kW"
+                description="Tends 2 adjacent bonsais (H/V). Consumes 1 compost total."
+                stockCount={getStructureInventoryCount(inv, 't2_compost_feeder')}
+                activeCount={deployedStructures.filter((s) => s.type === 't2_compost_feeder').length}
+                activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('t2_compost_feeder')}
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">✨</span>}
+                iconBg="bg-lime-950/80"
+                iconBorder="border-lime-500/50"
+                title="T3 Compost Feeder"
+                subtitle="4-Way Omni (4 Bonsais) • 16 kW"
+                description="Omni-chute feeder nourishing all 4 cardinal bonsais."
+                stockCount={getStructureInventoryCount(inv, 't3_compost_feeder')}
+                activeCount={deployedStructures.filter((s) => s.type === 't3_compost_feeder').length}
+                activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('t3_compost_feeder')}
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">🧪</span>}
+                iconBg="bg-cyan-950/80"
+                iconBorder="border-cyan-500/50"
+                title="T1 Fertilizer Dripper"
+                subtitle="1 Adjacent Bonsai (Rotatable) • 7 kW"
+                description="Automatically injects fertilizer into 1 facing bonsai."
+                stockCount={getStructureInventoryCount(inv, 't1_fertilizer_dripper')}
+                activeCount={deployedStructures.filter((s) => s.type === 't1_fertilizer_dripper').length}
+                activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('t1_fertilizer_dripper')}
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">⚡</span>}
+                iconBg="bg-cyan-950/80"
+                iconBorder="border-cyan-500/50"
+                title="T2 Fertilizer Dripper"
+                subtitle="2 Adjacent Bonsais (Rotatable) • 12 kW"
+                description="Tends 2 adjacent bonsais (H/V). Consumes 1 fertilizer total."
+                stockCount={getStructureInventoryCount(inv, 't2_fertilizer_dripper')}
+                activeCount={deployedStructures.filter((s) => s.type === 't2_fertilizer_dripper').length}
+                activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('t2_fertilizer_dripper')}
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">🌟</span>}
+                iconBg="bg-cyan-950/80"
+                iconBorder="border-cyan-500/50"
+                title="T3 Fertilizer Dripper"
+                subtitle="4-Way Omni (4 Bonsais) • 18 kW"
+                description="Omni-channel injector nourishing all 4 cardinal bonsais."
+                stockCount={getStructureInventoryCount(inv, 't3_fertilizer_dripper')}
+                activeCount={deployedStructures.filter((s) => s.type === 't3_fertilizer_dripper').length}
+                activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('t3_fertilizer_dripper')}
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">🦾</span>}
+                iconBg="bg-indigo-950/80"
+                iconBorder="border-indigo-500/50"
+                title="Auto (Un-)Loader"
+                subtitle="1x1 Automation • 2 kW • Auto Load &amp; Unload"
+                stockCount={getStructureInventoryCount(inv, 'auto_unloader' as any)}
+                activeCount={deployedStructures.filter((s) => s.type === ('auto_unloader' as any)).length}
+                activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('auto_unloader')}
+              />
+
+              <EquipmentCard
+                icon={<span className="text-xl">🍂</span>}
+                iconBg="bg-lime-950/80"
+                iconBorder="border-lime-500/50"
                 title="Compost Heap"
                 subtitle="20 Waste Cap • Passive Decomposition"
                 stockCount={getStructureInventoryCount(inv, 'tool_compost_heap')}
                 activeCount={deployedStructures.filter((s) => s.type === 'tool_compost_heap').length}
                 activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('tool_compost_heap')}
               />
 
               <EquipmentCard
                 icon={<span className="text-xl">🧪</span>}
                 iconBg="bg-emerald-950/80"
                 iconBorder="border-emerald-500/50"
-                title="Fertilizer Station"
+                title="Chemical Station (2x2)"
                 subtitle="Eco-Chemical Distiller • 300s Growth Boost Yield"
                 stockCount={getStructureInventoryCount(inv, 'fertilizer_station')}
                 activeCount={deployedStructures.filter((s) => s.type === 'fertilizer_station').length}
                 activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('fertilizer_station', false, true)}
               />
 
               <EquipmentCard
@@ -738,6 +950,7 @@ export default function InventoryModal({
                 stockCount={getStructureInventoryCount(inv, 'irrigation_t1')}
                 activeCount={deployedStructures.filter((s) => s.type === 'irrigation_t1').length}
                 activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('irrigation_t1')}
               />
 
               <EquipmentCard
@@ -749,6 +962,7 @@ export default function InventoryModal({
                 stockCount={getStructureInventoryCount(inv, 'irrigation_t2')}
                 activeCount={deployedStructures.filter((s) => s.type === 'irrigation_t2').length}
                 activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('irrigation_t2')}
               />
 
               <EquipmentCard
@@ -760,6 +974,7 @@ export default function InventoryModal({
                 stockCount={getStructureInventoryCount(inv, 'irrigation_t3')}
                 activeCount={deployedStructures.filter((s) => s.type === 'irrigation_t3').length}
                 activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('irrigation_t3')}
               />
 
               <EquipmentCard
@@ -771,6 +986,7 @@ export default function InventoryModal({
                 stockCount={getStructureInventoryCount(inv, 'solar_panel')}
                 activeCount={deployedStructures.filter((s) => s.type === 'solar_panel').length}
                 activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('solar_panel')}
               />
 
               <EquipmentCard
@@ -782,6 +998,7 @@ export default function InventoryModal({
                 stockCount={getStructureInventoryCount(inv, 'solar_farm_2x2' as any)}
                 activeCount={deployedStructures.filter((s) => s.type === 'solar_farm_2x2').length}
                 activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('solar_farm_2x2' as any, false, true)}
               />
 
               <EquipmentCard
@@ -793,6 +1010,7 @@ export default function InventoryModal({
                 stockCount={getStructureInventoryCount(inv, 'solar_farm_3x3' as any)}
                 activeCount={deployedStructures.filter((s) => s.type === 'solar_farm_3x3').length}
                 activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('solar_farm_3x3' as any, true, false)}
               />
 
               <EquipmentCard
@@ -804,6 +1022,7 @@ export default function InventoryModal({
                 stockCount={getStructureInventoryCount(inv, 'wind_turbine')}
                 activeCount={deployedStructures.filter((s) => s.type === 'wind_turbine').length}
                 activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('wind_turbine')}
               />
 
               <EquipmentCard
@@ -815,6 +1034,7 @@ export default function InventoryModal({
                 stockCount={getStructureInventoryCount(inv, 'wind_farm_2x2' as any)}
                 activeCount={deployedStructures.filter((s) => s.type === 'wind_farm_2x2').length}
                 activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('wind_farm_2x2' as any, false, true)}
               />
 
               <EquipmentCard
@@ -826,6 +1046,7 @@ export default function InventoryModal({
                 stockCount={getStructureInventoryCount(inv, 'wind_farm_3x3' as any)}
                 activeCount={deployedStructures.filter((s) => s.type === 'wind_farm_3x3').length}
                 activeLabel="Deployed"
+                onDeploy={() => handleDeployItem('wind_farm_3x3' as any, true, false)}
               />
             </div>
           </div>
@@ -848,7 +1069,7 @@ export default function InventoryModal({
                 iconBg="bg-sky-950/80"
                 iconBorder="border-sky-500/50"
                 title="T1 Hydration Sprinkler"
-                subtitle="Left & Right Plots (2 Total) • 2 kW Load"
+                subtitle="Left & Right Plots (2 Total) • 4 kW Load"
                 stockCount={getStructureInventoryCount(inv, 'automaton_t1')}
                 activeCount={deployedStructures.filter((s) => s.type === 'automaton_t1').length + plantedBonsais.filter((b) => b.automatonTier === 1).length}
                 activeLabel="Deployed"
@@ -859,7 +1080,7 @@ export default function InventoryModal({
                 iconBg="bg-purple-950/80"
                 iconBorder="border-purple-500/50"
                 title="T2 Hydration Sprinkler"
-                subtitle="4-Way Cross Plots (4 Total) • 4 kW Load"
+                subtitle="4-Way Cross Plots (4 Total) • 7 kW Load"
                 stockCount={getStructureInventoryCount(inv, 'automaton_t2')}
                 activeCount={deployedStructures.filter((s) => s.type === 'automaton_t2').length + plantedBonsais.filter((b) => b.automatonTier === 2).length}
                 activeLabel="Deployed"
@@ -870,7 +1091,7 @@ export default function InventoryModal({
                 iconBg="bg-amber-950/80"
                 iconBorder="border-amber-500/50"
                 title="T3 Hydration Sprinkler"
-                subtitle="360° Radial 3x3 (8 Plots) • 7 kW Load"
+                subtitle="360° Radial 3x3 (8 Plots) • 12 kW Load"
                 stockCount={getStructureInventoryCount(inv, 'automaton_t3')}
                 activeCount={deployedStructures.filter((s) => s.type === 'automaton_t3').length + plantedBonsais.filter((b) => b.automatonTier === 3).length}
                 activeLabel="Deployed"
@@ -896,7 +1117,7 @@ export default function InventoryModal({
                 iconBg="bg-sky-950/80"
                 iconBorder="border-sky-500/50"
                 title="T1 Assembly Bench Module"
-                subtitle="+1 Queue Slot"
+                subtitle="+1 Queue Slot (2 kW)"
                 stockCount={inv.assembly_module_t1_inv || 0}
                 activeCount={(inv.attached_workbench_modules || []).filter((m) => m === 'assembly_module_t1').length}
                 activeLabel="Attached"
@@ -907,7 +1128,7 @@ export default function InventoryModal({
                 iconBg="bg-sky-950/80"
                 iconBorder="border-sky-500/50"
                 title="T2 Assembly Bench Module"
-                subtitle="+2 Queue Slots"
+                subtitle="+2 Queue Slots (3 kW)"
                 stockCount={inv.assembly_module_t2_inv || 0}
                 activeCount={(inv.attached_workbench_modules || []).filter((m) => m === 'assembly_module_t2').length}
                 activeLabel="Attached"
@@ -918,7 +1139,7 @@ export default function InventoryModal({
                 iconBg="bg-sky-950/80"
                 iconBorder="border-sky-500/50"
                 title="T3 Assembly Bench Module"
-                subtitle="+3 Queue Slots"
+                subtitle="+3 Queue Slots (4 kW)"
                 stockCount={inv.assembly_module_t3_inv || 0}
                 activeCount={(inv.attached_workbench_modules || []).filter((m) => m === 'assembly_module_t3').length}
                 activeLabel="Attached"
@@ -929,7 +1150,7 @@ export default function InventoryModal({
                 iconBg="bg-amber-950/80"
                 iconBorder="border-amber-500/50"
                 title="T1 Overclock Workbench Module"
-                subtitle="+5% Craft Speed"
+                subtitle="+5% Craft Speed (3 kW)"
                 stockCount={inv.overclock_module_t1_inv || 0}
                 activeCount={(inv.attached_workbench_modules || []).filter((m) => m === 'overclock_module_t1').length}
                 activeLabel="Attached"
@@ -940,7 +1161,7 @@ export default function InventoryModal({
                 iconBg="bg-amber-950/80"
                 iconBorder="border-amber-500/50"
                 title="T2 Overclock Workbench Module"
-                subtitle="+10% Craft Speed"
+                subtitle="+10% Craft Speed (5 kW)"
                 stockCount={inv.overclock_module_t2_inv || 0}
                 activeCount={(inv.attached_workbench_modules || []).filter((m) => m === 'overclock_module_t2').length}
                 activeLabel="Attached"
@@ -951,7 +1172,7 @@ export default function InventoryModal({
                 iconBg="bg-amber-950/80"
                 iconBorder="border-amber-500/50"
                 title="T3 Overclock Workbench Module"
-                subtitle="+20% Craft Speed"
+                subtitle="+20% Craft Speed (7 kW)"
                 stockCount={inv.overclock_module_t3_inv || 0}
                 activeCount={(inv.attached_workbench_modules || []).filter((m) => m === 'overclock_module_t3').length}
                 activeLabel="Attached"
