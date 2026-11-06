@@ -69,6 +69,9 @@ import {
   getBonsaiGroup,
   getMaturityGrowthMultiplier,
   getBonsaiLevelGrowthNeeded,
+  getRequiredGrowthDuration,
+  getLevelRequirement,
+  GROWTH_TIME_TABLE,
   getSpeciesAreaProbability,
   getSpeciesFindOdds,
   getSpeciesName,
@@ -99,6 +102,10 @@ export {
   getBonsaiHaloPlots,
   getBonsaiMaturityRating,
   getMaturityBadgeColor,
+  getRequiredGrowthDuration,
+  getLevelRequirement,
+  GROWTH_TIME_TABLE,
+  getBonsaiLevelGrowthNeeded,
 };
 import {
   createFixedStepper,
@@ -123,7 +130,7 @@ import {
 import ZenLibraryModal, { ShrineTab } from './ZenLibraryModal';
 import InventoryModal, { EquipmentCard } from './InventoryModal';
 export { EquipmentCard };
-import BonsaiSocietyModal from './BonsaiSocietyModal';
+import BonsaiSocietyModal, { SOCIETY_MILESTONES, BLOCK_REWARDS, TIER_LABELS } from './BonsaiSocietyModal';
 import StationRecipeModal from './StationRecipeModal';
 import AutoUnloaderSettingsModal from './AutoUnloaderSettingsModal';
 import FeederDripperSettingsModal from './FeederDripperSettingsModal';
@@ -526,6 +533,33 @@ export const BONSAI_STYLES: Record<string, BonsaiStyleDefinition> = {
     subtitle: 'Clump of 3-5 slender trunks radiating outward with a unified shared canopy',
     description: 'A natural grove silhouette born from a single root system, radiating outwards in communal harmony.',
     icon: '🎋',
+  },
+  HOKIDACHI: {
+    id: 'HOKIDACHI',
+    name: 'Broom Style',
+    kanji: '箒立ち',
+    japanese: 'Hokidachi',
+    subtitle: 'Upright trunk branching evenly into a balanced, fan-like canopy',
+    description: 'Upright trunk branching evenly into a balanced, fan-like canopy.',
+    icon: '🧹',
+  },
+  BUNJINGI: {
+    id: 'BUNJINGI',
+    name: 'Literati Style',
+    kanji: '文人木',
+    japanese: 'Bunjingi',
+    subtitle: 'Graceful, slender, sinuous trunk with minimalist cloud pads',
+    description: 'Graceful, slender, sinuous trunk with minimalist cloud pads.',
+    icon: '🖌️',
+  },
+  FUKINAASHI: {
+    id: 'FUKINAASHI',
+    name: 'Windswept Style',
+    kanji: '吹流し',
+    japanese: 'Fukinaashi',
+    subtitle: 'Dynamic wind-sculpted posture with branches swept decisively in one direction',
+    description: 'Dynamic wind-sculpted posture with branches swept decisively in one direction.',
+    icon: '💨',
   },
 };
 
@@ -3177,6 +3211,20 @@ export interface GameStats {
   notableLv20Ids?: string[];
   refinedLv25Ids?: string[];
   premiumLv30Ids?: string[];
+  claimedMilestoneBlocks?: Record<string, number[]>;
+  grownLv5Ids?: string[];
+  grownLv10Ids?: string[];
+  grownLv25Ids?: string[];
+  grownLv50Ids?: string[];
+  grownLv100Ids?: string[];
+  sproutLv10MilestoneIds?: string[];
+  saplingLv10MilestoneIds?: string[];
+  notableLv10MilestoneIds?: string[];
+  refinedLv10MilestoneIds?: string[];
+  premiumLv10MilestoneIds?: string[];
+  totalBonsaisBroughtBack?: number;
+  totalResourcesBroughtBack?: number;
+  totalCrystalsBroughtBack?: number;
 }
 
 export const DEFAULT_STATS: GameStats = {
@@ -3206,6 +3254,20 @@ export const DEFAULT_STATS: GameStats = {
   notableLv20Ids: [],
   refinedLv25Ids: [],
   premiumLv30Ids: [],
+  claimedMilestoneBlocks: {},
+  grownLv5Ids: [],
+  grownLv10Ids: [],
+  grownLv25Ids: [],
+  grownLv50Ids: [],
+  grownLv100Ids: [],
+  sproutLv10MilestoneIds: [],
+  saplingLv10MilestoneIds: [],
+  notableLv10MilestoneIds: [],
+  refinedLv10MilestoneIds: [],
+  premiumLv10MilestoneIds: [],
+  totalBonsaisBroughtBack: 0,
+  totalResourcesBroughtBack: 0,
+  totalCrystalsBroughtBack: 0,
 };
 
 export type MilestoneCategory = 'BONDEX' | 'MATURITY' | 'AUTOMATION' | 'EXPEDITIONS';
@@ -3358,7 +3420,7 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
     category: 'BONDEX',
     title: 'Ultimate Bondex',
     subtitle: 'Log 60+ stylistic variants in Bondex',
-    description: 'Catalog 60 or more distinct stylistic variants across species and styles in the Botanical Bondex (out of 140 total variants)!',
+    description: 'Catalog 60 or more distinct stylistic variants across species and styles in the Botanical Bondex (out of 200 total variants)!',
     icon: '🏆',
     rewardZen: 5,
     targetValue: 60,
@@ -12185,6 +12247,20 @@ export default function App() {
     notableLv20Ids: [],
     refinedLv25Ids: [],
     premiumLv30Ids: [],
+    claimedMilestoneBlocks: {},
+    grownLv5Ids: [],
+    grownLv10Ids: [],
+    grownLv25Ids: [],
+    grownLv50Ids: [],
+    grownLv100Ids: [],
+    sproutLv10MilestoneIds: [],
+    saplingLv10MilestoneIds: [],
+    notableLv10MilestoneIds: [],
+    refinedLv10MilestoneIds: [],
+    premiumLv10MilestoneIds: [],
+    totalBonsaisBroughtBack: 0,
+    totalResourcesBroughtBack: 0,
+    totalCrystalsBroughtBack: 0,
   });
 
   // Walkable Botanist Avatar in Sanctuary
@@ -12964,20 +13040,24 @@ export default function App() {
         const isMid = dist > 20 && dist <= 40;
 
         // Unified Probability Calculation Per Tile:
-        // Area 1 (Foothills): Close: 8% bonsai, 4% resource, 0.2% crystal, 87.8% nothing
-        //                    Mid:   8% bonsai, 6% resource, 0.2% crystal, 85.8% nothing
-        //                    Far:   8% bonsai, 8% resource, 0.2% crystal, 83.8% nothing
-        // Area 2 (Highlands): Close: 8% bonsai, 4% resource, 0.4% crystal, 87.6% nothing
-        //                    Mid:   8% bonsai, 6% resource, 0.4% crystal, 85.6% nothing
-        //                    Far:   8% bonsai, 8% resource, 0.4% crystal, 83.6% nothing
-        // Area 3 (Overgrowth): Close: 8% bonsai, 4% resource, 0.6% crystal, 87.4% nothing
-        //                     Mid:   8% bonsai, 6% resource, 0.6% crystal, 85.4% nothing
-        //                     Far:   8% bonsai, 8% resource, 0.6% crystal, 83.4% nothing
+        // Area 1 (Foothills): Close: 8% bonsai, 4% resource, 0.05% crystal, 87.95% nothing
+        //                    Mid:   8% bonsai, 6% resource, 0.10% crystal, 85.90% nothing
+        //                    Far:   8% bonsai, 8% resource, 0.15% crystal, 83.85% nothing
+        // Area 2 (Highlands): Close: 8% bonsai, 4% resource, 0.10% crystal, 87.90% nothing
+        //                    Mid:   8% bonsai, 6% resource, 0.20% crystal, 85.80% nothing
+        //                    Far:   8% bonsai, 8% resource, 0.30% crystal, 83.70% nothing
+        // Area 3 (Overgrowth): Close: 8% bonsai, 4% resource, 0.15% crystal, 87.85% nothing
+        //                     Mid:   8% bonsai, 6% resource, 0.30% crystal, 85.70% nothing
+        //                     Far:   8% bonsai, 8% resource, 0.45% crystal, 83.55% nothing
         const bonsaiRate = 0.08 + dowsingBonus;
         const baseResRate = isClose ? 0.04 : isMid ? 0.06 : 0.08;
         const resourceRate = baseResRate + prospectingBonus;
         const crystalRate =
-          biomeId === 'FOOTHILLS' ? 0.002 : biomeId === 'HIGHLANDS' ? 0.004 : 0.006;
+          biomeId === 'FOOTHILLS'
+            ? (isClose ? 0.0005 : isMid ? 0.0010 : 0.0015)
+            : biomeId === 'HIGHLANDS'
+            ? (isClose ? 0.0010 : isMid ? 0.0020 : 0.0030)
+            : (isClose ? 0.0015 : isMid ? 0.0030 : 0.0045);
 
         const tileRoll = pseudoNoise(gx, gy, 111.1);
 
@@ -13359,6 +13439,15 @@ export default function App() {
     statsRef.current.expeditionsPerBiome[biomeKey] =
       (statsRef.current.expeditionsPerBiome[biomeKey] || 0) + 1;
 
+    // Track total items, saplings, and crystals brought back
+    const retainedSaplingsCount = report.saplings.filter((s) => s.retained).length;
+    const retainedResourcesCount = report.items.reduce((acc, it) => acc + (it.retained || 0), 0);
+    const retainedCrystalsCount = report.crystals ? report.crystals.filter((c) => c.retained).length : 0;
+
+    statsRef.current.totalBonsaisBroughtBack = (statsRef.current.totalBonsaisBroughtBack || 0) + retainedSaplingsCount;
+    statsRef.current.totalResourcesBroughtBack = (statsRef.current.totalResourcesBroughtBack || 0) + retainedResourcesCount;
+    statsRef.current.totalCrystalsBroughtBack = (statsRef.current.totalCrystalsBroughtBack || 0) + retainedCrystalsCount;
+
     backpackInventoryRef.current = {
       scrap_metal: 0,
       copper_wire: 0,
@@ -13398,6 +13487,9 @@ export default function App() {
     refreshHud();
     gameAudio.playCoinPickup();
     triggerNotification('Haul deposited into Sanctuary Storage!', '#10b981', 3500);
+
+    // Auto-evaluate milestone thresholds
+    checkAndAwardMilestones();
   }, [excursionReport, refreshHud, triggerNotification]);
 
   // Initiate Dig Minigame on Sapling or Crystal (2 BASE STRIKES + 100% SUCCESS REQUIRED)
@@ -13778,6 +13870,56 @@ export default function App() {
     [addFloatingText, canvasHeight, canvasWidth, refreshHud, triggerNotification],
   );
 
+  // Automatic Milestone Evaluation & Payout
+  const checkAndAwardMilestones = useCallback(() => {
+    const stats = statsRef.current;
+    const inv = sanctuaryInventoryRef.current;
+    if (!stats || !inv) return;
+
+    let totalAwarded = 0;
+    let lastTitle = '';
+    let lastTier = '';
+
+    SOCIETY_MILESTONES.forEach((ms) => {
+      if (ms.isNotObtainable) return;
+
+      const curVal = ms.getValue(
+        stats,
+        bondexDiscoveryRef.current,
+        plantedBonsaisRef.current,
+        storedPottedBonsaisRef.current,
+        inv,
+      );
+      const claimed = stats.claimedMilestoneBlocks?.[ms.id] || [];
+
+      for (let t = 0; t < 5; t++) {
+        const threshold = ms.targets[t];
+        if (curVal >= threshold && !claimed.includes(t)) {
+          claimed.push(t);
+          const reward = BLOCK_REWARDS[t];
+          totalAwarded += reward;
+          lastTitle = ms.title;
+          lastTier = TIER_LABELS[t];
+
+          inv.zen_essence = (inv.zen_essence || 0) + reward;
+        }
+      }
+
+      if (!stats.claimedMilestoneBlocks) stats.claimedMilestoneBlocks = {};
+      stats.claimedMilestoneBlocks[ms.id] = claimed;
+    });
+
+    if (totalAwarded > 0) {
+      gameAudio?.playLevelUpStinger?.();
+      triggerNotification(
+        `🏆 Milestone Block Reached: ${lastTitle} (Block ${lastTier})! (+${totalAwarded} Zen Point${totalAwarded > 1 ? 's' : ''})`,
+        '#f59e0b',
+        3500,
+      );
+      refreshHud();
+    }
+  }, [refreshHud, triggerNotification]);
+
   // Initialize or Restart Game
   const initGame = useCallback(() => {
     plantedBonsaisRef.current = [];
@@ -13814,6 +13956,20 @@ export default function App() {
       notableLv20Ids: [],
       refinedLv25Ids: [],
       premiumLv30Ids: [],
+      claimedMilestoneBlocks: {},
+      grownLv5Ids: [],
+      grownLv10Ids: [],
+      grownLv25Ids: [],
+      grownLv50Ids: [],
+      grownLv100Ids: [],
+      sproutLv10MilestoneIds: [],
+      saplingLv10MilestoneIds: [],
+      notableLv10MilestoneIds: [],
+      refinedLv10MilestoneIds: [],
+      premiumLv10MilestoneIds: [],
+      totalBonsaisBroughtBack: 0,
+      totalResourcesBroughtBack: 0,
+      totalCrystalsBroughtBack: 0,
     };
 
     areaDiscoveryRef.current = {
@@ -14786,10 +14942,35 @@ export default function App() {
       const stats = statsRef.current;
       stats.totalLevelUps += 1;
       recordBondexEntry(bonsai.leafType, bonsai.maturity, bonsai.style);
+      if (bonsai.level >= 5) {
+        if (!stats.grownLv5Ids) stats.grownLv5Ids = [];
+        if (!stats.grownLv5Ids.includes(bonsai.id)) stats.grownLv5Ids.push(bonsai.id);
+      }
       if (bonsai.level >= 10) {
         if (!stats.maxSpecimensGrownLv10.includes(bonsai.id)) {
           stats.maxSpecimensGrownLv10.push(bonsai.id);
         }
+        if (!stats.grownLv10Ids) stats.grownLv10Ids = [];
+        if (!stats.grownLv10Ids.includes(bonsai.id)) stats.grownLv10Ids.push(bonsai.id);
+
+        const mTier = (bonsai.maturity || 'sprout') as string;
+        if (mTier === 'sprout') {
+          if (!stats.sproutLv10MilestoneIds) stats.sproutLv10MilestoneIds = [];
+          if (!stats.sproutLv10MilestoneIds.includes(bonsai.id)) stats.sproutLv10MilestoneIds.push(bonsai.id);
+        } else if (mTier === 'sapling') {
+          if (!stats.saplingLv10MilestoneIds) stats.saplingLv10MilestoneIds = [];
+          if (!stats.saplingLv10MilestoneIds.includes(bonsai.id)) stats.saplingLv10MilestoneIds.push(bonsai.id);
+        } else if (mTier === 'notable') {
+          if (!stats.notableLv10MilestoneIds) stats.notableLv10MilestoneIds = [];
+          if (!stats.notableLv10MilestoneIds.includes(bonsai.id)) stats.notableLv10MilestoneIds.push(bonsai.id);
+        } else if (mTier === 'refined') {
+          if (!stats.refinedLv10MilestoneIds) stats.refinedLv10MilestoneIds = [];
+          if (!stats.refinedLv10MilestoneIds.includes(bonsai.id)) stats.refinedLv10MilestoneIds.push(bonsai.id);
+        } else if (mTier === 'premium') {
+          if (!stats.premiumLv10MilestoneIds) stats.premiumLv10MilestoneIds = [];
+          if (!stats.premiumLv10MilestoneIds.includes(bonsai.id)) stats.premiumLv10MilestoneIds.push(bonsai.id);
+        }
+
         const lt = bonsai.leafType || 'circle';
         const st = bonsai.style || 'MOYOGI';
         if (!stats.leafTypeStylesGrown[lt]) {
@@ -14800,11 +14981,19 @@ export default function App() {
         }
         stats.groupBonsaisGrown[bonsai.group] = (stats.groupBonsaisGrown[bonsai.group] || 0) + 1;
       }
-      if (bonsai.level >= 25 && !stats.maxSpecimensGrownLv25.includes(bonsai.id)) {
-        stats.maxSpecimensGrownLv25.push(bonsai.id);
+      if (bonsai.level >= 25) {
+        if (!stats.maxSpecimensGrownLv25.includes(bonsai.id)) {
+          stats.maxSpecimensGrownLv25.push(bonsai.id);
+        }
+        if (!stats.grownLv25Ids) stats.grownLv25Ids = [];
+        if (!stats.grownLv25Ids.includes(bonsai.id)) stats.grownLv25Ids.push(bonsai.id);
       }
-      if (bonsai.level >= 50 && !stats.maxSpecimensGrownLv50.includes(bonsai.id)) {
-        stats.maxSpecimensGrownLv50.push(bonsai.id);
+      if (bonsai.level >= 50) {
+        if (!stats.maxSpecimensGrownLv50.includes(bonsai.id)) {
+          stats.maxSpecimensGrownLv50.push(bonsai.id);
+        }
+        if (!stats.grownLv50Ids) stats.grownLv50Ids = [];
+        if (!stats.grownLv50Ids.includes(bonsai.id)) stats.grownLv50Ids.push(bonsai.id);
       }
       if (bonsai.level >= 10 && (bonsai.maturity || 'sprout') === 'sprout') {
         if (!stats.sproutLv10Ids) stats.sproutLv10Ids = [];
@@ -14828,7 +15017,12 @@ export default function App() {
       }
       if (bonsai.level >= 100) {
         stats.firstLevel100Reached = true;
+        if (!stats.grownLv100Ids) stats.grownLv100Ids = [];
+        if (!stats.grownLv100Ids.includes(bonsai.id)) stats.grownLv100Ids.push(bonsai.id);
       }
+
+      // Check and auto-award completed milestone thresholds
+      checkAndAwardMilestones();
 
       // Advance Cultivation Potential from Pedestals in dynamic halo spots
       if (!bonsai.cultivationPotential) {
@@ -14971,7 +15165,10 @@ export default function App() {
       }
       bonsai.progressSeconds += addSeconds;
       while (bonsai.level < 100) {
-        const targetSeconds = getBonsaiLevelGrowthNeeded(bonsai.level, bonsai.maturity);
+        const targetSeconds = getRequiredGrowthDuration(
+          bonsai.level,
+          bonsai.maturityRating || bonsai.maturity || bonsai,
+        );
         if (bonsai.progressSeconds >= targetSeconds) {
           bonsai.progressSeconds -= targetSeconds;
           handleBonsaiLevelUp(bonsai);
@@ -18678,10 +18875,10 @@ export default function App() {
 
     const tabLengths = {
       resources: 15,
-      bonsai_automatons: 3,
+      bonsai_automatons: 9,
       workbench: 11,
       rover: 11,
-      electricity: 6,
+      electricity: 7,
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -18722,24 +18919,12 @@ export default function App() {
           ];
           const r = wbList[focusedWbIdx];
           if (r) enqueueCraftingRecipe(r);
-        } else if (workbenchTab === 'rover') {
-          const roverList: CraftingRecipeId[] = [
-            'rover_chassis_t2',
-            'rover_chassis_t3',
-            'rover_storage_module_1',
-            'rover_storage_module_2',
-            'rover_storage_module_3',
-            'rover_battery_module_1',
-            'rover_battery_module_2',
-            'rover_battery_module_3',
-            'rover_radar_module_1',
-            'rover_radar_module_2',
-            'rover_radar_module_3',
-          ];
-          const r = roverList[focusedWbIdx];
-          if (r) enqueueCraftingRecipe(r);
         } else if (workbenchTab === 'resources' || workbenchTab === 'compost') {
           const resList: CraftingRecipeId[] = [
+            'craft_copper_wire',
+            'craft_gears',
+            'craft_microcircuits',
+            'craft_quantum_chips',
             'craft_compost_s',
             'craft_compost_m',
             'craft_compost_l',
@@ -18751,26 +18936,48 @@ export default function App() {
             'craft_speed_grow_m',
             'craft_speed_grow_l',
             'craft_speed_grow_xl',
-            'craft_copper_wire',
-            'craft_gears',
-            'craft_microcircuits',
-            'craft_quantum_chips',
           ];
           const r = resList[focusedWbIdx];
           if (r) enqueueCraftingRecipe(r);
         } else if (workbenchTab === 'bonsai_automatons' || workbenchTab === 'automatons') {
-          const autoList: CraftingRecipeId[] = ['tier1_automaton', 'tier2_automaton', 'tier3_automaton'];
+          const autoList: CraftingRecipeId[] = [
+            'tier1_automaton',
+            'tier2_automaton',
+            'tier3_automaton',
+            't1_compost_feeder',
+            't2_compost_feeder',
+            't3_compost_feeder',
+            't1_fertilizer_dripper',
+            't2_fertilizer_dripper',
+            't3_fertilizer_dripper',
+          ];
           const r = autoList[focusedWbIdx];
+          if (r) enqueueCraftingRecipe(r);
+        } else if (workbenchTab === 'rover') {
+          const roverList: CraftingRecipeId[] = [
+            'rover_chassis_t2',
+            'rover_chassis_t3',
+            'rover_battery_module_1',
+            'rover_battery_module_2',
+            'rover_battery_module_3',
+            'rover_storage_module_1',
+            'rover_storage_module_2',
+            'rover_storage_module_3',
+            'rover_radar_module_1',
+            'rover_radar_module_2',
+            'rover_radar_module_3',
+          ];
+          const r = roverList[focusedWbIdx];
           if (r) enqueueCraftingRecipe(r);
         } else if (workbenchTab === 'electricity' || (workbenchTab as string) === 'infrastructure') {
           const elecList: CraftingRecipeId[] = [
-            'auto_unloader',
             'solar_panel',
             'solar_farm_2x2',
             'solar_farm_3x3',
             'wind_turbine',
             'wind_farm_2x2',
             'wind_farm_3x3',
+            'auto_unloader',
           ];
           const r = elecList[focusedWbIdx];
           if (r) enqueueCraftingRecipe(r);
@@ -24990,7 +25197,10 @@ export default function App() {
 
           // Draw growth progress bar strictly constrained to inner plot width
           if (bonsai.level < 100) {
-            const target = getBonsaiLevelGrowthNeeded(bonsai.level, bonsai.maturity);
+            const target = getRequiredGrowthDuration(
+              bonsai.level,
+              bonsai.maturityRating || bonsai.maturity || bonsai,
+            );
             const pct = Math.min(1.0, bonsai.progressSeconds / target);
             const barY = by + (is2x2 ? 20 : 14);
             const barW = is2x2 ? 64 : Math.min(SANCTUARY_GRID.cellW - 12, 44);
@@ -30102,6 +30312,7 @@ export default function App() {
         onCompleteEcoTier1={handleCompleteEcoTier1}
         stats={statsRef.current || (gameState as any)?.stats || DEFAULT_STATS}
         claimAchievement={claimAchievement}
+        onAwardMilestoneZen={checkAndAwardMilestones}
         plantedBonsais={plantedBonsaisRef.current}
         storedPottedBonsais={storedPottedBonsaisRef.current}
         discoveredSpeciesMap={bondexDiscoveryRef.current}
@@ -30928,7 +31139,7 @@ export default function App() {
                       Claim large bonus Zen Point rewards through the Bonsai Society Milestones tab:
                     </p>
                     <ul className="list-disc list-inside space-y-1 text-slate-400 pl-1 text-xs">
-                      <li><strong>Taxonomy &amp; Styles:</strong> Catalog up to 20 leaf species and 140 stylistic variants in your Bondex.</li>
+                    <li><strong>Taxonomy &amp; Styles:</strong> Catalog up to 20 leaf species and 200 stylistic variants in your Bondex.</li>
                       <li><strong>Maturity &amp; Forms:</strong> Cultivate Sprout through Premium specimens and complete Tree Group triads.</li>
                       <li><strong>Wilderness Pioneer:</strong> Complete 5 and 10 expeditions in each biome.</li>
                     </ul>

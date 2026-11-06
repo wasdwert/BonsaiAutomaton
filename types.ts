@@ -861,13 +861,21 @@ export type GrowthStyle =
   | 'sokan'
   | 'kengai'
   | 'kabudachi'
+  | 'hokidachi'
+  | 'bunjingi'
+  | 'fukinaashi'
   | 'CHOKAN'
   | 'MOYOGI'
   | 'SHAKAN'
   | 'HAN_KENGAI'
   | 'SOKAN'
   | 'KENGAI'
-  | 'KABUDACHI';
+  | 'KABUDACHI'
+  | 'HOKIDACHI'
+  | 'BUNJINGI'
+  | 'FUKINAASHI';
+
+export type BonsaiStyle = GrowthStyle;
 
 export interface HaloPlotCoord {
   col: number;
@@ -977,15 +985,49 @@ export function getBonsaiHaloPlots(
 
 /**
  * Resolves the numeric Maturity Rating (1 to 5) for a bonsai or seedling.
+ * - R.1: Maturity Rating 1 (Sprout / Rating 1)
+ * - R.2: Maturity Rating 2 (Sapling / Rating 2)
+ * - R.3: Maturity Rating 3 (Mature / Rating 3)
+ * - R.4: Maturity Rating 4 (Ancient / Rating 4)
+ * - R.5: Maturity Rating 5 (Mythic / Rating 5)
+ * Clamps rating to 1..5, defaulting to 1 if not set.
  */
 export function getBonsaiMaturityRating(bonsai?: any): number {
-  if (!bonsai) return 1;
-  if (typeof bonsai.maturityRating === 'number') return bonsai.maturityRating;
-  if (typeof bonsai.maturity === 'number') return bonsai.maturity;
-  if (bonsai.maturity === 'premium' || (bonsai.level !== undefined && bonsai.level >= 21)) return 5;
-  if (bonsai.maturity === 'refined') return 4;
-  if (bonsai.maturity === 'notable') return 3;
-  if (bonsai.maturity === 'sapling') return 2;
+  if (bonsai === undefined || bonsai === null) return 1;
+  if (typeof bonsai === 'number') {
+    if (isNaN(bonsai)) return 1;
+    return Math.max(1, Math.min(5, Math.round(bonsai)));
+  }
+  if (typeof bonsai === 'string') {
+    const s = bonsai.toLowerCase().trim();
+    if (s === '1' || s === 'r1' || s === 'r.1' || s === 'sprout') return 1;
+    if (s === '2' || s === 'r2' || s === 'r.2' || s === 'sapling') return 2;
+    if (s === '3' || s === 'r3' || s === 'r.3' || s === 'notable' || s === 'mature') return 3;
+    if (s === '4' || s === 'r4' || s === 'r.4' || s === 'refined' || s === 'ancient') return 4;
+    if (s === '5' || s === 'r5' || s === 'r.5' || s === 'premium' || s === 'mythic') return 5;
+    const n = parseInt(s, 10);
+    if (!isNaN(n)) return Math.max(1, Math.min(5, n));
+    return 1;
+  }
+  if (typeof bonsai.maturityRating === 'number') {
+    return Math.max(1, Math.min(5, Math.round(bonsai.maturityRating)));
+  }
+  if (typeof bonsai.maturity === 'number') {
+    return Math.max(1, Math.min(5, Math.round(bonsai.maturity)));
+  }
+  if (typeof bonsai.rating === 'number') {
+    return Math.max(1, Math.min(5, Math.round(bonsai.rating)));
+  }
+  if (typeof bonsai.maturity === 'string') {
+    const m = bonsai.maturity.toLowerCase().trim();
+    if (m === 'premium' || m === 'mythic' || m === '5') return 5;
+    if (m === 'refined' || m === 'ancient' || m === '4') return 4;
+    if (m === 'notable' || m === 'mature' || m === '3') return 3;
+    if (m === 'sapling' || m === '2') return 2;
+    if (m === 'sprout' || m === '1') return 1;
+  }
+  if (bonsai.rarity === 'MYTHIC') return 5;
+  if (bonsai.rarity === 'ANCIENT') return 4;
   return 1;
 }
 
@@ -1117,6 +1159,9 @@ export const STYLE_ATTRIBUTE_WEIGHTS: Record<
   sokan: { foliage: 0.9, branches: 1.0, trunk: 1.2, roots: 0.9 },
   kengai: { foliage: 1.0, branches: 0.8, trunk: 1.0, roots: 1.2 },
   kabudachi: { foliage: 1.0, branches: 1.2, trunk: 1.1, roots: 0.7 },
+  hokidachi: { foliage: 1.1, branches: 1.2, trunk: 0.9, roots: 0.8 },
+  bunjingi: { foliage: 0.8, branches: 0.9, trunk: 1.2, roots: 1.1 },
+  fukinaashi: { foliage: 1.0, branches: 1.1, trunk: 1.1, roots: 0.8 },
 
   CHOKAN: { foliage: 1.1, branches: 1.0, trunk: 0.9, roots: 1.0 },
   MOYOGI: { foliage: 1.1, branches: 1.1, trunk: 0.9, roots: 0.9 },
@@ -1126,6 +1171,9 @@ export const STYLE_ATTRIBUTE_WEIGHTS: Record<
   SOKAN: { foliage: 0.9, branches: 1.0, trunk: 1.2, roots: 0.9 },
   KENGAI: { foliage: 1.0, branches: 0.8, trunk: 1.0, roots: 1.2 },
   KABUDACHI: { foliage: 1.0, branches: 1.2, trunk: 1.1, roots: 0.7 },
+  HOKIDACHI: { foliage: 1.1, branches: 1.2, trunk: 0.9, roots: 0.8 },
+  BUNJINGI: { foliage: 0.8, branches: 0.9, trunk: 1.2, roots: 1.1 },
+  FUKINAASHI: { foliage: 1.0, branches: 1.1, trunk: 1.1, roots: 0.8 },
 };
 
 export function getStyleAttributeWeights(style?: string): {

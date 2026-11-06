@@ -52,14 +52,9 @@ export type BonsaiStyle =
   | 'SOKAN'
   | 'KENGAI'
   | 'KABUDACHI'
-  | 'chokan'
-  | 'moyogi'
-  | 'shakan'
-  | 'han_kengai'
-  | 'sokan'
-  | 'kengai'
-  | 'kabudachi';
-export type GrowthStyle =
+  | 'HOKIDACHI'
+  | 'BUNJINGI'
+  | 'FUKINAASHI'
   | 'chokan'
   | 'moyogi'
   | 'shakan'
@@ -67,13 +62,10 @@ export type GrowthStyle =
   | 'sokan'
   | 'kengai'
   | 'kabudachi'
-  | 'CHOKAN'
-  | 'MOYOGI'
-  | 'SHAKAN'
-  | 'HAN_KENGAI'
-  | 'SOKAN'
-  | 'KENGAI'
-  | 'KABUDACHI';
+  | 'hokidachi'
+  | 'bunjingi'
+  | 'fukinaashi';
+export type GrowthStyle = BonsaiStyle;
 
 export const ALL_BONSAI_STYLES: BonsaiStyle[] = [
   'CHOKAN',
@@ -83,6 +75,9 @@ export const ALL_BONSAI_STYLES: BonsaiStyle[] = [
   'SOKAN',
   'KENGAI',
   'KABUDACHI',
+  'HOKIDACHI',
+  'BUNJINGI',
+  'FUKINAASHI',
 ];
 
 export const STYLE_ATTRIBUTE_WEIGHTS: Record<
@@ -97,6 +92,9 @@ export const STYLE_ATTRIBUTE_WEIGHTS: Record<
   sokan: { foliage: 0.9, branches: 1.0, trunk: 1.2, roots: 0.9 },
   kengai: { foliage: 1.0, branches: 0.8, trunk: 1.0, roots: 1.2 },
   kabudachi: { foliage: 1.0, branches: 1.2, trunk: 1.1, roots: 0.7 },
+  hokidachi: { foliage: 1.1, branches: 1.2, trunk: 0.9, roots: 0.8 },
+  bunjingi: { foliage: 0.8, branches: 0.9, trunk: 1.2, roots: 1.1 },
+  fukinaashi: { foliage: 1.0, branches: 1.1, trunk: 1.1, roots: 0.8 },
 
   CHOKAN: { foliage: 1.1, branches: 1.0, trunk: 0.9, roots: 1.0 },
   MOYOGI: { foliage: 1.1, branches: 1.1, trunk: 0.9, roots: 0.9 },
@@ -106,6 +104,9 @@ export const STYLE_ATTRIBUTE_WEIGHTS: Record<
   SOKAN: { foliage: 0.9, branches: 1.0, trunk: 1.2, roots: 0.9 },
   KENGAI: { foliage: 1.0, branches: 0.8, trunk: 1.0, roots: 1.2 },
   KABUDACHI: { foliage: 1.0, branches: 1.2, trunk: 1.1, roots: 0.7 },
+  HOKIDACHI: { foliage: 1.1, branches: 1.2, trunk: 0.9, roots: 0.8 },
+  BUNJINGI: { foliage: 0.8, branches: 0.9, trunk: 1.2, roots: 1.1 },
+  FUKINAASHI: { foliage: 1.0, branches: 1.1, trunk: 1.1, roots: 0.8 },
 };
 
 export function getStyleAttributeWeights(style?: string): {
@@ -230,10 +231,13 @@ export function getMaturityGrowthMultiplier(maturity?: MaturityTier | string): n
   return 1.0;
 }
 
-export function getBonsaiLevelGrowthNeeded(level: number, maturity?: MaturityTier | string): number {
-  const baseGrowthNeeded = 6 * Math.pow(1.07, Math.max(1, level) - 1);
-  return baseGrowthNeeded * getMaturityGrowthMultiplier(maturity);
-}
+export {
+  getRequiredGrowthDuration,
+  getLevelRequirement,
+  GROWTH_TIME_TABLE,
+  getBonsaiLevelGrowthNeeded,
+  type GrowthTimeRow,
+} from './gameState';
 
 /**
  * Exact Biome Discovery Distributions
@@ -586,6 +590,46 @@ export interface SpeciesPaletteEntry {
   base: string;
   highlight: string;
   shadow: string;
+}
+
+export interface BarkPaletteEntry {
+  base: string;
+  shadow: string;
+  highlight: string;
+}
+
+/**
+ * Canonical species trunk bark color palette across all 20 bonsai species.
+ * Enforces 100% trunk bark color consistency across all styles for each species.
+ */
+export const SPECIES_BARK_COLORS: Record<BonsaiLeafType, BarkPaletteEntry> = {
+  circle: { base: '#292524', shadow: '#1c1917', highlight: '#44403c' }, // Maru: Dark rugged charcoal pine
+  oval: { base: '#6d2e1b', shadow: '#451b0f', highlight: '#8f3e26' }, // Daen: Warm cinnamon-reddish maple
+  circle_hole: { base: '#78350f', shadow: '#451a03', highlight: '#92400e' }, // Yubiwa: Fibrous warm amber juniper/cedar
+  raindrop: { base: '#544738', shadow: '#382e22', highlight: '#73634f' }, // Otosu: Cool mossy bronze-brown cypress
+  fire: { base: '#7c2d12', shadow: '#451a03', highlight: '#9a3412' }, // Hi: Rich reddish cedar mahogany
+  cloud: { base: '#64748b', shadow: '#334155', highlight: '#94a3b8' }, // Kumo: Silvery-grey smooth beech bark
+  hexagon: { base: '#5c2e14', shadow: '#381a0a', highlight: '#7d3f1d' }, // Rokkakkei: Deep rich chestnut hemlock
+  star: { base: '#854d0e', shadow: '#543106', highlight: '#a16207' }, // Asutarisuku: Rich golden-amber warm ginkgo teak
+  snowflake: { base: '#475569', shadow: '#1e293b', highlight: '#64748b' }, // Sunōfurēku: Weathered slate-silver white pine
+  feather: { base: '#57534e', shadow: '#292524', highlight: '#78716c' }, // Fezā: Soft grey-brown zelkova
+  snail: { base: '#581c2b', shadow: '#370d18', highlight: '#75293d' }, // Makigai: Deep twisted reddish-purple yew
+  eye: { base: '#6b7280', shadow: '#374151', highlight: '#9ca3af' }, // Me: Striated silvery pewter hornbeam
+  triangle: { base: '#422006', shadow: '#291404', highlight: '#5e2f08' }, // Sankakkei: Dark furrowed umber larch
+  arrow: { base: '#833116', shadow: '#521d0b', highlight: '#a74322' }, // Yajirushi: Fibrous warm red-pine bark
+  shield: { base: '#3f3f46', shadow: '#18181b', highlight: '#52525b' }, // Shīrudo: Rugged dark slate-brown oak
+  diamond: { base: '#5c4d3c', shadow: '#3b3024', highlight: '#7d6b56' }, // Daiyamondo: Mottled grey-ochre elm
+  cube: { base: '#653b1b', shadow: '#40240e', highlight: '#854f26' }, // Shikaku: Tawny boxwood timber
+  rectangle: { base: '#8c3a1d', shadow: '#5c2411', highlight: '#ad4d29' }, // Kukei: Warm cinnamon cherry / sakura
+  gear: { base: '#3b2f2f', shadow: '#201a1a', highlight: '#574646' }, // Sōbi: Deep metallic bronze-charcoal ironbark
+  bell: { base: '#59391e', shadow: '#382310', highlight: '#78502d' }, // Beru: Resonant dark umber-gold camphor
+};
+
+export function getSpeciesBarkColors(leafType?: string): BarkPaletteEntry {
+  if (leafType && leafType in SPECIES_BARK_COLORS) {
+    return SPECIES_BARK_COLORS[leafType as BonsaiLeafType];
+  }
+  return SPECIES_BARK_COLORS['circle'];
 }
 
 /**
@@ -1592,19 +1636,11 @@ export function drawBonsaiTrunkAndCanopy(
 ) {
   const normStyle = (style || 'MOYOGI').toUpperCase().replace('-', '_');
 
-  const trunkColor = isStyleUnlogged
-    ? '#1e293b'
-    : normStyle === 'SHAKAN'
-    ? '#8b3a1a'
-    : normStyle === 'KENGAI' || normStyle === 'HAN_KENGAI'
-    ? '#6b2d10'
-    : normStyle === 'SOKAN' || normStyle === 'KABUDACHI'
-    ? '#854d0e'
-    : leafType === 'star'
-    ? '#854d0e'
-    : leafType === 'fire'
-    ? '#7c2d12'
-    : '#78350f';
+  // Enforce 100% bark color consistency per species across ALL styles
+  const barkPalette = SPECIES_BARK_COLORS[leafType] || SPECIES_BARK_COLORS['circle'];
+  const trunkColor = isStyleUnlogged ? '#1e293b' : barkPalette.base;
+  const trunkShadow = isStyleUnlogged ? '#0f172a' : barkPalette.shadow;
+  const trunkHighlight = isStyleUnlogged ? '#334155' : barkPalette.highlight;
 
   const folColor = isStyleUnlogged ? '#1e293b' : foliageColor;
   const folAccent = isStyleUnlogged ? '#334155' : foliageAccent;
@@ -1932,7 +1968,7 @@ export function drawBonsaiTrunkAndCanopy(
     drawLeafShape(ctx, plungeX + 2 * stageScale, plungeY - 3 * stageScale, 12 * stageScale, leafType, folColor, folAccent);
     drawLeafShape(ctx, plungeX - 8 * stageScale, plungeY + 4 * stageScale, 9 * stageScale, leafType, folColor, folAccent);
 
-  } else {
+  } else if (normStyle === 'KABUDACHI') {
     // 7. KABUDACHI (Multi-Trunk Clump): Clump of 3-5 slender trunks radiating upwards from unified flare
     // Broad unified root flare
     ctx.beginPath();
@@ -1967,6 +2003,273 @@ export function drawBonsaiTrunkAndCanopy(
     drawLeafShape(ctx, trunks[2].endX, trunks[2].endY - 3, 12 * stageScale, leafType, folColor, folAccent);
     drawLeafShape(ctx, trunks[3].endX, trunks[3].endY - 2, 9.5 * stageScale, leafType, folColor, folAccent);
     drawLeafShape(ctx, trunks[4].endX, trunks[4].endY - 2, 8 * stageScale, leafType, folColor, folAccent);
+
+  } else if (normStyle === 'HOKIDACHI') {
+    // 8. HOKIDACHI (Broom Style / 箒立ち): Straight upright trunk dividing evenly into a balanced, fan-like canopy
+    // Symmetrical anchor nebari roots
+    ctx.beginPath();
+    ctx.moveTo(bx - 12 * stageScale, by - 3);
+    ctx.lineTo(bx, by - 8);
+    ctx.lineTo(bx + 12 * stageScale, by - 3);
+    ctx.lineWidth = trunkThickness * 0.85;
+    ctx.stroke();
+
+    // Straight upright trunk pillar dividing at ~38% height
+    const divX = bx;
+    const divY = by - 4 - trunkHeight * 0.38;
+
+    ctx.lineWidth = trunkThickness * 1.1;
+    ctx.beginPath();
+    ctx.moveTo(bx, by - 4);
+    ctx.lineTo(divX, divY);
+    ctx.stroke();
+
+    // Fine trunk bark highlight
+    ctx.strokeStyle = trunkHighlight;
+    ctx.lineWidth = Math.max(1, trunkThickness * 0.3);
+    ctx.beginPath();
+    ctx.moveTo(bx - 1, by - 4);
+    ctx.lineTo(divX - 1, divY);
+    ctx.stroke();
+    ctx.strokeStyle = trunkColor;
+
+    // Radiating fan branches (7 distinct branches radiating outwards like an inverted broom)
+    const broomBranches = [
+      { endX: bx - 28 * stageScale, endY: by - 4 - trunkHeight * 0.72, cpX: bx - 14 * stageScale, cpY: divY - 6 * stageScale },
+      { endX: bx - 19 * stageScale, endY: by - 4 - trunkHeight * 0.88, cpX: bx - 9 * stageScale, cpY: divY - 8 * stageScale },
+      { endX: bx - 9 * stageScale, endY: by - 4 - trunkHeight * 1.02, cpX: bx - 4 * stageScale, cpY: divY - 10 * stageScale },
+      { endX: bx, endY: by - 4 - trunkHeight * 1.08, cpX: bx, cpY: divY - 12 * stageScale },
+      { endX: bx + 9 * stageScale, endY: by - 4 - trunkHeight * 1.02, cpX: bx + 4 * stageScale, cpY: divY - 10 * stageScale },
+      { endX: bx + 19 * stageScale, endY: by - 4 - trunkHeight * 0.88, cpX: bx + 9 * stageScale, cpY: divY - 8 * stageScale },
+      { endX: bx + 28 * stageScale, endY: by - 4 - trunkHeight * 0.72, cpX: bx + 14 * stageScale, cpY: divY - 6 * stageScale },
+    ];
+
+    // Draw main broom fan branches
+    ctx.lineWidth = Math.max(1.8, trunkThickness * 0.48);
+    broomBranches.forEach((b) => {
+      ctx.beginPath();
+      ctx.moveTo(divX, divY);
+      ctx.quadraticCurveTo(b.cpX, b.cpY, b.endX, b.endY);
+      ctx.stroke();
+    });
+
+    // Secondary fine ramification sub-twigs
+    ctx.lineWidth = Math.max(1.2, trunkThickness * 0.28);
+    broomBranches.forEach((b, i) => {
+      const midX = (divX + b.endX) / 2;
+      const midY = (divY + b.endY) / 2;
+      const subSpread = (i < 3 ? -1 : i > 3 ? 1 : (i % 2 === 0 ? 1 : -1)) * 6 * stageScale;
+      ctx.beginPath();
+      ctx.moveTo(midX, midY);
+      ctx.lineTo(b.endX + subSpread, b.endY - 4 * stageScale);
+      ctx.stroke();
+    });
+
+    // Symmetrical, rounded broom crown foliage pads creating a harmonious rounded dome
+    const broomPads = [
+      { x: bx, y: by - 4 - trunkHeight * 1.08, r: 12 * stageScale },
+      { x: bx - 10 * stageScale, y: by - 4 - trunkHeight * 1.01, r: 11 * stageScale },
+      { x: bx + 10 * stageScale, y: by - 4 - trunkHeight * 1.01, r: 11 * stageScale },
+      { x: bx - 20 * stageScale, y: by - 4 - trunkHeight * 0.87, r: 10 * stageScale },
+      { x: bx + 20 * stageScale, y: by - 4 - trunkHeight * 0.87, r: 10 * stageScale },
+      { x: bx - 29 * stageScale, y: by - 4 - trunkHeight * 0.70, r: 9 * stageScale },
+      { x: bx + 29 * stageScale, y: by - 4 - trunkHeight * 0.70, r: 9 * stageScale },
+      // Inner fill pads for lush dense canopy
+      { x: bx - 7 * stageScale, y: by - 4 - trunkHeight * 0.84, r: 9.5 * stageScale },
+      { x: bx + 7 * stageScale, y: by - 4 - trunkHeight * 0.84, r: 9.5 * stageScale },
+      { x: bx, y: by - 4 - trunkHeight * 0.90, r: 10 * stageScale },
+    ];
+
+    broomPads.forEach((pad) => {
+      drawLeafShape(ctx, pad.x, pad.y, pad.r, leafType, folColor, folAccent);
+    });
+
+  } else if (normStyle === 'BUNJINGI') {
+    // 9. BUNJINGI (Literati Style / 文人木): Slender, sinuous, minimalist trunk with dramatic graceful curves and sparse, expressive cloud foliage near the apex
+    // Minimalist, refined nebari
+    ctx.beginPath();
+    ctx.moveTo(bx - 6 * stageScale, by - 3);
+    ctx.lineTo(bx, by - 7);
+    ctx.lineTo(bx + 6 * stageScale, by - 3);
+    ctx.lineWidth = trunkThickness * 0.6;
+    ctx.stroke();
+
+    // Slender, elongated trunk line (60% thickness of standard styles)
+    const slenderW = Math.max(2.2, trunkThickness * 0.62);
+    ctx.lineWidth = slenderW;
+
+    // Dramatic sinuous S-curve climbing high
+    const p1X = bx - 14 * stageScale;
+    const p1Y = by - 4 - trunkHeight * 0.32;
+    const p2X = bx + 16 * stageScale;
+    const p2Y = by - 4 - trunkHeight * 0.62;
+    const p3X = bx - 8 * stageScale;
+    const p3Y = by - 4 - trunkHeight * 0.92;
+    const apexX = bx + 6 * stageScale;
+    const apexY = by - 4 - trunkHeight * 1.18;
+
+    ctx.beginPath();
+    ctx.moveTo(bx, by - 4);
+    ctx.bezierCurveTo(bx + 4 * stageScale, by - 4 - trunkHeight * 0.15, p1X - 4 * stageScale, p1Y + 6 * stageScale, p1X, p1Y);
+    ctx.bezierCurveTo(p1X + 4 * stageScale, p1Y - 12 * stageScale, p2X + 6 * stageScale, p2Y + 12 * stageScale, p2X, p2Y);
+    ctx.bezierCurveTo(p2X - 6 * stageScale, p2Y - 14 * stageScale, p3X - 6 * stageScale, p3Y + 10 * stageScale, p3X, p3Y);
+    ctx.bezierCurveTo(p3X + 4 * stageScale, p3Y - 10 * stageScale, apexX - 4 * stageScale, apexY + 8 * stageScale, apexX, apexY);
+    ctx.stroke();
+
+    // Delicate trunk highlight
+    ctx.strokeStyle = trunkHighlight;
+    ctx.lineWidth = Math.max(0.8, slenderW * 0.28);
+    ctx.beginPath();
+    ctx.moveTo(bx - 0.5, by - 4);
+    ctx.bezierCurveTo(bx + 3 * stageScale, by - 4 - trunkHeight * 0.15, p1X - 3 * stageScale, p1Y + 6 * stageScale, p1X + 1, p1Y);
+    ctx.bezierCurveTo(p1X + 5 * stageScale, p1Y - 12 * stageScale, p2X + 5 * stageScale, p2Y + 12 * stageScale, p2X - 1, p2Y);
+    ctx.stroke();
+    ctx.strokeStyle = trunkColor;
+
+    // Sparse, delicate branches near apex only (lower 75% trunk is completely bare)
+    ctx.lineWidth = Math.max(1.4, slenderW * 0.5);
+
+    // One drooping lower-apex twig
+    const branch1EndX = bx - 18 * stageScale;
+    const branch1EndY = by - 4 - trunkHeight * 0.86;
+    ctx.beginPath();
+    ctx.moveTo(p3X, p3Y);
+    ctx.quadraticCurveTo(bx - 14 * stageScale, p3Y + 4 * stageScale, branch1EndX, branch1EndY);
+    ctx.stroke();
+
+    // Top apex trailing twig
+    const branch2EndX = apexX + 14 * stageScale;
+    const branch2EndY = apexY + 4 * stageScale;
+    ctx.beginPath();
+    ctx.moveTo(apexX, apexY);
+    ctx.quadraticCurveTo(apexX + 8 * stageScale, apexY - 2 * stageScale, branch2EndX, branch2EndY);
+    ctx.stroke();
+
+    // Sparse, expressive, compact cloud pads (3 pads total, minimalist aesthetic)
+    drawLeafShape(ctx, branch1EndX - 1 * stageScale, branch1EndY, 8.5 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, apexX, apexY - 4 * stageScale, 11 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, branch2EndX, branch2EndY, 8 * stageScale, leafType, folColor, folAccent);
+
+  } else if (normStyle === 'FUKINAASHI') {
+    // 10. FUKINAASHI (Windswept Style / 吹流し): Strong directional lean with trunk, branches, and foliage swept dynamically in a single windward direction
+    // Strong windward anchor roots gripping the soil on the left
+    ctx.beginPath();
+    ctx.moveTo(bx - 22 * stageScale, by - 2);
+    ctx.lineTo(bx - 8 * stageScale, by - 8);
+    ctx.lineTo(bx, by - 5);
+    ctx.lineWidth = trunkThickness * 1.05;
+    ctx.stroke();
+
+    // Secondary surface root on right
+    ctx.beginPath();
+    ctx.moveTo(bx, by - 5);
+    ctx.lineTo(bx + 8 * stageScale, by - 3);
+    ctx.lineWidth = trunkThickness * 0.6;
+    ctx.stroke();
+
+    // Trunk emerges and leans heavily towards the leeward direction (right)
+    ctx.lineWidth = trunkThickness * 1.1;
+    const p1X = bx + 12 * stageScale;
+    const p1Y = by - 4 - trunkHeight * 0.28;
+    const p2X = bx + 28 * stageScale;
+    const p2Y = by - 4 - trunkHeight * 0.55;
+    const apexX = bx + 42 * stageScale;
+    const apexY = by - 4 - trunkHeight * 0.82;
+
+    ctx.beginPath();
+    ctx.moveTo(bx, by - 4);
+    ctx.bezierCurveTo(
+      bx + 4 * stageScale,
+      by - 4 - trunkHeight * 0.12,
+      p1X - 2 * stageScale,
+      p1Y + 4 * stageScale,
+      p1X,
+      p1Y,
+    );
+    ctx.bezierCurveTo(
+      p1X + 10 * stageScale,
+      p1Y - 10 * stageScale,
+      p2X - 2 * stageScale,
+      p2Y + 4 * stageScale,
+      p2X,
+      p2Y,
+    );
+    ctx.bezierCurveTo(
+      p2X + 8 * stageScale,
+      p2Y - 8 * stageScale,
+      apexX - 4 * stageScale,
+      apexY + 4 * stageScale,
+      apexX,
+      apexY,
+    );
+    ctx.stroke();
+
+    // Streamlined branches extending decisively to the right (leeward side only!)
+    ctx.lineWidth = Math.max(1.8, trunkThickness * 0.5);
+
+    // Lower streaming branch
+    const bLowEndX = bx + 36 * stageScale;
+    const bLowEndY = by - 4 - trunkHeight * 0.32;
+    ctx.beginPath();
+    ctx.moveTo(p1X, p1Y);
+    ctx.quadraticCurveTo(bx + 24 * stageScale, p1Y + 2 * stageScale, bLowEndX, bLowEndY);
+    ctx.stroke();
+
+    // Mid streaming branch
+    const bMidEndX = bx + 48 * stageScale;
+    const bMidEndY = by - 4 - trunkHeight * 0.58;
+    ctx.beginPath();
+    ctx.moveTo(p2X, p2Y);
+    ctx.quadraticCurveTo(bx + 38 * stageScale, p2Y - 2 * stageScale, bMidEndX, bMidEndY);
+    ctx.stroke();
+
+    // Top apex trailing streamer branch
+    const bTopEndX = apexX + 16 * stageScale;
+    const bTopEndY = apexY + 2 * stageScale;
+    ctx.beginPath();
+    ctx.moveTo(apexX, apexY);
+    ctx.quadraticCurveTo(apexX + 8 * stageScale, apexY - 3 * stageScale, bTopEndX, bTopEndY);
+    ctx.stroke();
+
+    // Windswept horizontally trailing foliage pads (all swept rightward in the wind stream)
+    drawLeafShape(ctx, bLowEndX, bLowEndY, 8.5 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, bMidEndX - 4 * stageScale, bMidEndY - 1, 9.5 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, bMidEndX + 7 * stageScale, bMidEndY + 1, 8 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, apexX - 2 * stageScale, apexY - 3 * stageScale, 10.5 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, bTopEndX, bTopEndY, 9 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, bTopEndX + 8 * stageScale, bTopEndY + 3 * stageScale, 7.5 * stageScale, leafType, folColor, folAccent);
+
+  } else {
+    // Fallback: Moyogi informal upright
+    ctx.beginPath();
+    ctx.moveTo(bx - 9 * stageScale, by - 3);
+    ctx.lineTo(bx, by - 7);
+    ctx.lineTo(bx + 9 * stageScale, by - 3);
+    ctx.lineWidth = trunkThickness * 0.75;
+    ctx.stroke();
+
+    ctx.lineWidth = trunkThickness;
+    const curveOffset = 13 * stageScale;
+    ctx.beginPath();
+    ctx.moveTo(bx, by - 4);
+    ctx.bezierCurveTo(
+      bx - curveOffset,
+      by - 4 - trunkHeight * 0.35,
+      bx + curveOffset * 1.2,
+      by - 4 - trunkHeight * 0.7,
+      bx + 2 * stageScale,
+      by - 4 - trunkHeight,
+    );
+    ctx.stroke();
+
+    const pads = [
+      { x: bx - curveOffset * 1.2, y: by - 4 - trunkHeight * 0.4, r: 12 * stageScale },
+      { x: bx + curveOffset * 1.3, y: by - 4 - trunkHeight * 0.72, r: 13 * stageScale },
+      { x: bx + 2 * stageScale, y: by - 4 - trunkHeight - 2, r: 14 * stageScale },
+    ];
+    pads.forEach((pad) => {
+      drawLeafShape(ctx, pad.x, pad.y, pad.r, leafType, folColor, folAccent);
+    });
   }
 
   ctx.restore();

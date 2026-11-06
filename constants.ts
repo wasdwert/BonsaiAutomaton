@@ -1,5 +1,11 @@
 import {SpriteConfig} from './utils/helper';
-export {SPECIES_PALETTE, type SpeciesPaletteEntry} from './bonsaiData';
+export {
+  SPECIES_PALETTE,
+  type SpeciesPaletteEntry,
+  SPECIES_BARK_COLORS,
+  getSpeciesBarkColors,
+  type BarkPaletteEntry,
+} from './bonsaiData';
 
 /**
  * Aesthetic theme colors and styles for Bonsai Automata

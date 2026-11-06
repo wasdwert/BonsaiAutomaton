@@ -25,6 +25,7 @@ import {
   getLeafTypeDef,
   getMaturityDef,
   getBonsaiLevelGrowthNeeded,
+  getRequiredGrowthDuration,
   calculateDonationValue,
   calculateBonsaiDonationValue,
   getBonsaiDonationBreakdown,
@@ -45,6 +46,7 @@ import {
   getBonsaiNature,
   formatCrystalPedestalBonus,
   calculateBaseAesthetic,
+  getBonsaiMaturityRating,
 } from './types';
 import { getNatureFactor } from './DeploymentModal';
 import { gameAudio } from './utils/helper';
@@ -401,7 +403,10 @@ export default function BonsaiInspectionModal({
     },
   ];
 
-  const targetSeconds = getBonsaiLevelGrowthNeeded(bonsai.level, bonsai.maturity);
+  const targetSeconds = getRequiredGrowthDuration(
+    bonsai.level,
+    bonsai.maturityRating || bonsai.maturity || bonsai,
+  );
   const growthPct = Math.min(100, Math.round((bonsai.progressSeconds / targetSeconds) * 100));
   const tierSpeed =
     bonsai.automatonTier > 0
@@ -481,7 +486,7 @@ export default function BonsaiInspectionModal({
                 </span>
                 <span>•</span>
                 <span style={{ color: matDef.color }} className="font-semibold">
-                  Growth Req: {matDef.growthMultiplier}x ({matDef.name})
+                  Req: {getRequiredGrowthDuration(bonsai.level, bonsai.maturityRating || bonsai.maturity || bonsai)}s (R.{getBonsaiMaturityRating(bonsai)} • {matDef.name})
                 </span>
                 <span>•</span>
                 <span className={`font-bold flex items-center gap-1 ${isEcoRequestMatch ? 'text-amber-300 bg-amber-950/80 border border-amber-500/50 px-2 py-0.5 rounded-lg' : 'text-emerald-300'}`}>
@@ -574,12 +579,12 @@ export default function BonsaiInspectionModal({
                         ⛔ Growth Stalled (&gt;4 {bSyn.stalledEntityLabel || 'identical neighbors'})
                       </strong>
                     ) : bonsai.automatonTier > 0 && powerSufficient ? (
-                      `Timer: ${remainingSeconds.toFixed(1)}s until Level ${bonsai.level + 1}`
+                      `Timer: ${remainingSeconds.toFixed(1)}s until Level ${bonsai.level + 1} (${targetSeconds}s total)`
                     ) : (
-                      `Progress: ${bonsai.progressSeconds.toFixed(1)}s / ${targetSeconds.toFixed(1)}s`
+                      `Progress: ${bonsai.progressSeconds.toFixed(1)}s / ${targetSeconds}s`
                     )}
                   </span>
-                  <span className="text-slate-500">({matDef.growthMultiplier}x Multiplier)</span>
+                  <span className="text-slate-500">(R.{getBonsaiMaturityRating(bonsai)}: {targetSeconds}s)</span>
                 </div>
               </div>
             </div>

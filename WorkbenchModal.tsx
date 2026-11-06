@@ -115,17 +115,26 @@ export default function WorkbenchModal({
   const maxCapacity = getWorkbenchAutomatonCapacity(inv.workbench_tier || 1);
   const totalQueued = (activeCraft ? 1 : 0) + craftingQueue.length;
 
+  const curLic1 = inv.license_t1 ?? inv.licenseT1 ?? inv.resources?.license_t1 ?? inv.resources?.licenseT1 ?? 0;
+  const curLic2 = inv.license_t2 ?? inv.licenseT2 ?? inv.resources?.license_t2 ?? inv.resources?.licenseT2 ?? 0;
+  const curLic3 = inv.license_t3 ?? inv.licenseT3 ?? inv.resources?.license_t3 ?? inv.resources?.licenseT3 ?? 0;
   const curScrap = inv.scrap_metal ?? inv.scrapMetal ?? inv.resources?.scrap_metal ?? inv.resources?.scrapMetal ?? 0;
   const curWire = inv.copper_wire ?? inv.copperWire ?? inv.resources?.copper_wire ?? inv.resources?.copperWire ?? 0;
   const curGears = inv.brass_gears ?? inv.gears ?? inv.resources?.brass_gears ?? inv.resources?.gears ?? 0;
   const curCircuits = inv.circuit_boards ?? inv.microcircuits ?? inv.resources?.circuit_boards ?? inv.resources?.microcircuits ?? 0;
   const curChips = inv.electronic_chips ?? inv.chips ?? inv.quantumChips ?? inv.resources?.electronic_chips ?? inv.resources?.chips ?? 0;
-  const curWaste = inv.organic_waste ?? inv.organicWaste ?? inv.resources?.organic_waste ?? inv.resources?.organicWaste ?? 0;
-  const curBio = inv.biochemicals ?? inv.biochemical ?? inv.resources?.biochemicals ?? 0;
   const curCondensed = inv.condensed_organic_material ?? inv.condensedOrganicMaterial ?? inv.resources?.condensed_organic_material ?? 0;
+  const curBio = inv.biochemicals ?? inv.biochemical ?? inv.resources?.biochemicals ?? 0;
+  const curWaste = inv.organic_waste ?? inv.organicWaste ?? inv.resources?.organic_waste ?? inv.resources?.organicWaste ?? 0;
 
-  // 11 fast-crafting recipes in Resources tab
+  // 15 craftable recipes in Resources tab:
+  // Copper Wire, Mechanical Gear, Microcircuit, Quantum Chip at very top in exact order;
+  // followed immediately by Compost S, M, L; Fertilizer S, M, L; Speed Grow XS, S, M, L, XL
   const resourceRecipeIds: CraftingRecipeId[] = [
+    'craft_copper_wire',
+    'craft_gears',
+    'craft_microcircuits',
+    'craft_quantum_chips',
     'craft_compost_s',
     'craft_compost_m',
     'craft_compost_l',
@@ -137,10 +146,6 @@ export default function WorkbenchModal({
     'craft_speed_grow_m',
     'craft_speed_grow_l',
     'craft_speed_grow_xl',
-    'craft_copper_wire',
-    'craft_gears',
-    'craft_microcircuits',
-    'craft_quantum_chips',
   ];
 
   const renderRecipeCard = (recipeId: CraftingRecipeId, cardIdx?: number) => {
@@ -200,18 +205,26 @@ export default function WorkbenchModal({
 
     const queueFull = totalQueued >= maxQueueCapacity;
 
+    // Standardized Resource Cost Order strictly:
+    // 1. License (T1, T2, or T3 License)
+    // 2. Scrap (Scrap Metal)
+    // 3. Wire (Copper Wire)
+    // 4. Gears (Mechanical Gears)
+    // 5. Circuits (Microcircuits / Circuit Boards)
+    // 6. Chips (Quantum Chips / Microchips)
+    // Followed by organic ingredients (Condensed Organic Material, Biochemicals, Organic Waste)
     const costStrings: string[] = [];
     if (costs.license_t1) costStrings.push(`${costs.license_t1}x T1 License`);
     if (costs.license_t2) costStrings.push(`${costs.license_t2}x T2 License`);
     if (costs.license_t3) costStrings.push(`${costs.license_t3}x T3 License`);
-    if (costs.condensed_organic_material) costStrings.push(`${costs.condensed_organic_material} Condensed Organic Material`);
-    if (costs.biochemicals) costStrings.push(`${costs.biochemicals} Biochemical`);
-    if (costs.organic_waste) costStrings.push(`${costs.organic_waste} Organic Waste`);
-    if (costs.copper_wire) costStrings.push(`${costs.copper_wire} Copper Wire`);
     if (costs.scrap_metal) costStrings.push(`${costs.scrap_metal} Scrap Metal`);
+    if (costs.copper_wire) costStrings.push(`${costs.copper_wire} Copper Wire`);
     if (costs.brass_gears) costStrings.push(`${costs.brass_gears} Gears`);
     if (costs.circuit_boards) costStrings.push(`${costs.circuit_boards} Circuit Boards`);
     if (costs.electronic_chips) costStrings.push(`${costs.electronic_chips} Microchips`);
+    if (costs.condensed_organic_material) costStrings.push(`${costs.condensed_organic_material} Condensed Organic Material`);
+    if (costs.biochemicals) costStrings.push(`${costs.biochemicals} Biochemical`);
+    if (costs.organic_waste) costStrings.push(`${costs.organic_waste} Organic Waste`);
 
     const isResourceRecipe = recipe.category === 'resources' || recipe.category === 'compost';
 
@@ -332,21 +345,19 @@ export default function WorkbenchModal({
               <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-900/60 border border-emerald-500/30 text-emerald-300">
                 Tier {inv.workbench_tier || 1}: {getWorkbenchName(inv.workbench_tier || 1)}
               </span>
+              {/* Prominently styled Manage Modules button matching active/hover look and color theme of submenu tabs */}
               <button
                 onClick={() => {
                   setWorkbenchTab(workbenchTab === 'modules' ? 'resources' : 'modules');
                   gameAudio.playCrispClick();
                 }}
-                className={`text-xs font-bold px-3 py-1 rounded-xl border transition-all flex items-center gap-1.5 shadow active:scale-95 cursor-pointer ${
+                className={`py-1.5 px-3.5 rounded-xl text-xs sm:text-sm font-bold border transition-all flex items-center gap-2 shadow-md active:scale-95 cursor-pointer ${
                   workbenchTab === 'modules'
-                    ? 'bg-cyan-600 text-white border-cyan-400 ring-2 ring-cyan-400/40'
-                    : totalAttached >= maxCapacity
-                    ? 'bg-amber-950/80 text-amber-300 border-amber-500/60 hover:bg-amber-900'
-                    : 'bg-emerald-950/80 text-emerald-300 border-emerald-500/60 hover:bg-emerald-900'
+                    ? 'bg-cyan-600 hover:bg-cyan-500 text-white border-cyan-300 ring-2 ring-cyan-400/50 shadow-[0_0_14px_rgba(6,182,212,0.45)]'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400 hover:border-emerald-300 ring-1 ring-emerald-400/40 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
                 }`}>
-                <span>⚙️</span>
-                <span>Manage Modules: {totalAttached} / {maxCapacity} Max</span>
-                <span className="text-[10px] opacity-75 font-normal">({workbenchTab === 'modules' ? 'Viewing' : 'Open'})</span>
+                <span className="text-sm">⚙️</span>
+                <span>Manage Modules: {totalAttached}/{maxCapacity} Max ({workbenchTab === 'modules' ? 'Viewing' : 'Open'})</span>
               </button>
             </div>
             <p className="text-[11px] text-slate-400 mt-0.5">
@@ -361,16 +372,24 @@ export default function WorkbenchModal({
         </button>
       </div>
 
-      {/* Materials Strip with Condensed Organic Material Tracking */}
+      {/* Standardized Resource Availability Bar strictly ordered:
+          1. Licenses (T1: X | T2: Y | T3: Z)
+          2. Scrap
+          3. Wire
+          4. Gears
+          5. Circuits
+          6. Chips
+          7. Condensed Organic Material
+          8. Biochemicals */}
       <div className="bg-slate-900/90 border border-slate-800 px-3 py-2 rounded-2xl mb-3 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
-        <span>🧱 Condensed: <strong className="text-amber-300 font-mono">{curCondensed}</strong></span>
-        <span>🧪 Bio: <strong className="text-cyan-400 font-mono">{curBio}</strong></span>
-        <span>🍂 Waste: <strong className="text-lime-400 font-mono">{curWaste}</strong></span>
+        <span>📜 Licenses: <strong className="text-amber-300 font-mono">T1: {curLic1} | T2: {curLic2} | T3: {curLic3}</strong></span>
+        <span>🔩 Scrap: <strong className="text-slate-300 font-mono">{curScrap}</strong></span>
         <span>⚡ Wire: <strong className="text-orange-400 font-mono">{curWire}</strong></span>
         <span>⚙️ Gears: <strong className="text-yellow-400 font-mono">{curGears}</strong></span>
         <span>🟩 Circuits: <strong className="text-emerald-400 font-mono">{curCircuits}</strong></span>
         <span>💎 Chips: <strong className="text-purple-400 font-mono">{curChips}</strong></span>
-        <span>🔩 Scrap: <strong className="text-slate-300 font-mono">{curScrap}</strong></span>
+        <span>🧱 Condensed: <strong className="text-amber-300 font-mono">{curCondensed}</strong></span>
+        <span>🧪 Bio: <strong className="text-cyan-400 font-mono">{curBio}</strong></span>
       </div>
 
       {/* Active Crafting Banner */}
@@ -492,7 +511,7 @@ export default function WorkbenchModal({
             gameAudio.playCrispClick();
           }}
           className={`py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-            workbenchTab === 'electricity'
+            workbenchTab === 'electricity' || (workbenchTab as string) === 'infrastructure'
               ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/40'
               : 'bg-slate-800 text-slate-400 hover:bg-slate-750'
           }`}>
@@ -501,41 +520,32 @@ export default function WorkbenchModal({
         </button>
       </div>
 
-      {/* CONTENT: RESOURCES SUBMENU WITH 11 FAST-CRAFTING RECIPES */}
+      {/* CONTENT: SUBMENUS */}
       <div className="flex-1 space-y-2.5 mb-3 overflow-y-auto pr-1">
+        {/* TAB 1: RESOURCES (Clean card grid with Copper Wire, Mechanical Gear, Microcircuit, Quantum Chip at very top, followed by Composts, Fertilizers, Speed Grows) */}
         {workbenchTab === 'resources' || workbenchTab === 'compost' ? (
-          <div>
-            <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <span>🌾</span>
-                <span>Fast-Crafting Recipes (Condensed Organic Material &amp; Biochemicals)</span>
-              </span>
-              <span className="text-[11px] text-slate-400 font-normal">
-                Quick 5s - 40s synthesis in Workbench
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {resourceRecipeIds.map((recipeId, rIdx) => renderRecipeCard(recipeId, rIdx))}
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {resourceRecipeIds.map((recipeId, rIdx) => renderRecipeCard(recipeId, rIdx))}
           </div>
         ) : workbenchTab === 'bonsai_automatons' || workbenchTab === 'automatons' ? (
+          /* TAB 2: BONSAI CARE (Sprinklers T1-T3 at top, followed by Compost Feeders and Fertilizer Drippers) */
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {[
+              'tier1_automaton',
+              'tier2_automaton',
+              'tier3_automaton',
               't1_compost_feeder',
               't2_compost_feeder',
               't3_compost_feeder',
               't1_fertilizer_dripper',
               't2_fertilizer_dripper',
               't3_fertilizer_dripper',
-              'tier1_automaton',
-              'tier2_automaton',
-              'tier3_automaton',
             ].map((rId, idx) =>
               renderRecipeCard(rId as CraftingRecipeId, idx),
             )}
           </div>
         ) : workbenchTab === 'workbench' || workbenchTab === 'upgrades' ? (
+          /* TAB 3: WORKBENCH UPGRADES & MODULES */
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {['workbench_t2_upgrade', 'workbench_t3_upgrade'].map((rId, idx) =>
@@ -557,32 +567,254 @@ export default function WorkbenchModal({
             </div>
           </div>
         ) : workbenchTab === 'rover' ? (
+          /* TAB 4: ROVER (Chassis upgrades, Battery Modules T1-T3 directly above Storage Modules T1-T3, Radar Modules T1-T3) */
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {[
               'rover_chassis_t2',
               'rover_chassis_t3',
-              'rover_storage_module_1',
-              'rover_storage_module_2',
-              'rover_storage_module_3',
               'rover_battery_module_1',
               'rover_battery_module_2',
               'rover_battery_module_3',
+              'rover_storage_module_1',
+              'rover_storage_module_2',
+              'rover_storage_module_3',
               'rover_radar_module_1',
               'rover_radar_module_2',
               'rover_radar_module_3',
             ].map((rId, idx) => renderRecipeCard(rId as CraftingRecipeId, idx))}
           </div>
-        ) : workbenchTab === 'electricity' ? (
+        ) : workbenchTab === 'electricity' || (workbenchTab as string) === 'infrastructure' ? (
+          /* TAB 5: INFRASTRUCTURE (Solar panels, Solar farms, Turbines, Turbine farms, Auto (Un-)Loader at very bottom) */
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {[
-              'auto_unloader',
               'solar_panel',
               'solar_farm_2x2',
               'solar_farm_3x3',
               'wind_turbine',
               'wind_farm_2x2',
               'wind_farm_3x3',
+              'auto_unloader',
             ].map((rId, idx) => renderRecipeCard(rId as CraftingRecipeId, idx))}
+          </div>
+        ) : workbenchTab === 'modules' ? (
+          /* DEDICATED MODULE MANAGEMENT VIEW */
+          <div className="space-y-4">
+            {/* Installed Modules Summary */}
+            <div className="bg-slate-900/90 border border-cyan-500/40 p-4 rounded-2xl shadow-lg space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-950 border border-cyan-500/60 flex items-center justify-center text-xl shadow">
+                    ⚙️
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-100">
+                      Installed Workbench Modules ({totalAttached} / {maxCapacity} Bays)
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Tier {inv.workbench_tier || 1}: {getWorkbenchName(inv.workbench_tier || 1)} • Queue Capacity: {maxQueueCapacity} • Craft Speed: +{((overclockBonusSpeed) * 100).toFixed(0)}%
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className={`text-xs font-mono font-bold px-2 py-1 rounded-lg border ${
+                    powerSufficient ? 'bg-emerald-950 text-emerald-300 border-emerald-500/50' : 'bg-rose-950 text-rose-300 border-rose-500/50'
+                  }`}>
+                    Load: {craftingPowerDrain + autoFabricatorPowerDrain} kW
+                  </span>
+                </div>
+              </div>
+
+              {/* Grid of Installed Modules */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-slate-800">
+                {/* Legacy Assembly Arms */}
+                {Array.from({ length: installedCraftingArms }).map((_, aIdx) => (
+                  <div key={`arm_${aIdx}`} className="bg-slate-950/80 border border-sky-500/50 p-3 rounded-xl flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">🤖</span>
+                      <div>
+                        <div className="text-xs font-bold text-slate-100">Crafting Assembly Arm</div>
+                        <div className="text-[10px] text-sky-300">+1 Queue Slot • +25% Speed • 3 kW</div>
+                      </div>
+                    </div>
+                    {onDetachWorkbenchModule && (
+                      <button
+                        onClick={() => onDetachWorkbenchModule(aIdx)}
+                        className="bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-200 border border-slate-700 hover:border-rose-500 text-[10px] font-bold px-2.5 py-1 rounded-lg cursor-pointer">
+                        Detach
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                {/* Attached Modules */}
+                {(inv.attached_workbench_modules || []).map((modType, mIdx) => {
+                  const cfg = WORKBENCH_MODULE_CONFIGS[modType];
+                  if (!cfg) return null;
+                  return (
+                    <div key={`mod_${mIdx}`} className="bg-slate-950/80 border border-cyan-500/50 p-3 rounded-xl flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{cfg.icon}</span>
+                        <div>
+                          <div className="text-xs font-bold text-slate-100">{cfg.name}</div>
+                          <div className="text-[10px] text-cyan-300">{cfg.bonusLabel} • ⚡ {cfg.kw} kW</div>
+                        </div>
+                      </div>
+                      {onDetachWorkbenchModule && (
+                        <button
+                          onClick={() => onDetachWorkbenchModule(mIdx)}
+                          className="bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-200 border border-slate-700 hover:border-rose-500 text-[10px] font-bold px-2.5 py-1 rounded-lg cursor-pointer">
+                          Detach
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Auto-Fabricator Lanes */}
+                {autoFabricatorLanes.map((lane) => {
+                  const targetRecipe = lane.targetRecipeId !== 'none' ? WORKBENCH_RECIPES[lane.targetRecipeId] : null;
+                  const kw = lane.tier === 1 ? 6 : lane.tier === 3 ? 14 : 10;
+                  const speedLabel = lane.tier === 1 ? '50% Speed' : lane.tier === 3 ? '150% Speed' : '100% Speed';
+
+                  return (
+                    <div key={lane.id} className="bg-slate-950/80 border border-cyan-500/60 p-3 rounded-xl space-y-2 col-span-1 sm:col-span-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">🏭</span>
+                          <div>
+                            <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                              <span>T{lane.tier} Auto-Fabrication Lane</span>
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/40">
+                                {speedLabel} • ⚡ {kw} kW
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              Target: <strong className="text-emerald-300">{targetRecipe ? targetRecipe.name : 'None / Halted'}</strong>
+                            </div>
+                          </div>
+                        </div>
+                        {onDetachAutoLane && (
+                          <button
+                            onClick={() => onDetachAutoLane(lane.id)}
+                            className="bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-200 border border-slate-700 hover:border-rose-500 text-[10px] font-bold px-2.5 py-1 rounded-lg cursor-pointer">
+                            Detach Lane
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Recipe Selector for Auto-Lane */}
+                      {onSetAutoLaneRecipe && (
+                        <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-800">
+                          <span className="text-[10px] text-slate-400 font-semibold mr-1">Assign Recipe:</span>
+                          {[
+                            { id: 'craft_copper_wire', label: 'Wire' },
+                            { id: 'craft_gears', label: 'Gears' },
+                            { id: 'craft_microcircuits', label: 'Circuits' },
+                            { id: 'craft_quantum_chips', label: 'Chips' },
+                            { id: 'craft_compost_s', label: 'Compost S' },
+                            { id: 'craft_fertilizer_s', label: 'Fertilizer S' },
+                            { id: 'none', label: 'Halt' },
+                          ].map((opt) => (
+                            <button
+                              key={opt.id}
+                              onClick={() => onSetAutoLaneRecipe(lane.id, opt.id as any)}
+                              className={`text-[10px] px-2 py-0.5 rounded-lg font-bold border transition-all cursor-pointer ${
+                                lane.targetRecipeId === opt.id
+                                  ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm'
+                                  : 'bg-slate-900 text-slate-400 border-slate-700 hover:bg-slate-800'
+                              }`}>
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {totalAttached === 0 && (
+                  <div className="col-span-1 sm:col-span-2 text-center py-4 text-xs text-slate-500 bg-slate-950/40 rounded-xl border border-dashed border-slate-800">
+                    No modules currently attached. Install available modules from your inventory below!
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Unattached Modules in Inventory */}
+            <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-lg space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <Package className="w-4 h-4 text-emerald-400" />
+                  <span>Uninstalled Modules in Inventory</span>
+                </h4>
+                <span className="text-[11px] text-slate-400">
+                  {totalAttached >= maxCapacity ? (
+                    <strong className="text-amber-400">Bays Full ({totalAttached}/{maxCapacity})</strong>
+                  ) : (
+                    <strong className="text-emerald-400">{maxCapacity - totalAttached} Bays Open</strong>
+                  )}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {(
+                  [
+                    'assembly_module_t1',
+                    'assembly_module_t2',
+                    'assembly_module_t3',
+                    'overclock_module_t1',
+                    'overclock_module_t2',
+                    'overclock_module_t3',
+                    'auto_fabrication_t1',
+                    'auto_fabrication_t2',
+                    'auto_fabrication_t3',
+                  ] as WorkbenchModuleType[]
+                ).map((mKey) => {
+                  const cfg = WORKBENCH_MODULE_CONFIGS[mKey];
+                  const invKey = `${mKey}_inv` as keyof SanctuaryInventory;
+                  const inStock = ((inv[invKey] as number) || 0) + (mKey === 'auto_fabrication_t2' ? (inv.auto_fabricators_inv || 0) : 0);
+                  const canAttach = inStock > 0 && totalAttached < maxCapacity;
+
+                  return (
+                    <div
+                      key={mKey}
+                      className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-all ${
+                        inStock > 0
+                          ? 'bg-slate-950/90 border-slate-700 shadow-sm'
+                          : 'bg-slate-950/40 border-slate-850 opacity-50'
+                      }`}>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-xl shrink-0">{cfg.icon}</span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h5 className="font-bold text-xs text-slate-100 truncate">{cfg.name}</h5>
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-500/40">
+                              {cfg.bonusLabel} • ⚡ {cfg.kw} kW
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                            Stock: <strong className={inStock > 0 ? 'text-sky-300 font-mono' : 'text-slate-500 font-mono'}>{inStock}</strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        disabled={!canAttach}
+                        onClick={() => onAttachWorkbenchModule && onAttachWorkbenchModule(mKey)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all shadow cursor-pointer ${
+                          canAttach
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
+                            : inStock <= 0
+                            ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                            : 'bg-slate-800 text-amber-400/80 cursor-not-allowed'
+                        }`}>
+                        {inStock <= 0 ? 'No Stock' : totalAttached >= maxCapacity ? 'Bays Full' : 'Install (+)'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         ) : null}
       </div>

@@ -371,6 +371,9 @@ const STYLES: BonsaiStyle[] = [
   'SOKAN',
   'KENGAI',
   'KABUDACHI',
+  'HOKIDACHI',
+  'BUNJINGI',
+  'FUKINAASHI',
 ];
 
 /**
@@ -1045,7 +1048,7 @@ export default function DeploymentModal({
                         </span>
                       </div>
                       <span className="text-[10px] text-slate-400 font-mono shrink-0">
-                        {activeStyleIdx + 1} / 7
+                        {activeStyleIdx + 1} / {STYLES.length}
                       </span>
                     </div>
                     <p className="text-xs text-emerald-300 font-medium truncate mt-0.5">

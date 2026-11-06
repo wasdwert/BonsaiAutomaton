@@ -52,8 +52,8 @@
   "sections": [
     {
       "title": "User Interface & Navigation",
-      "content": "1. Full-Screen Modular Layout: Standardized the Bonsai Society menu layout to dock directly below the top telemetry HUD (analogous to the Zen Library, Workbench, and Market), maximizing usable viewport height for submenus. 2. Compact Title Bar: Harmonized the Society header typography to compact standard dimensions, reducing vertical padding. 3. Bonsai Master Quest & Sub-Tab Rank Telemetry: Renamed the quest hub to 'Bonsai Master Quest' and eliminated redundant operational info banners. Replaced all legacy 'Tier' references with 'Rank' across quest branches, badges, and milestones. Sub-tab headers now embed live rank telemetry directly (e.g. 'Discovery \u2013 Rank 1', 'Competition \u2013 Rank 1', 'Eco \u2013 Rank 1'), while removing extraneous status badges from the tab buttons.",
-      "summary": "Standardized Society Full-Screen Frame, Compact Title Architecture, and Integrated Quest Rank Nomenclature."
+      "content": "1. Clean Tab Bar Typography: Removed auxiliary pills ('3 Branches' from Bonsai Master Quest and '+ 0 ZP Earned' from Milestones) from the Bonsai Society navigation bar, presenting clean icons and titles. 2. Two-Line Compact Milestone Blocks: Removed 'Block X' text from milestone cards so each threshold block renders across exactly two lines (Line 1: Target requirement; Line 2: Reward status and completion tick), substantially expanding vertical view space to display multiple objectives at once. 3. Interactive Keyboard & Gamepad Selection: Milestone cards are interactively selectable with highlighted focus states and smooth scroll-into-view behavior across mouse wheel, touch swipe, and controller inputs.",
+      "summary": "Streamlined Navigation Telemetry, Compact Two-Line Milestone Blocks, and Interactive List Navigation."
     }
   ]
 }

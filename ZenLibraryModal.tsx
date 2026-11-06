@@ -454,6 +454,9 @@ export default function ZenLibraryModal({
       'SOKAN',
       'KENGAI',
       'KABUDACHI',
+      'HOKIDACHI',
+      'BUNJINGI',
+      'FUKINAASHI',
     ];
 
     const skillKeys = Object.keys(SKILL_CONFIGS);
@@ -678,7 +681,7 @@ export default function ZenLibraryModal({
                 🌿 {discoveredSpeciesCount} / 20 Species Discovered ({Math.round((discoveredSpeciesCount / 20) * 100)}%)
               </div>
               <div className="bg-slate-950/90 border border-amber-500/60 px-2.5 py-0.5 rounded-lg text-amber-300 font-bold font-mono text-[11px] shadow-sm">
-                🎋 {totalStylesLoggedCount} / 140 Styles
+                🎋 {totalStylesLoggedCount} / 200 Styles
               </div>
             </div>
           </div>
@@ -794,7 +797,7 @@ export default function ZenLibraryModal({
                                 {def.group}
                               </span>
                               <span className="text-emerald-400 font-mono">
-                                Styles: {raisedCount}/7
+                                Styles: {raisedCount}/10
                               </span>
                             </>
                           ) : (
@@ -863,7 +866,7 @@ export default function ZenLibraryModal({
                 <div className="flex-1 w-full space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 sticky top-0 bg-slate-950/90 py-0.5 z-10">
                     <Sparkles className="w-3 h-3 text-amber-400" />
-                    <span>7 Structural Growth Styles</span>
+                    <span>10 Structural Growth Styles</span>
                   </div>
 
                   {(
@@ -875,6 +878,9 @@ export default function ZenLibraryModal({
                       'SOKAN',
                       'KENGAI',
                       'KABUDACHI',
+                      'HOKIDACHI',
+                      'BUNJINGI',
+                      'FUKINAASHI',
                     ] as BonsaiStyle[]
                   ).map((stKey) => {
                     const stDef = getBonsaiStyleDef(stKey);
