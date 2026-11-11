@@ -4,12 +4,14 @@ import {
   Sparkles,
   Layers,
   Award,
+  Lock,
 } from 'lucide-react';
 import {
   BlueprintDef,
   BlueprintCategory,
   BlueprintUnlockRank,
   BLUEPRINTS_CATALOG,
+  getBlueprintRequiredRank,
 } from './blueprints';
 import { VerdureIcon } from './App';
 import { gameAudio } from './utils/helper';
@@ -18,7 +20,9 @@ export interface BlueprintsCatalogViewProps {
   unlockedBlueprints: string[];
   verdureBalance: number;
   onPurchaseBlueprint: (blueprint: BlueprintDef) => void;
+  maxBranchRank?: number;
   accentTone?: 'amber' | 'emerald' | 'sky';
+  discountRate?: number;
 }
 
 const CATEGORIES: ('All' | BlueprintCategory)[] = [
@@ -42,11 +46,16 @@ export default function BlueprintsCatalogView({
   unlockedBlueprints,
   verdureBalance,
   onPurchaseBlueprint,
+  maxBranchRank = 0,
   accentTone = 'amber',
+  discountRate = 0,
 }: BlueprintsCatalogViewProps) {
   const [selectedCategory, setSelectedCategory] = useState<'All' | BlueprintCategory>('All');
   const [selectedRank, setSelectedRank] = useState<'All Ranks' | BlueprintUnlockRank>('All Ranks');
   const [localPurchased, setLocalPurchased] = useState<Set<string>>(new Set());
+
+  const discountMultiplier = Math.max(0.1, 1 - (discountRate || 0));
+  const getDiscountedPrice = (price: number) => Math.max(1, Math.round(price * discountMultiplier));
 
   // Synchronize when unlockedBlueprints prop updates
   useEffect(() => {
@@ -82,6 +91,11 @@ export default function BlueprintsCatalogView({
   }, [ownedSet, unlockedBlueprints, localPurchased, selectedCategory, selectedRank]);
 
   const handleBuy = (bp: BlueprintDef) => {
+    const reqRank = getBlueprintRequiredRank(bp);
+    if (reqRank > 0 && maxBranchRank < reqRank) {
+      gameAudio?.playErrorBuzz?.();
+      return;
+    }
     // Instantly add to local set so the card disappears on the very same frame
     setLocalPurchased((prev) => new Set(prev).add(bp.id));
     onPurchaseBlueprint(bp);
@@ -187,13 +201,18 @@ export default function BlueprintsCatalogView({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
             {filteredBlueprints.map((bp) => {
-              const canAfford = verdureBalance >= bp.price;
+              const reqRank = getBlueprintRequiredRank(bp);
+              const isRankLocked = reqRank > 0 && maxBranchRank < reqRank;
+              const discountedPrice = getDiscountedPrice(bp.price);
+              const canAfford = verdureBalance >= discountedPrice;
 
               return (
                 <div
                   key={bp.id}
                   className={`p-3.5 rounded-2xl border flex flex-col justify-between gap-2.5 transition-all shadow-sm ${
-                    canAfford
+                    isRankLocked
+                      ? 'bg-slate-950/70 border-slate-800'
+                      : canAfford
                       ? 'bg-slate-900/90 border-slate-800 hover:border-amber-500/40'
                       : 'bg-slate-950/70 border-slate-850 opacity-75'
                   }`}>
@@ -213,11 +232,20 @@ export default function BlueprintsCatalogView({
                           )}`}>
                           {bp.unlockRank}
                         </span>
+                        {isRankLocked && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md border bg-slate-950 text-amber-400 border-amber-500/40 flex items-center gap-1 shadow-sm">
+                            <Lock className="w-3 h-3 text-amber-400" />
+                            <span>Requires Rank {reqRank} Branch</span>
+                          </span>
+                        )}
                       </div>
 
                       <span className="text-xs font-black text-amber-300 flex items-center gap-1 font-mono">
                         <VerdureIcon className="w-3.5 h-3.5" />
-                        <span>{bp.price} Verdure</span>
+                        <span>{discountedPrice} Verdure</span>
+                        {discountRate > 0 && (
+                          <span className="text-[10px] text-slate-400 line-through">({bp.price})</span>
+                        )}
                       </span>
                     </div>
 
@@ -235,21 +263,31 @@ export default function BlueprintsCatalogView({
 
                   {/* Purchase Button */}
                   <div>
-                    <button
-                      disabled={!canAfford}
-                      onClick={() => handleBuy(bp)}
-                      className={`w-full py-2 rounded-xl text-xs font-bold transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                        canAfford
-                          ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95 ring-1 ring-amber-400/50'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-                      }`}>
-                      <VerdureIcon className="w-3.5 h-3.5" />
-                      <span>
-                        {canAfford
-                          ? `Purchase Blueprint (${bp.price} Verdure)`
-                          : `Need ${bp.price} Verdure`}
-                      </span>
-                    </button>
+                    {isRankLocked ? (
+                      <button
+                        disabled
+                        title={`Requires at least one Master Quest Branch completed to Rank ${reqRank}`}
+                        className="w-full py-2 rounded-xl text-xs font-bold transition-all shadow flex items-center justify-center gap-1.5 bg-slate-950 text-amber-400/90 border border-amber-500/40 cursor-not-allowed">
+                        <Lock className="w-3.5 h-3.5 text-amber-400" />
+                        <span>🔒 Requires Rank {reqRank} Branch Finished</span>
+                      </button>
+                    ) : (
+                      <button
+                        disabled={!canAfford}
+                        onClick={() => handleBuy(bp)}
+                        className={`w-full py-2 rounded-xl text-xs font-bold transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                          canAfford
+                            ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95 ring-1 ring-amber-400/50'
+                            : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                        }`}>
+                        <VerdureIcon className="w-3.5 h-3.5" />
+                        <span>
+                          {canAfford
+                            ? `Purchase Blueprint (${discountedPrice} Verdure)`
+                            : `Need ${discountedPrice} Verdure`}
+                        </span>
+                      </button>
+                    )}
                   </div>
                 </div>
               );

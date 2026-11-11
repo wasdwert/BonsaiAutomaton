@@ -80,6 +80,7 @@ export interface BonsaiInspectionModalProps {
   synergies: BonsaiSynergies;
   powerSufficient: boolean;
   inventory: SanctuaryInventory;
+  skills?: any;
   greenThumbRank: number;
   isEcoRequestMatch?: boolean;
   isStored?: boolean;
@@ -193,6 +194,7 @@ export default function BonsaiInspectionModal({
   synergies: bSyn,
   powerSufficient,
   inventory: inv,
+  skills,
   greenThumbRank,
   isEcoRequestMatch = false,
   isStored = false,
@@ -413,7 +415,7 @@ export default function BonsaiInspectionModal({
       ? getAutomatonConfig(bonsai.automatonTier)?.speedMultiplier || 1.0
       : 1.0;
   const remainingSeconds = Math.max(0, (targetSeconds - bonsai.progressSeconds) / tierSpeed);
-  const donationBreakdown = getBonsaiDonationBreakdown(bonsai);
+  const donationBreakdown = getBonsaiDonationBreakdown(bonsai, skills);
   const finalDonationValue = donationBreakdown.finalValue;
 
   return (
@@ -1031,11 +1033,19 @@ export default function BonsaiInspectionModal({
                     <span>Donation Value Breakdown:</span>
                   </span>
                   <span className="text-emerald-300 font-mono font-black">
-                    +{finalDonationValue.toFixed(2)} Verdure <span className="text-[9px] text-slate-500">(Max: 675.00)</span>
+                    +{finalDonationValue.toFixed(2)} Verdure{' '}
+                    <span className="text-[9px] text-slate-500">
+                      (Max: {(675 * donationBreakdown.expertNegotiatorBonus).toFixed(2)})
+                    </span>
                   </span>
                 </div>
                 <div className="text-[9px] text-slate-400 font-mono leading-tight">
                   1.0 (Base) × {donationBreakdown.speciesFindOdds.toFixed(1)}x (Odds) × {donationBreakdown.maturityRating.toFixed(1)}x (Rank {donationBreakdown.ratingRank}) × {donationBreakdown.levelFactor.toFixed(2)}x (Lv.{donationBreakdown.level}) × {donationBreakdown.attributeFactor.toFixed(2)}x (GP/CP)
+                  {donationBreakdown.expertNegotiatorLvl > 0 && (
+                    <span className="text-amber-300 font-bold">
+                      {' '}× {donationBreakdown.expertNegotiatorBonus.toFixed(2)}x (+{donationBreakdown.expertNegotiatorLvl * 10}% Expert Negotiator)
+                    </span>
+                  )}
                 </div>
               </div>
 

@@ -130,6 +130,7 @@ export interface InventoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   inventory: SanctuaryInventory;
+  skills?: any;
   storageTab: 'PLANTING' | 'MATERIALS' | 'EQUIPMENT' | 'DECOR';
   setStorageTab: (tab: 'PLANTING' | 'MATERIALS' | 'EQUIPMENT' | 'DECOR') => void;
   storedPottedBonsais: StoredPottedBonsai[];
@@ -155,6 +156,7 @@ export default function InventoryModal({
   isOpen,
   onClose,
   inventory: inv,
+  skills,
   storageTab,
   setStorageTab,
   storedPottedBonsais,
@@ -423,8 +425,8 @@ export default function InventoryModal({
                     activeEcoRequestIndex,
                     ecoRequestCounts,
                   ).matches;
-                  const baseValue = calculateDonationValue(stored);
-                  const donationPayout = isEcoMatch ? Number((baseValue * 2).toFixed(2)) : baseValue;
+                  const baseValue = calculateDonationValue(stored, skills);
+                  const donationPayout = isEcoMatch ? Math.floor((baseValue * 2 + 1e-9) * 100) / 100 : baseValue;
 
                   return (
                     <div

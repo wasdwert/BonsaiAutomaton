@@ -51,9 +51,9 @@
   ],
   "sections": [
     {
-      "title": "User Interface & Navigation",
-      "content": "1. Clean Tab Bar Typography: Removed auxiliary pills ('3 Branches' from Bonsai Master Quest and '+ 0 ZP Earned' from Milestones) from the Bonsai Society navigation bar, presenting clean icons and titles. 2. Two-Line Compact Milestone Blocks: Removed 'Block X' text from milestone cards so each threshold block renders across exactly two lines (Line 1: Target requirement; Line 2: Reward status and completion tick), substantially expanding vertical view space to display multiple objectives at once. 3. Interactive Keyboard & Gamepad Selection: Milestone cards are interactively selectable with highlighted focus states and smooth scroll-into-view behavior across mouse wheel, touch swipe, and controller inputs.",
-      "summary": "Streamlined Navigation Telemetry, Compact Two-Line Milestone Blocks, and Interactive List Navigation."
+      "title": "Economy and Progression",
+      "content": "1. Level 0 Player Onboarding: New sessions explicitly initialize at Botanist Level 0 with 0 XP. Reaching Level 1 requires 200 XP (displaying 0 / 200 XP). Advancing to Level 1 triggers the first Level Up milestone and awards 5 Zen Points. 2. Subsequent Level Scaling: From Level 1 onward, advancing to Level 2 requires 263 XP, Level 3 requires 329 XP, scaling recursively up to Level 100 at 156,685 XP.",
+      "summary": "Initial Level 0 Baseline Architecture and 200 XP Progression Scaling."
     }
   ]
 }

@@ -19,6 +19,17 @@ export {
 export const drawBonsai = drawBonsaiTrunkAndCanopy;
 export const drawTrunk = drawBonsaiTrunkAndCanopy;
 
+export {
+  calculateWateringGrowthRate,
+  calculatePruningXP,
+  calculateBonsaiLevelUpXP,
+  getXPRequirementForLevel,
+  getExpRequiredForLevel,
+  XP_FOR_LEVEL,
+  XP_REQUIREMENTS,
+  addPlayerXP,
+} from './gameState';
+
 export interface SanctuaryCanvasProps {
   bonsai?: {
     leafType: BonsaiLeafType;

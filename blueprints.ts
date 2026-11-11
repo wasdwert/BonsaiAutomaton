@@ -17,11 +17,26 @@ export interface BlueprintDef {
   price: number;
   category: BlueprintCategory;
   unlockRank: BlueprintUnlockRank;
+  rank?: number;
+  group2?: string;
+  requiredBranchRank?: number;
   description?: string;
   targetItemId?: string;
 }
 
-export const BLUEPRINTS_CATALOG: BlueprintDef[] = [
+export function getBlueprintRequiredRank(bp: BlueprintDef | any): number {
+  if (!bp) return 0;
+  if (typeof bp.requiredBranchRank === 'number') return bp.requiredBranchRank;
+  if (typeof bp.rank === 'number') return bp.rank;
+  const str = String(bp.unlockRank || bp.group2 || bp.rank || '');
+  if (str.includes('3')) return 3;
+  if (str.includes('2')) return 2;
+  if (str.includes('1')) return 1;
+  if (str.includes('0')) return 0;
+  return 0;
+}
+
+const RAW_BLUEPRINTS_CATALOG: BlueprintDef[] = [
   {
     id: 'bp_t1_sprinkler',
     name: 'T1 Hydration Sprinkler Blueprint',
@@ -545,6 +560,16 @@ export const BLUEPRINTS_CATALOG: BlueprintDef[] = [
     targetItemId: 'craft_speed_grow_xl',
   },
 ];
+
+export const BLUEPRINTS_CATALOG: BlueprintDef[] = RAW_BLUEPRINTS_CATALOG.map((bp) => {
+  const rank = getBlueprintRequiredRank(bp);
+  return {
+    ...bp,
+    rank,
+    group2: bp.unlockRank,
+    requiredBranchRank: rank,
+  };
+});
 
 export const BLUEPRINT_BY_ID = new Map<string, BlueprintDef>(
   BLUEPRINTS_CATALOG.map((bp) => [bp.id, bp]),

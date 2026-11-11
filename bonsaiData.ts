@@ -406,18 +406,25 @@ export interface BonsaiDonationBreakdown {
   attributeBreakdown: AttributeFactorBreakdown;
   rawValue: number;
   finalValue: number;
+  expertNegotiatorLvl: number;
+  expertNegotiatorBonus: number;
 }
 
-export function getBonsaiDonationBreakdown(bonsai: {
-  leafType?: BonsaiLeafType;
-  maturity?: MaturityTier | number;
-  maturityRating?: number;
-  level?: number;
-  findOdds?: number;
-  foundOdds?: number;
-  basePriceBonus?: number;
-  [key: string]: any;
-}): BonsaiDonationBreakdown {
+export function getBonsaiDonationBreakdown(
+  bonsai: {
+    leafType?: BonsaiLeafType;
+    maturity?: MaturityTier | number;
+    maturityRating?: number;
+    level?: number;
+    findOdds?: number;
+    foundOdds?: number;
+    basePriceBonus?: number;
+    skills?: Record<string, number>;
+    expertNegotiatorLvl?: number;
+    [key: string]: any;
+  },
+  skills?: Record<string, number> | number,
+): BonsaiDonationBreakdown {
   if (!bonsai) {
     const dummyAttr = calculateAttributeFactor(null);
     return {
@@ -432,6 +439,8 @@ export function getBonsaiDonationBreakdown(bonsai: {
       attributeBreakdown: dummyAttr,
       rawValue: 0.0,
       finalValue: 0.0,
+      expertNegotiatorLvl: 0,
+      expertNegotiatorBonus: 1.0,
     };
   }
 
@@ -461,10 +470,26 @@ export function getBonsaiDonationBreakdown(bonsai: {
   const attributeBreakdown = calculateAttributeFactor(bonsai);
   const attributeFactor = attributeBreakdown.attributeFactor;
 
+  // 6. "Expert Negotiator" Skill: +10% per level to donation value
+  const gStateSkills = (globalThis as any)?.gameState?.skills;
+  const expertNegotiatorLvl =
+    typeof skills === 'number'
+      ? skills
+      : (skills?.['expert_negotiator'] ??
+         skills?.['expertNegotiator'] ??
+         bonsai?.skills?.['expert_negotiator'] ??
+         bonsai?.skills?.['expertNegotiator'] ??
+         bonsai?.expertNegotiatorLvl ??
+         gStateSkills?.['expert_negotiator'] ??
+         gStateSkills?.['expertNegotiator'] ??
+         0);
+  const expertNegotiatorBonus = 1 + expertNegotiatorLvl * 0.10;
+
   // Final Donation Value formula:
   // Math.floor((rawValue + 1e-9) * 100) / 100 (always truncated/rounded down to 2 decimal places)
-  // Max possible value = 1 * 5.0 * 3.0 * 5.0 * 9.0 = 675.00 Verdure
-  const rawValue = basePrice * speciesFindOdds * maturityRating * levelFactor * attributeFactor;
+  // Max possible base value = 1 * 5.0 * 3.0 * 5.0 * 9.0 = 675.00 Verdure (* expertNegotiatorBonus)
+  const rawBaseValue = basePrice * speciesFindOdds * maturityRating * levelFactor * attributeFactor;
+  const rawValue = rawBaseValue * expertNegotiatorBonus;
   const finalValue = Math.floor((rawValue + 1e-9) * 100) / 100;
 
   return {
@@ -479,20 +504,27 @@ export function getBonsaiDonationBreakdown(bonsai: {
     attributeBreakdown,
     rawValue,
     finalValue,
+    expertNegotiatorLvl,
+    expertNegotiatorBonus,
   };
 }
 
-export function calculateBonsaiDonationValue(bonsai: {
-  leafType?: BonsaiLeafType;
-  maturity?: MaturityTier | number;
-  maturityRating?: number;
-  level?: number;
-  findOdds?: number;
-  foundOdds?: number;
-  basePriceBonus?: number;
-  [key: string]: any;
-}): number {
-  return getBonsaiDonationBreakdown(bonsai).finalValue;
+export function calculateBonsaiDonationValue(
+  bonsai: {
+    leafType?: BonsaiLeafType;
+    maturity?: MaturityTier | number;
+    maturityRating?: number;
+    level?: number;
+    findOdds?: number;
+    foundOdds?: number;
+    basePriceBonus?: number;
+    skills?: Record<string, number>;
+    expertNegotiatorLvl?: number;
+    [key: string]: any;
+  },
+  skills?: Record<string, number> | number,
+): number {
+  return getBonsaiDonationBreakdown(bonsai, skills).finalValue;
 }
 
 export const calculateDonationValue = calculateBonsaiDonationValue;

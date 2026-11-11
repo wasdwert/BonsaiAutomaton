@@ -43,6 +43,7 @@ export interface MarketModalProps {
   deployedStructures?: DeployedStructure[];
   activeTab?: MarketTabKey;
   onTabChange?: (tab: MarketTabKey) => void;
+  discountRate?: number;
 }
 
 export default function MarketModal({
@@ -61,6 +62,7 @@ export default function MarketModal({
   deployedStructures = [],
   activeTab: externalTab,
   onTabChange,
+  discountRate = 0,
 }: MarketModalProps) {
   const [internalTab, setInternalTab] = useState<MarketTabKey>('maps');
   const [focusedShopIdx, setFocusedShopIdx] = useState<number>(0);
@@ -78,6 +80,9 @@ export default function MarketModal({
   };
 
   const tabs: MarketTabKey[] = ['maps', 'expansions', 'decorations', 'equipment'];
+
+  const discountMultiplier = Math.max(0.1, 1 - (discountRate || 0));
+  const getPrice = (baseCost: number) => Math.max(1, Math.round(baseCost * discountMultiplier));
 
   const tabLengths: Record<string, number> = {
     maps: 2,
@@ -170,6 +175,12 @@ export default function MarketModal({
           <h3 className="text-lg font-bold text-emerald-300">🏪 Botanical Merchant Market</h3>
         </div>
         <div className="flex items-center gap-3">
+          {discountRate > 0 && (
+            <div className="bg-amber-950/80 border border-amber-500/60 px-2.5 py-1 rounded-xl text-xs font-bold text-amber-300 flex items-center gap-1.5 shadow hidden sm:flex">
+              <span>🏷️</span>
+              <span>Discount: -{Math.round(discountRate * 100)}%</span>
+            </div>
+          )}
           <div className="bg-emerald-950/85 border border-emerald-500/80 px-3 py-1 rounded-xl text-xs font-black text-emerald-300 flex items-center gap-1.5 shadow">
             <VerdureIcon className="w-4 h-4" />
             <span>{verdureBalance.toFixed(2)} Verdure</span>
@@ -267,17 +278,21 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={inv.has_map_highlands || verdureBalance < 250}
+                disabled={inv.has_map_highlands || verdureBalance < getPrice(250)}
                 onClick={() => onBuyExpeditionMap('has_map_highlands', 250, 'Misty Highlands')}
                 className={`px-4 py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center gap-1 cursor-pointer ${
                   inv.has_map_highlands
                     ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
-                    : verdureBalance >= 250
+                    : verdureBalance >= getPrice(250)
                     ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 {!inv.has_map_highlands && <VerdureIcon className="w-3.5 h-3.5" />}
-                <span>{inv.has_map_highlands ? 'Discovered' : 'Purchase (250 Verdure)'}</span>
+                <span>
+                  {inv.has_map_highlands
+                    ? 'Discovered'
+                    : `Purchase (${getPrice(250)} Verdure)${discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}`}
+                </span>
               </button>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
@@ -317,17 +332,21 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={inv.has_map_overgrowth || verdureBalance < 800}
+                disabled={inv.has_map_overgrowth || verdureBalance < getPrice(800)}
                 onClick={() => onBuyExpeditionMap('has_map_overgrowth', 800, 'Ancient Overgrowth')}
                 className={`px-4 py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center gap-1 cursor-pointer ${
                   inv.has_map_overgrowth
                     ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
-                    : verdureBalance >= 800
+                    : verdureBalance >= getPrice(800)
                     ? 'bg-purple-600 hover:bg-purple-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 {!inv.has_map_overgrowth && <VerdureIcon className="w-3.5 h-3.5" />}
-                <span>{inv.has_map_overgrowth ? 'Discovered' : 'Purchase (800 Verdure)'}</span>
+                <span>
+                  {inv.has_map_overgrowth
+                    ? 'Discovered'
+                    : `Purchase (${getPrice(800)} Verdure)${discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}`}
+                </span>
               </button>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
@@ -350,7 +369,8 @@ export default function MarketModal({
           {SANCTUARY_EXPANSIONS.map((exp, expIdx) => {
             const isOwned = inv.sanctuary_expansion_tier >= exp.tier;
             const isPrevOwned = inv.sanctuary_expansion_tier >= exp.tier - 1;
-            const canAfford = verdureBalance >= exp.cost;
+            const discountedExpCost = getPrice(exp.cost);
+            const canAfford = verdureBalance >= discountedExpCost;
             const isFocused = focusedShopIdx === expIdx;
 
             return (
@@ -393,7 +413,13 @@ export default function MarketModal({
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                     }`}>
                     {!isOwned && isPrevOwned && <VerdureIcon className="w-3.5 h-3.5" />}
-                    <span>{isOwned ? 'Active' : !isPrevOwned ? 'Requires Prev Tier' : `Unlock (${exp.cost} Verdure)`}</span>
+                    <span>
+                      {isOwned
+                        ? 'Active'
+                        : !isPrevOwned
+                        ? 'Requires Prev Tier'
+                        : `Unlock (${discountedExpCost} Verdure)${discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}`}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -441,15 +467,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 3}
+                disabled={verdureBalance < getPrice(3)}
                 onClick={() => onBuyDecoration('bamboo_fence', 3, 'Bamboo Fence (Takegaki)')}
                 className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 3
+                  verdureBalance >= getPrice(3)
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase (3 Verdure)</span>
+                <span>Purchase ({getPrice(3)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
 
@@ -481,15 +507,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 5}
+                disabled={verdureBalance < getPrice(5)}
                 onClick={() => onBuyDecoration('decor_pebble_path', 5, 'Zen Pebble Stepping Path')}
                 className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 5
+                  verdureBalance >= getPrice(5)
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase (5 Verdure)</span>
+                <span>Purchase ({getPrice(5)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
 
@@ -521,15 +547,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 10}
+                disabled={verdureBalance < getPrice(10)}
                 onClick={() => onBuyDecoration('growing_bamboo_formation', 10, 'Growing Bamboo Formation')}
                 className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 10
+                  verdureBalance >= getPrice(10)
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase (10 Verdure)</span>
+                <span>Purchase ({getPrice(10)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
 
@@ -561,15 +587,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 15}
+                disabled={verdureBalance < getPrice(15)}
                 onClick={() => onBuyDecoration('asparagus_fern_ball', 15, 'Asparagus Fern Ball')}
                 className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 15
+                  verdureBalance >= getPrice(15)
                     ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase (15 Verdure)</span>
+                <span>Purchase ({getPrice(15)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
 
@@ -601,15 +627,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 20}
+                disabled={verdureBalance < getPrice(20)}
                 onClick={() => onBuyDecoration('zen_rock_formation', 20, 'Zen Rock Formation')}
                 className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 20
+                  verdureBalance >= getPrice(20)
                     ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase (20 Verdure)</span>
+                <span>Purchase ({getPrice(20)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
 
@@ -641,15 +667,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 30}
+                disabled={verdureBalance < getPrice(30)}
                 onClick={() => onBuyDecoration('water_feature', 30, 'Water Feature (Shishi-Odoshi)')}
                 className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 30
+                  verdureBalance >= getPrice(30)
                     ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase (30 Verdure)</span>
+                <span>Purchase ({getPrice(30)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
 
@@ -681,15 +707,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 50}
+                disabled={verdureBalance < getPrice(50)}
                 onClick={() => onBuyDecoration('empty_crystal_pedestal', 50, 'Empty Pedestal')}
                 className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 50
+                  verdureBalance >= getPrice(50)
                     ? 'bg-purple-600 hover:bg-purple-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase (50 Verdure)</span>
+                <span>Purchase ({getPrice(50)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
 
@@ -721,15 +747,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 75}
+                disabled={verdureBalance < getPrice(75)}
                 onClick={() => onBuyDecoration('seven_lucky_gods', 75, 'Seven Lucky Gods (Shichifukujin)')}
                 className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 75
+                  verdureBalance >= getPrice(75)
                     ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase (75 Verdure)</span>
+                <span>Purchase ({getPrice(75)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
 
@@ -761,15 +787,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 125}
+                disabled={verdureBalance < getPrice(125)}
                 onClick={() => onBuyDecoration('stone_lantern', 125, 'Stone Lantern (Tōrō)')}
                 className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 125
+                  verdureBalance >= getPrice(125)
                     ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase (125 Verdure)</span>
+                <span>Purchase ({getPrice(125)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
 
@@ -812,15 +838,15 @@ export default function MarketModal({
                 </button>
               ) : (
                 <button
-                  disabled={verdureBalance < 250}
+                  disabled={verdureBalance < getPrice(250)}
                   onClick={() => onBuyDecoration('torii_gate', 250, 'Torii Gate (3x1)')}
                   className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
-                    verdureBalance >= 250
+                    verdureBalance >= getPrice(250)
                       ? 'bg-red-600 hover:bg-red-500 text-white ring-1 ring-red-400/50'
                       : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                   }`}>
                   <VerdureIcon className="w-3.5 h-3.5" />
-                  <span>Purchase (250 Verdure)</span>
+                  <span>Purchase ({getPrice(250)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
                 </button>
               )}
             </div>
@@ -874,15 +900,15 @@ export default function MarketModal({
                 </div>
 
                 <button
-                  disabled={verdureBalance < 25}
+                  disabled={verdureBalance < getPrice(25)}
                   onClick={() => onBuyEngineeringLicense(1, 25)}
                   className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                    verdureBalance >= 25
+                    verdureBalance >= getPrice(25)
                       ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
                       : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                   }`}>
                   <VerdureIcon className="w-3.5 h-3.5" />
-                  <span>Purchase (25 Verdure)</span>
+                  <span>Purchase ({getPrice(25)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
                 </button>
               </div>
 
@@ -909,15 +935,15 @@ export default function MarketModal({
                 </div>
 
                 <button
-                  disabled={verdureBalance < 75}
+                  disabled={verdureBalance < getPrice(75)}
                   onClick={() => onBuyEngineeringLicense(2, 75)}
                   className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                    verdureBalance >= 75
+                    verdureBalance >= getPrice(75)
                       ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
                       : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                   }`}>
                   <VerdureIcon className="w-3.5 h-3.5" />
-                  <span>Purchase (75 Verdure)</span>
+                  <span>Purchase ({getPrice(75)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
                 </button>
               </div>
 
@@ -944,15 +970,15 @@ export default function MarketModal({
                 </div>
 
                 <button
-                  disabled={verdureBalance < 200}
+                  disabled={verdureBalance < getPrice(200)}
                   onClick={() => onBuyEngineeringLicense(3, 200)}
                   className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                    verdureBalance >= 200
+                    verdureBalance >= getPrice(200)
                       ? 'bg-purple-600 hover:bg-purple-500 text-white active:scale-95'
                       : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                   }`}>
                   <VerdureIcon className="w-3.5 h-3.5" />
-                  <span>Purchase (200 Verdure)</span>
+                  <span>Purchase ({getPrice(200)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
                 </button>
               </div>
             </div>
@@ -995,15 +1021,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 20}
+                disabled={verdureBalance < getPrice(20)}
                 onClick={() => onBuyTool('tool_compost_heap', 20, 'Compost Heap')}
                 className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 20
+                  verdureBalance >= getPrice(20)
                     ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase Compost Heap (20 Verdure)</span>
+                <span>Purchase Compost Heap ({getPrice(20)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
 
@@ -1038,15 +1064,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 50}
+                disabled={verdureBalance < getPrice(50)}
                 onClick={() => onBuyTool('fertilizer_station', 50, 'Chemical Station')}
                 className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 50
+                  verdureBalance >= getPrice(50)
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase Chemical Station (50 Verdure)</span>
+                <span>Purchase Chemical Station ({getPrice(50)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
 
@@ -1081,15 +1107,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 5}
+                disabled={verdureBalance < getPrice(5)}
                 onClick={() => onBuyBiochemicals(5)}
                 className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 5
+                  verdureBalance >= getPrice(5)
                     ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase Biochemical (5 Verdure)</span>
+                <span>Purchase Biochemical ({getPrice(5)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
 
@@ -1124,15 +1150,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 10}
+                disabled={verdureBalance < getPrice(10)}
                 onClick={() => onBuyManualIrrigation('irrigation_t1', 10, 'T1 Manual Irrigation System')}
                 className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 10
+                  verdureBalance >= getPrice(10)
                     ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase T1 Irrigation (10 Verdure)</span>
+                <span>Purchase T1 Irrigation ({getPrice(10)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
 
@@ -1167,15 +1193,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 25}
+                disabled={verdureBalance < getPrice(25)}
                 onClick={() => onBuyManualIrrigation('irrigation_t2', 25, 'T2 Manual Irrigation System')}
                 className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 25
+                  verdureBalance >= getPrice(25)
                     ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase T2 Irrigation (25 Verdure)</span>
+                <span>Purchase T2 Irrigation ({getPrice(25)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
 
@@ -1210,15 +1236,15 @@ export default function MarketModal({
               </div>
 
               <button
-                disabled={verdureBalance < 75}
+                disabled={verdureBalance < getPrice(75)}
                 onClick={() => onBuyManualIrrigation('irrigation_t3', 75, 'T3 Manual Irrigation System')}
                 className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= 75
+                  verdureBalance >= getPrice(75)
                     ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                 }`}>
                 <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase T3 Irrigation (75 Verdure)</span>
+                <span>Purchase T3 Irrigation ({getPrice(75)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
               </button>
             </div>
           </div>

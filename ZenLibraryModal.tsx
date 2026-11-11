@@ -9,9 +9,11 @@ import {
   Lock,
   Sparkles,
   Sprout,
-  Trophy,
   X,
   Zap,
+  Tag,
+  Info,
+  Shield,
 } from 'lucide-react';
 import {
   BonsaiGroup,
@@ -35,17 +37,22 @@ import {
   DeployedStructure,
   GameStats,
   PlantedBonsai,
-  SKILL_CONFIGS,
   SanctuaryInventory,
   StoredPottedBonsai,
   ZenSkills,
   getBonsaiGroupBadgeClass,
   getBonsaiStyleDef,
   getExpRequiredForLevel,
-  VerdureIcon,
 } from './App';
 import { BlueprintDef } from './blueprints';
 import BlueprintsCatalogView from './BlueprintsCatalogView';
+import {
+  ZEN_SKILLS_DATA,
+  SKILL_BY_ID,
+  SkillCategory,
+  SkillDefinition,
+} from './skillsData';
+import { MasterQuestsState } from './types';
 
 export type ShrineTab = 'bondex' | 'blueprints' | 'skills';
 
@@ -76,6 +83,27 @@ export const BONDEX_SPECIES_LIST: BondexSpeciesEntry[] = [
   { num: '#019', id: 'gear' },
   { num: '#020', id: 'bell' },
 ];
+
+/**
+ * Helper to determine player's highest completed Master Quest branch rank (0, 1, 2, or 3)
+ */
+export function getMaxMasterQuestBranchRank(masterQuests?: MasterQuestsState | any): number {
+  if (!masterQuests) return 0;
+  const getBranchMax = (b: any) => {
+    if (!b) return 0;
+    if (typeof b.completedRank === 'number') return b.completedRank;
+    if (b.tier3Completed || b.rank3Completed || b.rank >= 4) return 3;
+    if (b.tier2Completed || b.rank2Completed || b.rank >= 3) return 2;
+    if (b.tier1Completed || b.rank1Completed || b.rank >= 2) return 1;
+    if (typeof b.completedTier === 'number') return b.completedTier;
+    return 0;
+  };
+  return Math.max(
+    getBranchMax(masterQuests.discovery),
+    getBranchMax(masterQuests.competition),
+    getBranchMax(masterQuests.eco),
+  );
+}
 
 /**
  * Returns the biomes and probability percentages where a species can be encountered.
@@ -390,6 +418,8 @@ export interface ZenLibraryModalProps {
   discoveredAreaSpecies?: Record<string, BonsaiLeafType[]>;
   stats?: GameStats;
   claimAchievement?: (achId: string, rewardZen: number, title: string) => void;
+  masterQuests?: MasterQuestsState;
+  masterQuest?: MasterQuestsState;
 }
 
 export default function ZenLibraryModal({
@@ -405,61 +435,55 @@ export default function ZenLibraryModal({
   onPurchaseBlueprint,
   discoveredSpeciesMap,
   discoveredAreaSpecies,
-  stats = DEFAULT_STATS,
-  claimAchievement,
+  masterQuests,
+  masterQuest,
 }: ZenLibraryModalProps) {
-  const safeStats: GameStats = useMemo(() => ({
-    leafTypeStylesGrown: stats?.leafTypeStylesGrown ?? {},
-    groupBonsaisGrown: stats?.groupBonsaisGrown ?? {
-      Raundo: 0,
-      Erementaru: 0,
-      'Roku-men': 0,
-      Seikatsu: 0,
-      Sanmen: 0,
-      Shihen: 0,
-      'Jinkō-teki': 0,
-    },
-    firstLevel100Reached: stats?.firstLevel100Reached ?? false,
-    expeditionsPerBiome: stats?.expeditionsPerBiome ?? { FOOTHILLS: 0, HIGHLANDS: 0, OVERGROWTH: 0 },
-    claimedAchievements: stats?.claimedAchievements ?? [],
-    totalLevelUps: stats?.totalLevelUps ?? 0,
-    maxSpecimensGrownLv10: stats?.maxSpecimensGrownLv10 ?? [],
-    maxSpecimensGrownLv25: stats?.maxSpecimensGrownLv25 ?? [],
-    maxSpecimensGrownLv50: stats?.maxSpecimensGrownLv50 ?? [],
-    sproutLv10Ids: stats?.sproutLv10Ids ?? [],
-    saplingLv15Ids: stats?.saplingLv15Ids ?? [],
-    notableLv20Ids: stats?.notableLv20Ids ?? [],
-    refinedLv25Ids: stats?.refinedLv25Ids ?? [],
-    premiumLv30Ids: stats?.premiumLv30Ids ?? [],
-  }), [stats]);
-  // Shrine category tabs: ['bondex', 'blueprints', 'skills']
-  const [activeTab, setActiveTab] = useState<ShrineTab>('bondex');
+  // Primary Tabs: ['bondex', 'blueprints', 'skills']
+  const [activeTab, setActiveTab] = useState<ShrineTab>('skills');
 
   // Bondex Filter and Selected Species State
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>('ALL');
   const [selectedSpeciesIndex, setSelectedSpeciesIndex] = useState<number>(0);
   const [viewerStyle, setViewerStyle] = useState<BonsaiStyle>('MOYOGI');
 
-  const [focusedSkillIdx, setFocusedSkillIdx] = useState<number>(0);
+  // Skills Category Filter: 'ALL' | 'Expedition' | 'Growing' | 'Economy & Energy' | 'Competition'
+  const [selectedSkillCategory, setSelectedSkillCategory] = useState<'ALL' | SkillCategory>('ALL');
+
+  const effectiveMasterQuests = masterQuests || masterQuest;
+
+  // Highest completed branch rank across all 3 branches (Discovery, Competition, Eco)
+  const maxCompletedBranchRank = useMemo(() => {
+    return getMaxMasterQuestBranchRank(effectiveMasterQuests);
+  }, [effectiveMasterQuests]);
+
+  // Filter skills by Category
+  const filteredSkills = useMemo(() => {
+    return ZEN_SKILLS_DATA.filter((skill) => {
+      if (selectedSkillCategory !== 'ALL' && skill.category !== selectedSkillCategory) {
+        return false;
+      }
+      return true;
+    });
+  }, [selectedSkillCategory]);
+
+  // Category counts for quick tabs
+  const categoryCounts = useMemo(() => {
+    const counts = {
+      ALL: ZEN_SKILLS_DATA.length,
+      Expedition: 0,
+      Growing: 0,
+      'Economy & Energy': 0,
+      Competition: 0,
+    };
+    ZEN_SKILLS_DATA.forEach((s) => {
+      counts[s.category] += 1;
+    });
+    return counts;
+  }, []);
 
   // Handle Gamepad Bumper tab cycling & Keyboard Navigation
   useEffect(() => {
     if (!isOpen) return;
-
-    const ALL_STYLES: BonsaiStyle[] = [
-      'CHOKAN',
-      'MOYOGI',
-      'SHAKAN',
-      'HAN_KENGAI',
-      'SOKAN',
-      'KENGAI',
-      'KABUDACHI',
-      'HOKIDACHI',
-      'BUNJINGI',
-      'FUKINAASHI',
-    ];
-
-    const skillKeys = Object.keys(SKILL_CONFIGS);
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const tabs: ShrineTab[] = ['bondex', 'blueprints', 'skills'];
@@ -479,36 +503,6 @@ export default function ZenLibraryModal({
         const nextIdx = (idx + 1) % tabs.length;
         setActiveTab(tabs[nextIdx]);
         gameAudio.playCrispClick();
-      } else if (e.key === 'w' || e.key === 'W') {
-        e.preventDefault();
-        if (activeTab === 'bondex') {
-          setSelectedSpeciesIndex((idx) => Math.max(0, idx - 1));
-          gameAudio.playHoverMicroTone();
-        } else if (activeTab === 'skills') {
-          setFocusedSkillIdx((idx) => Math.max(0, idx - 1));
-          gameAudio.playHoverMicroTone();
-        }
-      } else if (e.key === 's' || e.key === 'S') {
-        e.preventDefault();
-        if (activeTab === 'bondex') {
-          setSelectedSpeciesIndex((idx) => Math.min(BONDEX_SPECIES_LIST.length - 1, idx + 1));
-          gameAudio.playHoverMicroTone();
-        } else if (activeTab === 'skills') {
-          setFocusedSkillIdx((idx) => Math.min(skillKeys.length - 1, idx + 1));
-          gameAudio.playHoverMicroTone();
-        }
-      } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'e' || e.key === 'E') {
-        e.preventDefault();
-        if (activeTab === 'bondex') {
-          setViewerStyle((cur) => {
-            const idx = ALL_STYLES.indexOf(cur);
-            return ALL_STYLES[(idx + 1) % ALL_STYLES.length];
-          });
-          gameAudio.playCrispClick();
-        } else if (activeTab === 'skills') {
-          const key = skillKeys[focusedSkillIdx];
-          if (key) upgradeZenSkill(key as keyof ZenSkills);
-        }
       }
     };
 
@@ -530,13 +524,7 @@ export default function ZenLibraryModal({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('gamepad-bumper', handleBumper);
     };
-  }, [
-    isOpen,
-    activeTab,
-    focusedSkillIdx,
-    upgradeZenSkill,
-    onClose,
-  ]);
+  }, [isOpen, activeTab, onClose]);
 
   // Calculate Bondex Discovery Statistics
   let discoveredSpeciesCount = 0;
@@ -565,7 +553,7 @@ export default function ZenLibraryModal({
       (discoveredAreaSpecies[bio.biomeId] || []).includes(selectedEntry.id),
   );
 
-  const filteredList =
+  const filteredBondexList =
     selectedGroupFilter === 'ALL'
       ? BONDEX_SPECIES_LIST
       : BONDEX_SPECIES_LIST.filter((sp) => {
@@ -578,7 +566,7 @@ export default function ZenLibraryModal({
   return (
     <div className="fixed top-12 left-0 right-0 bottom-0 z-40 bg-slate-950/95 backdrop-blur-md p-3 sm:p-5 flex flex-col overflow-hidden border-t border-slate-800 text-left">
       {/* LIBRARY HEADER */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2.5 shrink-0">
+      <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2.5 shrink-0 flex-wrap gap-2">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-2xl bg-pink-950/80 border-2 border-pink-500/70 flex items-center justify-center text-pink-300 shadow">
             <BookOpen className="w-5 h-5" />
@@ -586,23 +574,24 @@ export default function ZenLibraryModal({
           <div>
             <h3 className="text-base sm:text-lg font-black text-pink-300 tracking-wide">📚 Zen Library</h3>
             <p className="text-[10.5px] text-slate-400">
-              Botanical Bondex Compendium, Blueprints Catalog &amp; Mastery Skills
+              Botanical Bondex Compendium, Blueprints Catalog &amp; 36 Zen Mastery Skills
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          {/* Verdure Balance for purchasing blueprints */}
-          <div className="bg-emerald-950/85 border border-emerald-500/80 px-3 py-1 rounded-xl text-xs font-black text-emerald-300 flex items-center gap-1.5 shadow">
-            <VerdureIcon className="w-4 h-4" />
-            <span>{verdureBalance.toFixed(2)} Verdure</span>
+        <div className="flex items-center gap-2">
+          {/* Botanist Profile: Level, Current XP, and XP to Next Level */}
+          <div className="bg-slate-900/90 border border-emerald-500/60 px-2.5 py-1 rounded-xl text-xs font-bold text-emerald-300 flex items-center gap-2 shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Botanist Lv.{playerLevel}</span>
+            <span className="text-slate-600 font-light">|</span>
+            <span className="font-mono text-[11px] text-slate-300">
+              {playerLevel >= 100
+                ? 'MAX'
+                : `${Math.floor(playerExp)} / ${getExpRequiredForLevel(playerLevel + 1)} XP`}
+            </span>
           </div>
 
-          {/* Zen Points */}
-          <div className="bg-pink-950/80 border border-pink-500 px-3 py-1 rounded-xl text-xs font-black text-pink-300 flex items-center gap-1.5 shadow">
-            <span>🌸</span>
-            <span>{zenEssence} Zen Points</span>
-          </div>
           <button
             onClick={onClose}
             className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer">
@@ -613,7 +602,6 @@ export default function ZenLibraryModal({
 
       {/* THREE PRIMARY TABS: ['Bondex', 'Blueprints', 'Skills'] */}
       <div className="grid grid-cols-3 gap-2 mb-2.5 shrink-0">
-        {/* TAB 1: BONDEX */}
         <button
           onClick={() => {
             setActiveTab('bondex');
@@ -626,12 +614,8 @@ export default function ZenLibraryModal({
           }`}>
           <BookOpen className="w-4 h-4 text-emerald-300" />
           <span>📖 Bondex</span>
-          <span className="text-[10px] bg-slate-950/60 px-1.5 py-0.5 rounded-full font-mono text-emerald-300">
-            {discoveredSpeciesCount}/20
-          </span>
         </button>
 
-        {/* TAB 2: BLUEPRINTS (MOVED FROM MARKET TO ZEN LIBRARY) */}
         <button
           onClick={() => {
             setActiveTab('blueprints');
@@ -644,12 +628,8 @@ export default function ZenLibraryModal({
           }`}>
           <BookOpen className="w-4 h-4 text-lime-300" />
           <span>📜 Blueprints</span>
-          <span className="text-[10px] bg-slate-950/60 px-1.5 py-0.5 rounded-full font-mono text-lime-300">
-            58 Catalog
-          </span>
         </button>
 
-        {/* TAB 3: SKILLS */}
         <button
           onClick={() => {
             setActiveTab('skills');
@@ -730,7 +710,7 @@ export default function ZenLibraryModal({
           <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-3 min-h-0 overflow-hidden">
             {/* LEFT PANE: 20 SPECIES INDEX LIST (#001 TO #020) */}
             <div className="md:col-span-5 bg-slate-900/80 border border-slate-800 rounded-2xl p-2 flex flex-col min-h-0 overflow-y-auto space-y-1.5 pr-1.5">
-              {filteredList.map((entry) => {
+              {filteredBondexList.map((entry) => {
                 const def = getLeafTypeDef(entry.id);
                 const disc = discoveredSpeciesMap[entry.id];
                 const isDiscovered = disc ? disc.discovered : false;
@@ -998,7 +978,7 @@ export default function ZenLibraryModal({
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2 CONTENT: STANDARDIZED BLUEPRINTS CATALOG (MOVED FROM MARKET TO ZEN LIBRARY) */}
+      {/* TAB 2 CONTENT: STANDARDIZED BLUEPRINTS CATALOG */}
       {/* ========================================================================= */}
       {activeTab === 'blueprints' && (
         <div className="flex-1 overflow-hidden pr-1">
@@ -1006,99 +986,204 @@ export default function ZenLibraryModal({
             unlockedBlueprints={unlockedBlueprints}
             verdureBalance={verdureBalance}
             onPurchaseBlueprint={onPurchaseBlueprint || (() => {})}
+            maxBranchRank={maxCompletedBranchRank}
             accentTone="emerald"
+            discountRate={(zenSkills.discountHunter ?? (zenSkills as any)['discount_hunter'] ?? 0) * 0.02}
           />
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 3 CONTENT: SKILLS */}
+      {/* TAB 3 CONTENT: 36 ZEN MASTERY SKILLS OVERHAUL */}
       {/* ========================================================================= */}
       {activeTab === 'skills' && (
         <div className="flex-1 flex flex-col min-h-0 space-y-2.5">
-          {/* BOTANIST LEVEL & EXP INFO STRIP */}
-          <div className="bg-slate-900/90 border border-emerald-500/40 px-3.5 py-2 rounded-2xl flex items-center justify-between gap-3 text-xs shrink-0 shadow">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-emerald-950 border border-emerald-400/60 flex items-center justify-center font-black text-emerald-300 text-xs">
-                {playerLevel}
-              </div>
-              <div>
-                <span className="font-bold text-slate-100">Botanist Lv.{playerLevel}</span>
-                <span className="text-[10px] text-emerald-400 ml-1.5 hidden sm:inline">
-                  (+2 Zen Points per Level Up)
-                </span>
-              </div>
+          {/* CATEGORY FILTER PILLS & ZEN POINTS BALANCE BADGE */}
+          <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 shrink-0 flex-wrap sm:flex-nowrap">
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+              {(['ALL', 'Expedition', 'Growing', 'Economy & Energy', 'Competition'] as const).map((cat) => {
+                const isSelected = selectedSkillCategory === cat;
+                const count = categoryCounts[cat];
+
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      setSelectedSkillCategory(cat);
+                      gameAudio.playCrispClick();
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border flex items-center gap-1.5 cursor-pointer ${
+                      isSelected
+                        ? 'bg-pink-600 text-white border-pink-400 shadow-md ring-2 ring-pink-400/40'
+                        : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:border-slate-700'
+                    }`}>
+                    <span>{cat === 'ALL' ? 'All' : cat}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                        isSelected ? 'bg-slate-950 text-pink-300' : 'bg-slate-950 text-slate-400'
+                      }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="flex items-center gap-2 flex-1 max-w-xs">
-              <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-700">
-                <div
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      (playerExp / getExpRequiredForLevel(playerLevel)) * 100,
-                    )}%`,
-                  }}
-                  className="bg-gradient-to-r from-emerald-500 to-teal-300 h-full transition-all"
-                />
-              </div>
-              <span className="text-[10px] text-slate-300 font-mono whitespace-nowrap">
-                {playerExp}/{getExpRequiredForLevel(playerLevel)} EXP
-              </span>
+            {/* Clean Zen Points Balance Badge */}
+            <div className="bg-pink-950/80 border border-pink-500/80 px-3 py-1.5 rounded-xl text-xs font-black text-pink-300 flex items-center gap-1.5 shadow shrink-0">
+              <span>🌸</span>
+              <span>Zen Points: <strong className="font-mono text-pink-200">{zenEssence}</strong></span>
             </div>
           </div>
 
-          {/* SKILLS MULTI-COLUMN GRID */}
+          {/* 36 SKILLS GRID */}
           <div className="flex-1 space-y-2.5 overflow-y-auto pr-1">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {(Object.keys(SKILL_CONFIGS) as string[]).map((key, sIdx) => {
-                const conf = SKILL_CONFIGS[key];
-                if (!conf) return null;
-                const currentRank = (zenSkills[key as keyof ZenSkills] as number) || 0;
-                const isMax = currentRank >= conf.maxRank;
-                const cost = isMax ? 0 : conf.costs[currentRank] || 5;
+              {filteredSkills.map((skill) => {
+                const currentLevel = (zenSkills[skill.id as keyof ZenSkills] as number) || 0;
+                const isMax = currentLevel >= skill.maxLevel;
+                const nextLevelData = isMax ? null : skill.levels[currentLevel];
+                const cost = nextLevelData ? nextLevelData.cost : 0;
+                const reqRank = nextLevelData ? nextLevelData.requiredBranchRank : undefined;
+
+                // Rank gating check: Player must have completed at least Rank X in ANY Master Quest branch!
+                const isRankLocked = Boolean(reqRank && maxCompletedBranchRank < reqRank);
                 const canAfford = zenEssence >= cost;
-                const isFocused = focusedSkillIdx === sIdx;
+                const isGreyedOut = Boolean(skill.isGreyedOut);
+
+                const canUpgrade = !isMax && !isGreyedOut && !isRankLocked && canAfford;
+
+                // Badge styling by category
+                const catBadgeStyles: Record<SkillCategory, string> = {
+                  Expedition: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40',
+                  Growing: 'bg-green-950/80 text-green-300 border-green-500/40',
+                  'Economy & Energy': 'bg-amber-950/80 text-amber-300 border-amber-500/40',
+                  Competition: 'bg-purple-950/80 text-purple-300 border-purple-500/40',
+                };
 
                 return (
                   <div
-                    key={key}
-                    className={`bg-slate-900/90 border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
-                      isFocused ? 'border-pink-400 ring-2 ring-pink-500/50 bg-slate-850 scale-[1.01]' : 'border-slate-800'
+                    key={skill.id}
+                    className={`p-3.5 rounded-2xl flex flex-col justify-between gap-2.5 border transition-all ${
+                      isGreyedOut
+                        ? 'bg-slate-950/40 border-slate-850 opacity-60'
+                        : isMax
+                        ? 'bg-slate-900/90 border-emerald-500/40 shadow-sm'
+                        : isRankLocked
+                        ? 'bg-slate-900/80 border-slate-800'
+                        : canAfford
+                        ? 'bg-slate-900/90 border-slate-700/80 hover:border-pink-500/60 shadow'
+                        : 'bg-slate-900/80 border-slate-800'
                     }`}>
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">{conf.icon}</span>
-                          <div>
-                            <h4 className="font-bold text-xs sm:text-sm text-slate-100">{conf.name}</h4>
-                            <span className="text-[11px] text-pink-400 font-semibold">
-                              Rank {currentRank} / {conf.maxRank}
-                            </span>
+                      {/* Top Header: Icon, Name, Category Badge & Upgrade Button */}
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-2xl shrink-0">{skill.icon}</span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h4 className="font-bold text-xs sm:text-sm text-slate-100 truncate">
+                                {skill.name}
+                              </h4>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className={`text-[9.5px] px-1.5 py-0.2 rounded-md font-bold border ${catBadgeStyles[skill.category]}`}>
+                                {skill.category}
+                              </span>
+                              {isGreyedOut && (
+                                <span className="text-[9.5px] bg-slate-800 text-amber-300/90 border border-amber-500/30 px-1.5 py-0.2 rounded-md font-semibold">
+                                  System in development
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
-                        <button
-                          disabled={isMax || !canAfford}
-                          onClick={() => upgradeZenSkill(key as keyof ZenSkills)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow cursor-pointer ${
-                            isMax
-                              ? 'bg-slate-800 text-emerald-400 border border-emerald-500/40 cursor-default'
-                              : canAfford
-                              ? 'bg-pink-600 hover:bg-pink-500 text-white active:scale-95'
-                              : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                          }`}>
-                          {isMax ? 'MAX' : `Upgrade (${cost} Zen)`}
-                        </button>
+                        {/* UPGRADE BUTTON OR STATUS BADGE */}
+                        <div className="shrink-0">
+                          {isGreyedOut ? (
+                            <span className="bg-slate-950 text-slate-500 text-[10px] font-bold px-2.5 py-1 rounded-xl border border-slate-800 inline-block">
+                              Locked
+                            </span>
+                          ) : isMax ? (
+                            <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/60 text-xs font-black px-2.5 py-1 rounded-xl shadow-sm inline-flex items-center gap-1">
+                              <Check className="w-3.5 h-3.5" />
+                              <span>MAX</span>
+                            </span>
+                          ) : isRankLocked ? (
+                            <button
+                              disabled
+                              title={`Requires finishing 1 Master Quest Branch to Rank ${reqRank}`}
+                              className="bg-slate-950 text-amber-400/80 border border-amber-500/40 text-[11px] font-bold px-2.5 py-1 rounded-xl cursor-not-allowed flex items-center gap-1 shadow-sm">
+                              <Lock className="w-3 h-3 text-amber-400" />
+                              <span>Rank {reqRank} Req</span>
+                            </button>
+                          ) : (
+                            <button
+                              disabled={!canUpgrade}
+                              onClick={() => {
+                                upgradeZenSkill(skill.id as keyof ZenSkills);
+                              }}
+                              className={`px-3 py-1 rounded-xl text-xs font-black transition-all shadow cursor-pointer flex items-center gap-1 ${
+                                canUpgrade
+                                  ? 'bg-pink-600 hover:bg-pink-500 text-white active:scale-95 ring-1 ring-pink-400'
+                                  : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                              }`}>
+                              <span>Upgrade ({cost} ZP)</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
 
-                      <p className="text-xs text-slate-400 leading-relaxed mb-1.5">
-                        {conf.description}
+                      {/* LEVEL PIPS / STARS (e.g. ★★★☆☆) */}
+                      <div className="flex items-center gap-1 my-1.5">
+                        {Array.from({ length: skill.maxLevel }).map((_, pipIdx) => {
+                          const isLevelFilled = pipIdx < currentLevel;
+                          return (
+                            <span
+                              key={pipIdx}
+                              className={`text-xs ${
+                                isLevelFilled ? 'text-amber-400 drop-shadow-[0_0_4px_rgba(250,204,21,0.6)]' : 'text-slate-700'
+                              }`}>
+                              ★
+                            </span>
+                          );
+                        })}
+                        <span className="text-[10px] text-slate-400 font-mono font-bold ml-1">
+                          Level {currentLevel} / {skill.maxLevel}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-300 leading-relaxed mb-1.5">
+                        {skill.description}
                       </p>
                     </div>
 
-                    <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800 text-[11px] text-emerald-300 font-mono">
-                      Bonus: <strong>{conf.getBonusText(currentRank)}</strong>
+                    {/* BOTTOM STATUS & EFFECT BOX */}
+                    <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800 space-y-1 text-[11px]">
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-400 font-semibold">Current Effect:</span>
+                        <strong className="text-emerald-300 font-mono">
+                          {skill.getCurrentEffectText(currentLevel)}
+                        </strong>
+                      </div>
+
+                      {!isMax && !isGreyedOut && (
+                        <div className="flex items-center justify-between text-slate-400 text-[10.5px]">
+                          <span>Next Level:</span>
+                          <span className="text-sky-300 font-mono font-semibold">
+                            {skill.getNextEffectText(currentLevel)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* RANK PREREQUISITE WARNING LABEL IF LOCKED */}
+                      {isRankLocked && reqRank && (
+                        <div className="flex items-center gap-1 text-[10.5px] text-amber-400 font-bold pt-1 border-t border-slate-900">
+                          <Lock className="w-3 h-3 text-amber-400 shrink-0" />
+                          <span>Requires finishing 1 Master Quest Branch to Rank {reqRank}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -1111,7 +1196,7 @@ export default function ZenLibraryModal({
       {/* FOOTER CONTROLLER & KEYBOARD PROMPTS STRIP */}
       <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 shrink-0 mt-1">
         <span className="font-mono text-pink-400 text-[11px] hidden sm:inline">
-          🎮 [A/D / LB/RB] Switch Tabs • [W/S] Navigate • [E / A] Inspect/Select • [Arrows / R-Stick] Scroll • [Esc / B] Close
+          🎮 [A/D / LB/RB] Switch Tabs • [W/S] Navigate • [E / A] Select • [Esc / B] Close
         </span>
         <button
           onClick={onClose}

@@ -60,7 +60,7 @@ export interface MilestoneDef {
 }
 
 export const TIER_LABELS = ['I', 'II', 'III', 'IV', 'V'] as const;
-export const BLOCK_REWARDS = [1, 2, 3, 4, 5] as const;
+export const BLOCK_REWARDS = [10, 25, 75, 250, 1000] as const;
 
 export const SOCIETY_MILESTONES: MilestoneDef[] = [
   // 1. Category: Bondex
@@ -388,7 +388,9 @@ export interface BonsaiSocietyModalProps {
   onCompleteEcoTier1: () => void;
   stats?: GameStats;
   claimAchievement?: (achId: string, rewardZen: number, title: string) => void;
+  onAwardMilestoneXP?: (amount: number, milestoneTitle: string, blockTierName: string) => void;
   onAwardMilestoneZen?: (amount: number, milestoneTitle: string, blockTierName: string) => void;
+  addPlayerXP?: (amount: number, source?: string) => void;
   plantedBonsais?: PlantedBonsai[];
   storedPottedBonsais?: StoredPottedBonsai[];
   discoveredSpeciesMap?: Record<
@@ -416,7 +418,9 @@ export default function SocietyModal({
   onCompleteCompetitionTier1,
   onCompleteEcoTier1,
   stats,
+  onAwardMilestoneXP,
   onAwardMilestoneZen,
+  addPlayerXP,
   plantedBonsais = [],
   storedPottedBonsais = [],
   discoveredSpeciesMap = {},
@@ -460,8 +464,8 @@ export default function SocietyModal({
     return SOCIETY_MILESTONES.filter((m) => m.category === milestoneFilter);
   }, [milestoneFilter]);
 
-  // Total Zen Points earned from milestones
-  const totalMilestoneZenEarned = useMemo(() => {
+  // Total Player XP earned from milestones
+  const totalMilestoneXpEarned = useMemo(() => {
     let sum = 0;
     if (!stats?.claimedMilestoneBlocks) return 0;
     Object.values(stats.claimedMilestoneBlocks).forEach((tierIndices) => {
@@ -490,7 +494,7 @@ export default function SocietyModal({
     }
   }, [selectedMilestoneIndex, mainTab]);
 
-  // AUTOMATIC THRESHOLD COMPLETION & PAYOUT EVALUATION
+  // AUTOMATIC THRESHOLD COMPLETION & XP PAYOUT EVALUATION
   useEffect(() => {
     if (!isOpen || !stats) return;
 
@@ -512,10 +516,6 @@ export default function SocietyModal({
           totalAwarded += reward;
           lastTitle = ms.title;
           lastTier = TIER_LABELS[t];
-
-          if (inventory) {
-            inventory.zen_essence = (inventory.zen_essence || 0) + reward;
-          }
         }
       }
 
@@ -525,7 +525,14 @@ export default function SocietyModal({
 
     if (totalAwarded > 0) {
       gameAudio?.playLevelUpStinger?.();
-      onAwardMilestoneZen?.(totalAwarded, lastTitle, lastTier);
+      if (addPlayerXP) {
+        addPlayerXP(totalAwarded, `Milestone: ${lastTitle}`);
+      }
+      if (onAwardMilestoneXP) {
+        onAwardMilestoneXP(totalAwarded, lastTitle, lastTier);
+      } else if (onAwardMilestoneZen) {
+        onAwardMilestoneZen(totalAwarded, lastTitle, lastTier);
+      }
     }
   }, [
     isOpen,
@@ -534,6 +541,8 @@ export default function SocietyModal({
     plantedBonsais,
     storedPottedBonsais,
     inventory,
+    addPlayerXP,
+    onAwardMilestoneXP,
     onAwardMilestoneZen,
   ]);
 
@@ -697,6 +706,13 @@ export default function SocietyModal({
     const maxTarget = ms.targets[4];
     const isSelected = selectedMilestoneId === ms.id || selectedMilestoneIndex === idx;
 
+    // Visual Fog of War / Masking:
+    // Only show objective for current milestone block and already achieved blocks.
+    // Following unreached blocks strictly show "???" until preceding block has been achieved!
+    const currentAchievedCount = ms.isNotObtainable
+      ? 0
+      : Math.max(claimed.length, ms.targets.filter((tgt) => curVal >= tgt).length);
+
     // Category Badge Styling
     const catBadgeStyles: Record<MilestoneCategory, string> = {
       Bondex: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50',
@@ -737,7 +753,7 @@ export default function SocietyModal({
             ? 'bg-slate-850 border-2 border-emerald-400 ring-2 ring-emerald-400/50 shadow-[0_0_15px_rgba(52,211,153,0.25)] scale-[1.008]'
             : 'bg-slate-900/90 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-850/60'
         } ${ms.isNotObtainable ? 'opacity-50 pointer-events-none' : ''}`}>
-        {/* TOP ROW: Category badge, Title, Progress Count / Target, and Total Zen Points Earned */}
+        {/* TOP ROW: Category badge, Title, Progress Count / Target, and Total Player XP Earned */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2 min-w-0">
             <span className={`text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full border shrink-0 ${catBadgeStyles[ms.category]}`}>
@@ -760,26 +776,30 @@ export default function SocietyModal({
                 <span className="text-slate-500">0 / {maxTarget} {ms.unit}</span>
               ) : (
                 <>
-                  <strong className="text-amber-300">{Math.min(maxTarget, curVal)}</strong>
+                  <strong className="text-amber-300">{curVal}</strong>
                   <span className="text-slate-500"> / </span>
-                  <span className="text-slate-400">{maxTarget} {ms.unit}</span>
+                  <span className="text-slate-400">
+                    {currentAchievedCount < 5 ? `${ms.targets[currentAchievedCount]} ${ms.unit}` : `${maxTarget} ${ms.unit}`}
+                  </span>
                   {curVal >= maxTarget && <span className="text-emerald-400 font-bold ml-1">✓</span>}
                 </>
               )}
             </div>
 
-            <div className="bg-slate-950/90 border border-amber-500/50 px-2 py-0.5 rounded-lg text-amber-300 font-bold text-[11px] flex items-center gap-1 shadow-sm">
-              <span>🌸</span>
-              <span>{earnedFromMs} / 15 ZP</span>
+            <div className="bg-slate-950/90 border border-emerald-500/50 px-2 py-0.5 rounded-lg text-emerald-300 font-bold text-[11px] flex items-center gap-1 shadow-sm">
+              <span>⚡</span>
+              <span>{earnedFromMs} / 1360 XP</span>
             </div>
           </div>
         </div>
 
-        {/* BOTTOM ROW: STREAMLINED TWO-LINE THRESHOLD BLOCKS (Target on Line 1, Reward/Status on Line 2) */}
+        {/* BOTTOM ROW: TWO-LINE THRESHOLD BLOCKS WITH VISUAL FOG OF WAR (??? ON FUTURE BLOCKS) */}
         <div className="grid grid-cols-5 gap-1.5 sm:gap-2 w-full">
           {ms.targets.map((tgt, tierIdx) => {
             const isComplete = !ms.isNotObtainable && curVal >= tgt;
-            const rewardZP = BLOCK_REWARDS[tierIdx];
+            const rewardXP = BLOCK_REWARDS[tierIdx];
+            const isRevealed = tierIdx <= currentAchievedCount;
+            const objectiveText = isRevealed ? `${tgt} ${ms.unit}` : '???';
 
             // Completion gradient styling according to tier (Bronze, Silver, Gold, Platinum, Diamond)
             const tierCompletedClasses = [
@@ -796,19 +816,27 @@ export default function SocietyModal({
                 className={`flex flex-col items-center justify-center py-1 sm:py-1.5 px-1 sm:px-1.5 rounded-lg sm:rounded-xl border text-center transition-all min-h-[38px] sm:min-h-[42px] ${
                   isComplete
                     ? tierCompletedClasses[tierIdx]
-                    : 'bg-slate-900/60 border-slate-800 text-slate-400'
+                    : isRevealed
+                    ? 'bg-slate-900/90 border-slate-700 text-slate-300 ring-1 ring-emerald-500/30'
+                    : 'bg-slate-950/60 border-slate-850 text-slate-600'
                 }`}>
-                {/* Line 1: Threshold target requirement (e.g. 3 Species, 15 Styles, 5 Bonsais) */}
-                <div className="text-[10px] sm:text-xs font-bold leading-tight truncate max-w-full">
-                  {tgt} {ms.unit}
+                {/* Line 1: Threshold target requirement or ??? if locked behind fog of war */}
+                <div className={`text-[10px] sm:text-xs leading-tight truncate max-w-full font-bold ${
+                  isRevealed ? '' : 'tracking-widest font-mono text-slate-500'
+                }`}>
+                  {objectiveText}
                 </div>
 
-                {/* Line 2: Reward / completion indicator (e.g. +1 ZP, ✓ +2 ZP) */}
+                {/* Line 2: Player XP reward (+10 XP, +25 XP, +75 XP, +250 XP, +1000 XP) */}
                 <div
                   className={`text-[9px] sm:text-[10px] font-mono leading-tight flex items-center justify-center gap-0.5 mt-0.5 ${
-                    isComplete ? 'font-black opacity-95' : 'font-bold text-amber-400/80'
+                    isComplete
+                      ? 'font-black opacity-95'
+                      : isRevealed
+                      ? 'font-bold text-emerald-400'
+                      : 'font-semibold text-slate-500'
                   }`}>
-                  {isComplete ? `✓ +${rewardZP} ZP` : `+${rewardZP} ZP`}
+                  {isComplete ? `✓ +${rewardXP} XP` : `+${rewardXP} XP`}
                 </div>
               </div>
             );
@@ -1355,7 +1383,7 @@ export default function SocietyModal({
 
             <div className="ml-auto text-xs font-bold text-amber-300 flex items-center gap-1.5 shrink-0 pl-2">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Total: +{totalMilestoneZenEarned} ZP • Auto-payout</span>
+              <span>Total: +{totalMilestoneXpEarned} XP • Auto-payout</span>
             </div>
           </div>
 

@@ -46,6 +46,7 @@ export interface WorkbenchModalProps {
   isOpen: boolean;
   onClose: () => void;
   inventory: SanctuaryInventory;
+  skills?: any;
   unlockedBlueprints?: string[];
   activeCraft: CraftingQueueItem | null;
   craftingQueue: CraftingQueueItem[];
@@ -73,6 +74,7 @@ export default function WorkbenchModal({
   isOpen,
   onClose,
   inventory: inv,
+  skills,
   unlockedBlueprints = [],
   activeCraft,
   craftingQueue,
@@ -148,10 +150,44 @@ export default function WorkbenchModal({
     'craft_speed_grow_xl',
   ];
 
+  const wireLvl = skills?.['efficientWireProduction'] ?? skills?.['efficient_wire_production'] ?? inv.skills?.['efficientWireProduction'] ?? inv.skills?.['efficient_wire_production'] ?? 0;
+  const gearsLvl = skills?.['efficientGearsProduction'] ?? skills?.['efficient_gears_production'] ?? inv.skills?.['efficientGearsProduction'] ?? inv.skills?.['efficient_gears_production'] ?? 0;
+  const circuitLvl = skills?.['efficientCircuitProduction'] ?? skills?.['efficient_circuit_production'] ?? inv.skills?.['efficientCircuitProduction'] ?? inv.skills?.['efficient_circuit_production'] ?? 0;
+  const chipLvl = skills?.['efficientChipProduction'] ?? skills?.['efficient_chip_production'] ?? inv.skills?.['efficientChipProduction'] ?? inv.skills?.['efficient_chip_production'] ?? 0;
+
+  const getEffectiveCosts = (recipeId: CraftingRecipeId, baseCosts: CraftingRecipeDef['costs']) => {
+    if (recipeId === 'craft_copper_wire') {
+      return {
+        ...baseCosts,
+        scrap_metal: Math.max(1, 10 - wireLvl),
+      };
+    }
+    if (recipeId === 'craft_gears') {
+      return {
+        ...baseCosts,
+        copper_wire: Math.max(1, 8 - gearsLvl),
+      };
+    }
+    if (recipeId === 'craft_microcircuits') {
+      return {
+        ...baseCosts,
+        brass_gears: Math.max(1, 6 - circuitLvl),
+      };
+    }
+    if (recipeId === 'craft_quantum_chips') {
+      const baseCost = baseCosts.circuit_boards ?? 4;
+      return {
+        ...baseCosts,
+        circuit_boards: Math.max(1, baseCost - chipLvl),
+      };
+    }
+    return baseCosts;
+  };
+
   const renderRecipeCard = (recipeId: CraftingRecipeId, cardIdx?: number) => {
     const recipe = WORKBENCH_RECIPES[recipeId];
     if (!recipe) return null;
-    const costs = recipe.costs;
+    const costs = getEffectiveCosts(recipeId, recipe.costs);
 
     // Check blueprint requirement from 58 standardized catalog
     const requiredBpId = BLUEPRINT_REQUIRED_FOR_ITEM[recipeId];
@@ -280,7 +316,17 @@ export default function WorkbenchModal({
             </div>
           </div>
 
-          <p className="text-xs text-slate-400 mb-2 leading-relaxed">{recipe.description}</p>
+          <p className="text-xs text-slate-400 mb-2 leading-relaxed">
+            {recipeId === 'craft_copper_wire'
+              ? `Transmute Scrap Metal into 1 conductive Copper Wire (${costs.scrap_metal} Scrap Metal needed).`
+              : recipeId === 'craft_gears'
+              ? `Precision-mill Copper Wire into 1 Mechanical Gear (${costs.copper_wire} Copper Wire needed).`
+              : recipeId === 'craft_microcircuits'
+              ? `Etch and solder Mechanical Gears into 1 high-density Microcircuit (${costs.brass_gears} Gears needed).`
+              : recipeId === 'craft_quantum_chips'
+              ? `Crystallize Microcircuits into 1 advanced Quantum Chip (${costs.circuit_boards} Microcircuits needed).`
+              : recipe.description}
+          </p>
         </div>
 
         <div>

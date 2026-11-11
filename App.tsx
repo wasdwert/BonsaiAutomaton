@@ -48,6 +48,7 @@ import {
   Info,
   Maximize2,
   BookOpen,
+  Save,
 } from 'lucide-react';
 import {getConfig, THEME, ASSET_DOUBLE_RESOURCES} from './constants';
 import BackgroundMusic from './utils/BackgroundMusic';
@@ -127,7 +128,8 @@ import {
   usePlayground,
   usePlaygroundGameLifecycle,
 } from './utils/usePlayground';
-import ZenLibraryModal, { ShrineTab } from './ZenLibraryModal';
+import ZenLibraryModal, { ShrineTab, getMaxMasterQuestBranchRank } from './ZenLibraryModal';
+import { SKILL_BY_ID } from './skillsData';
 import InventoryModal, { EquipmentCard } from './InventoryModal';
 export { EquipmentCard };
 import BonsaiSocietyModal, { SOCIETY_MILESTONES, BLOCK_REWARDS, TIER_LABELS } from './BonsaiSocietyModal';
@@ -136,7 +138,43 @@ import AutoUnloaderSettingsModal from './AutoUnloaderSettingsModal';
 import FeederDripperSettingsModal from './FeederDripperSettingsModal';
 import WorkbenchModal from './WorkbenchModal';
 import MarketModal from './MarketModal';
-import { BlueprintDef, BLUEPRINTS_CATALOG, BLUEPRINT_BY_ID, BLUEPRINT_REQUIRED_FOR_ITEM } from './blueprints';
+import { BlueprintDef, BLUEPRINTS_CATALOG, BLUEPRINT_BY_ID, BLUEPRINT_REQUIRED_FOR_ITEM, getBlueprintRequiredRank } from './blueprints';
+import {
+  calculateWateringGrowthRate,
+  XP_FOR_LEVEL,
+  XP_REQUIREMENTS,
+  getXPRequirementForLevel,
+  getExpRequiredForLevel,
+  MATURITY_XP_FACTORS,
+  getMaturityXPFactor,
+  getSpeciesFindingOddsForXP,
+  calculatePruningXP,
+  calculateBonsaiLevelUpXP,
+  calculateFindingSeedlingXP,
+  calculateFindingCrystalXP,
+  calculateFindingResourceXP,
+  INITIAL_GAME_STATE,
+  defaultGameState,
+  initialGameState,
+} from './gameState';
+export {
+  calculateWateringGrowthRate,
+  XP_FOR_LEVEL,
+  XP_REQUIREMENTS,
+  getXPRequirementForLevel,
+  getExpRequiredForLevel,
+  MATURITY_XP_FACTORS,
+  getMaturityXPFactor,
+  getSpeciesFindingOddsForXP,
+  calculatePruningXP,
+  calculateBonsaiLevelUpXP,
+  calculateFindingSeedlingXP,
+  calculateFindingCrystalXP,
+  calculateFindingResourceXP,
+  INITIAL_GAME_STATE,
+  defaultGameState,
+  initialGameState,
+};
 import BlueprintsCatalogView from './BlueprintsCatalogView';
 import {
   RoverChassisTier,
@@ -196,6 +234,20 @@ import BonsaiExcavationModal, { ExcavationResultData } from './BonsaiExcavationM
 import BonsaiInspectionModal from './BonsaiInspectionModal';
 import DeploymentModal, { BonsaiStyleThumbnail } from './DeploymentModal';
 import { SeedlingItem } from './types';
+import SaveLoadModal from './SaveLoadModal';
+import OfflineReportModal from './OfflineReportModal';
+import {
+  SaveSlotId,
+  SaveSlotMetadata,
+  FullSaveState,
+  OfflineSummary,
+  saveGame,
+  loadGame,
+  deleteSaveSlot,
+  getSaveSlotMetadata,
+  getAllSaveSlotsMetadata,
+  formatTimeAway,
+} from './saveManager';
 
 // Relaxing nature & sanctuary soundtrack
 const BACKGROUND_MUSIC_URL =
@@ -835,7 +887,7 @@ export const WORKBENCH_RECIPES: Record<CraftingRecipeId, CraftingRecipeDef> = {
     category: 'bonsai_automatons',
     durationSeconds: 12,
     kw: 4,
-    description: 'Deployable 1x1 infrastructure sprinkler. Sprays Left & Right adjacent plots with continuous hydration at 1.0x baseline speed (4 kW).',
+    description: 'Deployable 1x1 infrastructure sprinkler. Sprays Left & Right adjacent plots with continuous hydration at 1.0s/s baseline speed (4 kW). Base 1s/s (+1s/s per Hydrodynamics Sprinkler T1 level).',
     icon: '💧',
     requiresGuide: 'has_tier1_guide',
     guideName: 'Tier 1 Mist Irrigation Guidebook',
@@ -847,7 +899,7 @@ export const WORKBENCH_RECIPES: Record<CraftingRecipeId, CraftingRecipeDef> = {
     category: 'bonsai_automatons',
     durationSeconds: 25,
     kw: 7,
-    description: 'Deployable 1x1 infrastructure sprinkler. 4-way cross nozzles spray Up, Down, Left, Right adjacent plots at 2.5x speed (7 kW).',
+    description: 'Deployable 1x1 infrastructure sprinkler. 4-way cross nozzles spray Up, Down, Left, Right adjacent plots with continuous hydration at 1.0s/s baseline speed (7 kW). Base 1s/s (+1s/s per Hydrodynamics Sprinkler T2 level).',
     icon: '⚡',
     requiresGuide: 'has_tier2_guide',
     guideName: 'Tier 2 Pulsar Irrigation Guidebook',
@@ -859,7 +911,7 @@ export const WORKBENCH_RECIPES: Record<CraftingRecipeId, CraftingRecipeDef> = {
     category: 'bonsai_automatons',
     durationSeconds: 60,
     kw: 12,
-    description: 'Deployable 1x1 infrastructure sprinkler. Rotating pulse impact head sprays all 8 surrounding plots in 3x3 at 5.0x ultra speed (12 kW).',
+    description: 'Deployable 1x1 infrastructure sprinkler. Rotating pulse impact head sprays all 8 surrounding plots in 3x3 at 1.0s/s baseline speed (12 kW). Base 1s/s (+1s/s per Hydrodynamics Sprinkler T3 level).',
     icon: '✨',
     requiresGuide: 'has_tier3_guide',
     guideName: 'Tier 3 Hydro Irrigation Guidebook',
@@ -1358,27 +1410,27 @@ export const WORKBENCH_RECIPES: Record<CraftingRecipeId, CraftingRecipeDef> = {
     name: 'Copper Wire',
     category: 'resources',
     durationSeconds: 5,
-    description: 'Transmute 4 Scrap Metal into 1 conductive Copper Wire in the crafting queue (5s duration).',
+    description: 'Transmute 10 Scrap Metal into 1 conductive Copper Wire in the crafting queue (5s duration).',
     icon: '⚡',
-    costs: {scrap_metal: 4},
+    costs: {scrap_metal: 10},
   },
   craft_gears: {
     id: 'craft_gears',
     name: 'Mechanical Gear',
     category: 'resources',
     durationSeconds: 8,
-    description: 'Precision-mill 4 Copper Wire into 1 Mechanical Gear in the crafting queue (8s duration).',
+    description: 'Precision-mill 8 Copper Wire into 1 Mechanical Gear in the crafting queue (8s duration).',
     icon: '⚙️',
-    costs: {copper_wire: 4},
+    costs: {copper_wire: 8},
   },
   craft_microcircuits: {
     id: 'craft_microcircuits',
     name: 'Microcircuit',
     category: 'resources',
     durationSeconds: 12,
-    description: 'Etch and solder 4 Mechanical Gears into 1 high-density Microcircuit in the crafting queue (12s duration).',
+    description: 'Etch and solder 6 Mechanical Gears into 1 high-density Microcircuit in the crafting queue (12s duration).',
     icon: '🟩',
-    costs: {brass_gears: 4},
+    costs: {brass_gears: 6},
   },
   craft_quantum_chips: {
     id: 'craft_quantum_chips',
@@ -1421,7 +1473,7 @@ export const AUTOMATON_TIERS: Record<number, AutomatonConfig> = {
     name: 'T1 Hydration Sprinkler',
     speedMultiplier: 1.0,
     kwDrain: 4,
-    description: 'Gentle mist nozzles water bonsai at 1.0x baseline speed (4 kW).',
+    description: 'Gentle mist nozzles water bonsai at 1.0s/s baseline speed (+1s/s per level) (4 kW).',
     cost: {
       scrap_metal: 8,
       copper_wire: 4,
@@ -1433,9 +1485,9 @@ export const AUTOMATON_TIERS: Record<number, AutomatonConfig> = {
   2: {
     tier: 2,
     name: 'T2 Hydration Sprinkler',
-    speedMultiplier: 2.5,
+    speedMultiplier: 1.0,
     kwDrain: 7,
-    description: 'Pressurized micro-pulsars water bonsai at 2.5x speed (7 kW).',
+    description: 'Pressurized micro-pulsars water bonsai at 1.0s/s baseline speed (+1s/s per level) (7 kW).',
     cost: {
       scrap_metal: 6,
       copper_wire: 3,
@@ -1447,9 +1499,9 @@ export const AUTOMATON_TIERS: Record<number, AutomatonConfig> = {
   3: {
     tier: 3,
     name: 'T3 Hydration Sprinkler',
-    speedMultiplier: 5.0,
+    speedMultiplier: 1.0,
     kwDrain: 12,
-    description: 'Supercharged hydro-nanite sprayers water bonsai at 5.0x ultra speed (12 kW).',
+    description: 'Supercharged hydro-nanite sprayers water bonsai at 1.0s/s baseline speed (+1s/s per level) (12 kW).',
     cost: {
       scrap_metal: 8,
       copper_wire: 4,
@@ -1584,6 +1636,8 @@ export { BonsaiStyleThumbnail };
 export interface QuickBonsaiRadialMenuProps {
   bonsai: PlantedBonsai;
   inventory: SanctuaryInventory;
+  skills?: ZenSkills | Record<string, number>;
+  expertNegotiatorLvl?: number;
   onSell: (id: string) => void;
   onStore: (id: string) => void;
   onCompost: (id: string, tier?: 'S' | 'M' | 'L') => void;
@@ -1596,6 +1650,8 @@ export interface QuickBonsaiRadialMenuProps {
 export function QuickBonsaiRadialMenu({
   bonsai,
   inventory,
+  skills,
+  expertNegotiatorLvl,
   onSell,
   onStore,
   onCompost,
@@ -1604,8 +1660,9 @@ export function QuickBonsaiRadialMenu({
   onClose,
   isEcoMatch = false,
 }: QuickBonsaiRadialMenuProps) {
-  const basePayout = calculateDonationValue(bonsai);
-  const sellPrice = isEcoMatch ? Number((basePayout * 2).toFixed(2)) : basePayout;
+  const effectiveSkills = skills ?? expertNegotiatorLvl;
+  const basePayout = calculateDonationValue(bonsai, effectiveSkills);
+  const sellPrice = isEcoMatch ? Math.floor((basePayout * 2 + 1e-9) * 100) / 100 : basePayout;
   const matDef = getMaturityDef(bonsai.maturity);
 
   // Sub-menu state: 'main' | 'compost_fertilizer' | 'speed_grow'
@@ -3174,16 +3231,46 @@ export interface RadialDigState {
 }
 
 export interface ZenSkills {
-  [key: string]: any;
+  [key: string]: number;
   carefulTrowel: number;
+  steady_hands: number;
   broadSpade: number;
-  greenThumb: number;
-  hydrodynamics: number;
   botanicalForaging: number;
+  perpetuum_mobile: number;
+  resourceProspectingArea1: number;
+  resourceProspectingArea2: number;
+  resourceProspectingArea3: number;
+  botanicalDowsingArea1: number;
+  botanicalDowsingArea2: number;
+  botanicalDowsingArea3: number;
+  artifactHunterArea1: number;
+  artifactHunterArea2: number;
+  artifactHunterArea3: number;
+  greenThumb: number;
+  hydrodynamicsSprinklerT1: number;
+  hydrodynamicsSprinklerT2: number;
+  hydrodynamicsSprinklerT3: number;
+  automatonGreenThumb: number;
+  automatonHydrodynamics: number;
+  hydrodynamicsIrrigationT1: number;
+  hydrodynamicsIrrigationT2: number;
+  hydrodynamicsIrrigationT3: number;
+  expertNegotiator: number;
+  discountHunter: number;
+  solarExpert: number;
+  windExpert: number;
+  efficientComposts: number;
+  efficientFertilizers: number;
+  efficientSpeedGrows: number;
+  efficientWireProduction: number;
+  efficientGearsProduction: number;
+  efficientCircuitProduction: number;
+  efficientChipProduction: number;
+  experiencedPresenter: number;
+  bigHands: number;
+  hydrodynamics: number;
   resourceProspecting: number;
   botanicalDowsing: number;
-  perpetuum_mobile: number;
-  steady_hands: number;
 }
 
 export interface SkillConfigItem {
@@ -3883,6 +3970,7 @@ export interface ExcursionReportData {
   batteryRemaining: number;
   maxBatteryKwh: number;
   totalWeight: number;
+  totalExpeditionXP?: number;
   items: {
     key: ResourceItemKey;
     name: string;
@@ -3906,20 +3994,17 @@ export interface ExcursionReportData {
 }
 
 // EXP REQUIREMENT PROGRESSION CURVE
-export function getExpRequiredForLevel(lvl: number): number {
-  const l = Math.max(1, lvl);
-  return Math.floor(100 * Math.pow(1.25, l - 1));
-}
+// Re-exported from ./gameState for consistency across the application
 
-// EXP VALUES FOR HARVESTING & EXCAVATION
+// EXP VALUES FOR HARVESTING & EXCAVATION (3 XP Scrap, 6 XP Wire, 12 XP Gear, 25 XP Circuit, 50 XP Chip)
 export const RESOURCE_HARVEST_EXP: Record<ResourceItemKey, number> = {
-  scrap_metal: 8,
-  copper_wire: 12,
-  brass_gears: 20,
-  circuit_boards: 35,
-  electronic_chips: 60,
-  scrap_metal_double: 16,
-  copper_wire_double: 24,
+  scrap_metal: 3,
+  copper_wire: 6,
+  brass_gears: 12,
+  circuit_boards: 25,
+  electronic_chips: 50,
+  scrap_metal_double: 6,
+  copper_wire_double: 12,
 };
 
 /**
@@ -4075,18 +4160,21 @@ export function calculateBonsaiSellPrice(
         level?: number;
         findOdds?: number;
         foundOdds?: number;
+        skills?: Record<string, number>;
+        expertNegotiatorLvl?: number;
       },
   level?: number,
   leafType?: BonsaiLeafType,
+  skills?: Record<string, number> | number,
 ): number {
   if (maturityOrBonsai && typeof maturityOrBonsai === 'object') {
-    return calculateDonationValue(maturityOrBonsai);
+    return calculateDonationValue(maturityOrBonsai, skills);
   }
   return calculateDonationValue({
     leafType: leafType || 'circle',
     maturity: maturityOrBonsai as MaturityTier | undefined,
     level: level !== undefined ? level : 0,
-  });
+  }, skills);
 }
 
 // POWER GENERATION (kW)
@@ -5108,32 +5196,32 @@ export const MATURITY_SPOTS_COUNT: Record<MaturityTier, number> = {
   premium: 6,
 };
 
-// ZEN SKILL DEFINITIONS & UPGRADE COSTS
+export { ZEN_SKILLS_DATA, SKILL_BY_ID } from './skillsData';
 export const SKILL_CONFIGS: Record<string, SkillConfigItem> = {
   steady_hands: {
     name: 'Steady Hands',
     description: 'Increases the precision score of all excavation digging tiers by +10% per rank (+50% at Max Level 5).',
     icon: '🎯',
     maxRank: 5,
-    costs: [5, 10, 20, 35, 50],
-    getBonusText: (rank: number) => `+${rank * 10}% Precision Tier Bonus${rank === 5 ? ' (Center 100%)' : ''}`,
+    costs: [1, 2, 3, 4, 5],
+    getBonusText: (rank: number) => `+${rank * 10}% Precision Tier Bonus`,
     getNextBonusText: (rank: number) => `+${(rank + 1) * 10}% Precision Tier Bonus`,
   },
   carefulTrowel: {
     name: 'Careful Trowel',
-    description: 'Increases shovel strike capacity to excavate multi-spot high maturity flora (Sapling: 3, Notable: 4, Refined: 5, Premium: 6 sites).',
+    description: 'Increases shovel strike capacity to excavate multi-spot high maturity flora.',
     icon: '🥄',
-    maxRank: 5,
-    costs: [5, 10, 20, 35, 50],
+    maxRank: 4,
+    costs: [1, 2, 3, 5],
     getBonusText: (rank: number) => `${2 + rank} Total Shovel Strikes (+${rank})`,
     getNextBonusText: (rank: number) => `${3 + rank} Total Shovel Strikes (+${rank + 1})`,
   },
   broadSpade: {
     name: 'Broad Spade',
-    description: 'Widens the green root target zones on the excavation dial (+5% per rank, +25% max).',
-    icon: '🎯',
+    description: 'Widens the root target sectors on the excavation dial (+5% per rank, up to +25%).',
+    icon: '🌾',
     maxRank: 5,
-    costs: [5, 10, 20, 35, 50],
+    costs: [1, 2, 3, 4, 5],
     getBonusText: (rank: number) => `+${rank * 5}% Hit Arc Width`,
     getNextBonusText: (rank: number) => `+${(rank + 1) * 5}% Hit Arc Width`,
   },
@@ -5142,54 +5230,54 @@ export const SKILL_CONFIGS: Record<string, SkillConfigItem> = {
     description: 'Manual Spacebar Pruning reduces growth countdown timer faster.',
     icon: '✂️',
     maxRank: 5,
-    costs: [5, 10, 20, 35, 50],
+    costs: [1, 2, 3, 4, 5],
     getBonusText: (rank: number) => `-${1 + rank}s Progress per Prune`,
     getNextBonusText: (rank: number) => `-${2 + rank}s Progress per Prune`,
   },
   hydrodynamics: {
     name: 'Hydrodynamics',
-    description: 'Automaton watering irrigation pumps nourish trees with extra efficiency.',
+    description: '+1s Sprinkler Growth Speed per Second each.',
     icon: '💧',
     maxRank: 5,
-    costs: [5, 10, 20, 35, 50],
-    getBonusText: (rank: number) => `+${rank * 20}% Automaton Growth Speed`,
-    getNextBonusText: (rank: number) => `+${(rank + 1) * 20}% Automaton Growth Speed`,
+    costs: [1, 2, 3, 4, 5],
+    getBonusText: (rank: number) => `+${rank}s/s Sprinkler Growth Speed`,
+    getNextBonusText: (rank: number) => `+${rank + 1}s/s Sprinkler Growth Speed`,
   },
   botanicalForaging: {
     name: 'Botanical Foraging',
-    description: 'Chance upon excavating a wild bonsai seedling to promote its Maturity rating by +1 tier (up to Premium 五).',
+    description: 'Chance upon excavating a wild bonsai seedling to promote its Maturity rating by +1 tier.',
     icon: '🧭',
     maxRank: 5,
-    costs: [10, 20, 35, 55, 80],
-    getBonusText: (rank: number) => `${rank * 5}% Maturity Uplift Chance${rank === 0 ? ' (0%)' : ''}`,
-    getNextBonusText: (rank: number) => `+${(rank + 1) * 5}% Maturity Uplift Chance (${(rank + 1) * 5}% total)`,
+    costs: [1, 2, 3, 4, 5],
+    getBonusText: (rank: number) => `${rank * 5}% Maturity Uplift Chance`,
+    getNextBonusText: (rank: number) => `${(rank + 1) * 5}% Maturity Uplift Chance`,
   },
   resourceProspecting: {
     name: 'Resource Prospecting',
-    description: 'Zen radar attunement increases overworld resource node grid spawn chance (+2% per rank, up to +10%).',
+    description: 'Increases overworld resource node grid spawn chance.',
     icon: '⛏️',
     maxRank: 5,
-    costs: [8, 16, 28, 45, 65],
-    getBonusText: (rank: number) => `+${rank * 2}% Resource Spawn Chance (Close ${4 + rank * 2}%, Mid ${6 + rank * 2}%, Far ${8 + rank * 2}%)`,
+    costs: [1, 2, 3, 4, 5],
+    getBonusText: (rank: number) => `+${rank * 2}% Resource Spawn Chance`,
     getNextBonusText: (rank: number) => `+${(rank + 1) * 2}% Resource Spawn Chance`,
   },
   botanicalDowsing: {
     name: 'Botanical Dowsing',
-    description: 'Bio-resonance antenna increases wild seedling root node grid spawn chance (+2% per rank, up to +10%).',
+    description: 'Bio-resonance antenna increases wild seedling root node grid spawn chance.',
     icon: '🎋',
     maxRank: 5,
-    costs: [8, 16, 28, 45, 65],
-    getBonusText: (rank: number) => `+${rank * 2}% Seedling Spawn Chance (${8 + rank * 2}% per grid slot)`,
+    costs: [1, 2, 3, 4, 5],
+    getBonusText: (rank: number) => `+${rank * 2}% Seedling Spawn Chance`,
     getNextBonusText: (rank: number) => `+${(rank + 1) * 2}% Seedling Spawn Chance`,
   },
   perpetuum_mobile: {
-    name: '⚡ Perpetuum Mobile',
+    name: 'Perpetuum Mobile',
     description: 'Grants a chance to move the Rover without consuming any battery energy.',
     icon: '⚡',
     maxRank: 5,
-    costs: [5, 10, 20, 35, 50],
-    getBonusText: (rank: number) => `${rank * 5}% Free Step Chance${rank === 0 ? ' (0%)' : ''}`,
-    getNextBonusText: (rank: number) => `+${(rank + 1) * 5}% Free Step Chance (${(rank + 1) * 5}% total)`,
+    costs: [1, 2, 3, 4, 5],
+    getBonusText: (rank: number) => `${rank * 5}% Free Step Chance`,
+    getNextBonusText: (rank: number) => `${(rank + 1) * 5}% Free Step Chance`,
   },
 };
 
@@ -11422,6 +11510,10 @@ export default function App() {
 
   // Global Menus & UI Modals
   const [isGameMenuOpen, setIsGameMenuOpen] = useState(false);
+  const [isSaveLoadModalOpen, setIsSaveLoadModalOpen] = useState(false);
+  const [offlineSummaryModalOpen, setOfflineSummaryModalOpen] = useState(false);
+  const [offlineSummaryData, setOfflineSummaryData] = useState<OfflineSummary | null>(null);
+  const [currentActiveSaveSlot, setCurrentActiveSaveSlot] = useState<SaveSlotId>('autosave');
   const [isHowToPlayOpen, setIsHowToPlayOpen] = useState(false);
   const [guidebookChapter, setGuidebookChapter] = useState<number>(1);
   const [isUnifiedStorageOpen, setIsUnifiedStorageOpen] = useState(false);
@@ -11717,36 +11809,11 @@ export default function App() {
   }, []);
 
   // Title Screen Keyboard and Menu Navigation
+  const [hasExistingSave, setHasExistingSave] = useState(false);
   useEffect(() => {
-    if (gameState.status !== 'START') return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'w' || e.key === 'W') {
-        e.preventDefault();
-        setTitleMenuIdx((i) => Math.max(0, i - 1));
-        gameAudio.playHoverMicroTone();
-      } else if (e.key === 's' || e.key === 'S') {
-        e.preventDefault();
-        setTitleMenuIdx((i) => Math.min(2, i + 1));
-        gameAudio.playHoverMicroTone();
-      } else if (e.key === 'e' || e.key === 'E' || e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        if (titleMenuIdx === 0) {
-          setGameState((prev) => ({...prev, status: 'PLAYING'}));
-          gameAudio.playPowerupChime();
-          if (sdk) sdk.startGame();
-        } else if (titleMenuIdx === 1) {
-          setIsHowToPlayOpen(true);
-          gameAudio.playCrispClick();
-        } else if (titleMenuIdx === 2) {
-          setIsGameMenuOpen(true);
-          gameAudio.playCrispClick();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameState.status, titleMenuIdx, sdk]);
+    const meta = getSaveSlotMetadata('autosave') || getSaveSlotMetadata(1);
+    setHasExistingSave(Boolean(meta && meta.savedAt > 0));
+  }, [gameState.status]);
 
   // Global pure scrolling handler for Arrow keys across all scrollable containers
   useEffect(() => {
@@ -11876,8 +11943,12 @@ export default function App() {
     licenseT1: 0,
     licenseT2: 0,
     licenseT3: 0,
-    player_level: 1,
+    player_level: 0,
     player_exp: 0,
+    level: 0,
+    xp: 0,
+    playerLevel: 0,
+    playerXP: 0,
     scrap_metal: 25,
     copper_wire: 25,
     brass_gears: 25,
@@ -12206,17 +12277,47 @@ export default function App() {
     saplings: [],
   });
 
-  // Zen Skill Tree State
+  // Zen Skill Tree State (36 Skills)
   const zenSkillsRef = useRef<ZenSkills>({
-    steady_hands: 0,
     carefulTrowel: 0,
+    steady_hands: 0,
     broadSpade: 0,
-    greenThumb: 0,
-    hydrodynamics: 0,
     botanicalForaging: 0,
+    perpetuum_mobile: 0,
+    resourceProspectingArea1: 0,
+    resourceProspectingArea2: 0,
+    resourceProspectingArea3: 0,
+    botanicalDowsingArea1: 0,
+    botanicalDowsingArea2: 0,
+    botanicalDowsingArea3: 0,
+    artifactHunterArea1: 0,
+    artifactHunterArea2: 0,
+    artifactHunterArea3: 0,
+    greenThumb: 0,
+    hydrodynamicsSprinklerT1: 0,
+    hydrodynamicsSprinklerT2: 0,
+    hydrodynamicsSprinklerT3: 0,
+    automatonGreenThumb: 0,
+    automatonHydrodynamics: 0,
+    hydrodynamicsIrrigationT1: 0,
+    hydrodynamicsIrrigationT2: 0,
+    hydrodynamicsIrrigationT3: 0,
+    expertNegotiator: 0,
+    discountHunter: 0,
+    solarExpert: 0,
+    windExpert: 0,
+    efficientComposts: 0,
+    efficientFertilizers: 0,
+    efficientSpeedGrows: 0,
+    efficientWireProduction: 0,
+    efficientGearsProduction: 0,
+    efficientCircuitProduction: 0,
+    efficientChipProduction: 0,
+    experiencedPresenter: 0,
+    bigHands: 0,
+    hydrodynamics: 0,
     resourceProspecting: 0,
     botanicalDowsing: 0,
-    perpetuum_mobile: 0,
   });
 
   // Zen Milestones & Stats State
@@ -12283,6 +12384,10 @@ export default function App() {
   });
 
   // --- EXCURSION ROVER & CAMERA STATE ---
+  const [hasMovedOffSpawn, setHasMovedOffSpawn] = useState<boolean>(false);
+  const hasMovedOffSpawnRef = useRef<boolean>(false);
+  hasMovedOffSpawnRef.current = hasMovedOffSpawn;
+
   const roverRef = useRef({
     tileX: 0,
     tileY: 0,
@@ -12296,6 +12401,8 @@ export default function App() {
     isMovingAnim: false,
     moveCooldown: 0,
     maxDistanceReached: 0,
+    hasMovedOffSpawn: false,
+    stepsTaken: 0,
   });
 
   const cameraRef = useRef({
@@ -12623,20 +12730,31 @@ export default function App() {
   }, []);
 
   // --- PROGRESSIVE PLAYER LEVEL & EXP SYSTEM ---
-  const gainPlayerExp = useCallback(
+  const addPlayerXP = useCallback(
     (amount: number, sourceName?: string) => {
-      if (amount <= 0) return;
+      const cleanXP = Math.max(0, Math.round(amount));
+      if (cleanXP <= 0) return;
       const inv = sanctuaryInventoryRef.current;
-      inv.player_exp += amount;
+      if (inv.player_level >= 100) {
+        inv.player_level = 100;
+        inv.player_exp = 0;
+        refreshHud();
+        return;
+      }
+
+      inv.player_exp = Math.round((inv.player_exp + cleanXP) * 100) / 100;
 
       let leveledUp = false;
       let levelsGained = 0;
-      while (true) {
-        const needed = getExpRequiredForLevel(inv.player_level);
+      while (inv.player_level < 100) {
+        const targetLevel = inv.player_level + 1;
+        const needed = getXPRequirementForLevel(targetLevel);
         if (inv.player_exp >= needed) {
-          inv.player_exp -= needed;
+          inv.player_exp = Math.round((inv.player_exp - needed) * 100) / 100;
           inv.player_level += 1;
-          const zenGained = 2; // +2 Zen Points per level up!
+          inv.level = inv.player_level;
+          inv.playerLevel = inv.player_level;
+          const zenGained = 5; // +5 Zen Points per level up!
           inv.zen_essence += zenGained;
           leveledUp = true;
           levelsGained += 1;
@@ -12645,9 +12763,14 @@ export default function App() {
         }
       }
 
+      if (inv.player_level >= 100) {
+        inv.player_level = 100;
+        inv.player_exp = 0;
+      }
+
       if (leveledUp) {
         gameAudio.playLevelUpStinger();
-        const totalZenGained = levelsGained * 2;
+        const totalZenGained = levelsGained * 5;
         triggerNotification(
           `🌟 LEVEL UP! Botanist Level ${inv.player_level}! (+${totalZenGained} Zen Point${totalZenGained > 1 ? 's' : ''} Awarded)`,
           '#ec4899',
@@ -12664,7 +12787,7 @@ export default function App() {
         addFloatingText(
           locationRef.current === 'SANCTUARY' ? avatarRef.current.x : 640,
           locationRef.current === 'SANCTUARY' ? avatarRef.current.y - 30 : 340,
-          `+${amount} EXP`,
+          `+${cleanXP} XP`,
           '#38bdf8',
         );
       }
@@ -12673,6 +12796,7 @@ export default function App() {
     },
     [addFloatingText, refreshHud, triggerNotification],
   );
+  const gainPlayerExp = addPlayerXP;
 
   // Compute Maximum Battery Points (kWh) with Modules & Chassis Outfitting
   const getMaxRoverBattery = useCallback(() => {
@@ -12870,6 +12994,16 @@ export default function App() {
       turbineBonusCount += count;
     });
 
+    // Apply Solar Expert & Wind Expert skills (+10% power per level)
+    const solarSkill = zenSkillsRef.current.solarExpert || 0;
+    if (solarSkill > 0) {
+      solarKw = Math.round(solarKw * (1 + solarSkill * 0.10) * 10) / 10;
+    }
+    const windSkill = zenSkillsRef.current.windExpert || 0;
+    if (windSkill > 0) {
+      turbineKw = Math.round(turbineKw * (1 + windSkill * 0.10) * 10) / 10;
+    }
+
     const totalGenerated = solarKw + turbineKw;
 
     let totalRequired = 0;
@@ -13025,8 +13159,26 @@ export default function App() {
       return s - Math.floor(s);
     };
 
-    const dowsingBonus = (zenSkillsRef.current.botanicalDowsing || 0) * 0.02;
-    const prospectingBonus = (zenSkillsRef.current.resourceProspecting || 0) * 0.02;
+    const dowsingBonus =
+      biomeId === 'FOOTHILLS'
+        ? ((zenSkillsRef.current.botanicalDowsingArea1 || zenSkillsRef.current.botanicalDowsing || 0) * 0.02)
+        : biomeId === 'HIGHLANDS'
+        ? ((zenSkillsRef.current.botanicalDowsingArea2 || 0) * 0.02)
+        : ((zenSkillsRef.current.botanicalDowsingArea3 || 0) * 0.02);
+
+    const prospectingBonus =
+      biomeId === 'FOOTHILLS'
+        ? ((zenSkillsRef.current.resourceProspectingArea1 || zenSkillsRef.current.resourceProspecting || 0) * 0.02)
+        : biomeId === 'HIGHLANDS'
+        ? ((zenSkillsRef.current.resourceProspectingArea2 || 0) * 0.02)
+        : ((zenSkillsRef.current.resourceProspectingArea3 || 0) * 0.02);
+
+    const artifactHunterBonus =
+      biomeId === 'FOOTHILLS'
+        ? ((zenSkillsRef.current.artifactHunterArea1 || 0) * 0.0005)
+        : biomeId === 'HIGHLANDS'
+        ? ((zenSkillsRef.current.artifactHunterArea2 || 0) * 0.0005)
+        : ((zenSkillsRef.current.artifactHunterArea3 || 0) * 0.0005);
 
     for (let gx = -radius; gx <= radius; gx++) {
       for (let gy = -radius; gy <= radius; gy++) {
@@ -13052,12 +13204,13 @@ export default function App() {
         const bonsaiRate = 0.08 + dowsingBonus;
         const baseResRate = isClose ? 0.04 : isMid ? 0.06 : 0.08;
         const resourceRate = baseResRate + prospectingBonus;
-        const crystalRate =
+        const baseCrystalRate =
           biomeId === 'FOOTHILLS'
             ? (isClose ? 0.0005 : isMid ? 0.0010 : 0.0015)
             : biomeId === 'HIGHLANDS'
             ? (isClose ? 0.0010 : isMid ? 0.0020 : 0.0030)
             : (isClose ? 0.0015 : isMid ? 0.0030 : 0.0045);
+        const crystalRate = baseCrystalRate + artifactHunterBonus;
 
         const tileRoll = pseudoNoise(gx, gy, 111.1);
 
@@ -13222,6 +13375,9 @@ export default function App() {
       exploredTilesRef.current = new Set();
       revealFogAroundRover(0, 0);
 
+      hasMovedOffSpawnRef.current = false;
+      setHasMovedOffSpawn(false);
+
       const maxBat = getMaxRoverBattery();
       roverRef.current = {
         tileX: 0,
@@ -13236,6 +13392,8 @@ export default function App() {
         isMovingAnim: false,
         moveCooldown: 0,
         maxDistanceReached: 0,
+        hasMovedOffSpawn: false,
+        stepsTaken: 0,
       };
 
       cameraRef.current = {
@@ -13324,6 +13482,32 @@ export default function App() {
         retained: idx < retainedCrystalsCount || !isStranded,
       }));
 
+      // Calculate total secured XP upon return based on surviving/retained items only
+      let totalExpeditionXP = 0;
+
+      // Resources: 3 XP per Scrap Metal, 6 XP per Copper Wire, 12 XP per Gear, 25 XP per Circuit, 50 XP per Chip
+      itemBreakdown.forEach((item) => {
+        if (item.retained > 0) {
+          totalExpeditionXP += calculateFindingResourceXP(item.key, item.retained);
+        }
+      });
+
+      // Crystals: 25 XP (0.5 pt), 50 XP (1.0 pt), 100 XP (1.5 pt)
+      crystalBreakdown.forEach((c) => {
+        if (c.retained) {
+          totalExpeditionXP += calculateFindingCrystalXP(c.item.strength);
+        }
+      });
+
+      // Seedlings/Bonsais: Math.round(5.0 * maturityFactor * speciesOdds)
+      saplingBreakdown.forEach((s) => {
+        if (s.retained) {
+          totalExpeditionXP += calculateFindingSeedlingXP(s.maturity, s.leafType);
+        }
+      });
+
+      totalExpeditionXP = Math.max(0, Math.round(totalExpeditionXP));
+
       const report: ExcursionReportData = {
         safeReturn: !isStranded,
         biomeId: currentBiome.id,
@@ -13333,6 +13517,7 @@ export default function App() {
         batteryRemaining: rover.batteryKwh,
         maxBatteryKwh: rover.maxBatteryKwh,
         totalWeight: getCargoWeight(),
+        totalExpeditionXP,
         items: itemBreakdown,
         crystals: crystalBreakdown,
         saplings: saplingBreakdown,
@@ -13448,6 +13633,12 @@ export default function App() {
     statsRef.current.totalResourcesBroughtBack = (statsRef.current.totalResourcesBroughtBack || 0) + retainedResourcesCount;
     statsRef.current.totalCrystalsBroughtBack = (statsRef.current.totalCrystalsBroughtBack || 0) + retainedCrystalsCount;
 
+    // Award accumulated expedition XP for only the successfully returned cargo
+    const securedXP = report.totalExpeditionXP || 0;
+    if (securedXP > 0) {
+      addPlayerXP(securedXP, 'Excursion Findings');
+    }
+
     backpackInventoryRef.current = {
       scrap_metal: 0,
       copper_wire: 0,
@@ -13457,6 +13648,9 @@ export default function App() {
       crystals: [],
       saplings: [],
     };
+
+    hasMovedOffSpawnRef.current = false;
+    setHasMovedOffSpawn(false);
 
     setExcursionReport(null);
     setIsBiomeSelectOpen(false);
@@ -13486,11 +13680,17 @@ export default function App() {
     canvasRef.current?.focus();
     refreshHud();
     gameAudio.playCoinPickup();
-    triggerNotification('Haul deposited into Sanctuary Storage!', '#10b981', 3500);
+
+    if (securedXP > 0) {
+      triggerNotification(`+${securedXP} XP gained from excursion findings! Haul deposited into Sanctuary Storage.`, '#10b981', 4000);
+      addFloatingText(sanctuaryPlayerPosRef.current.x, sanctuaryPlayerPosRef.current.y - 45, `+${securedXP} XP from Findings!`, '#38bdf8');
+    } else {
+      triggerNotification('Haul deposited into Sanctuary Storage!', '#10b981', 3500);
+    }
 
     // Auto-evaluate milestone thresholds
     checkAndAwardMilestones();
-  }, [excursionReport, refreshHud, triggerNotification]);
+  }, [excursionReport, refreshHud, triggerNotification, addPlayerXP, addFloatingText]);
 
   // Initiate Dig Minigame on Sapling or Crystal (2 BASE STRIKES + 100% SUCCESS REQUIRED)
   const triggerRadialDig = useCallback(
@@ -13741,6 +13941,15 @@ export default function App() {
 
       rover.tileX = nextTileX;
       rover.tileY = nextTileY;
+      rover.stepsTaken = (rover.stepsTaken || 0) + 1;
+
+      if (nextTileX !== 0 || nextTileY !== 0) {
+        if (!hasMovedOffSpawnRef.current) {
+          hasMovedOffSpawnRef.current = true;
+          rover.hasMovedOffSpawn = true;
+          setHasMovedOffSpawn(true);
+        }
+      }
 
       // Perpetuum Mobile check (0% at Lv.0, +5% per rank up to 25% total at Lv.5)
       const perpetuumRank = zenSkillsRef.current.perpetuum_mobile || 0;
@@ -13774,7 +13983,11 @@ export default function App() {
       gameAudio.playFootstepWood();
 
       if (rover.tileX === 0 && rover.tileY === 0) {
-        triggerNotification('🏕️ At Campsite Base! Click [Unload Haul] or press [Enter] to safely return with 100% loot.', '#10b981');
+        if (hasMovedOffSpawnRef.current) {
+          triggerNotification('🏕️ At Campsite Base! Click [Unload Haul] or press [Enter] to safely return with 100% loot.', '#10b981');
+        } else {
+          triggerNotification('🏕️ At Campsite Base! Explore the sector before returning to sanctuary.', '#f59e0b');
+        }
       }
 
       const node = findNearbyExcursionNode();
@@ -13843,7 +14056,7 @@ export default function App() {
       }
 
       if (rover.batteryKwh <= 0) {
-        if (rover.tileX === 0 && rover.tileY === 0) {
+        if (rover.tileX === 0 && rover.tileY === 0 && hasMovedOffSpawnRef.current) {
           finishExcursion(false);
         } else {
           finishExcursion(true);
@@ -13900,8 +14113,6 @@ export default function App() {
           totalAwarded += reward;
           lastTitle = ms.title;
           lastTier = TIER_LABELS[t];
-
-          inv.zen_essence = (inv.zen_essence || 0) + reward;
         }
       }
 
@@ -13911,14 +14122,154 @@ export default function App() {
 
     if (totalAwarded > 0) {
       gameAudio?.playLevelUpStinger?.();
+      addPlayerXP(totalAwarded, `Milestone: ${lastTitle}`);
       triggerNotification(
-        `🏆 Milestone Block Reached: ${lastTitle} (Block ${lastTier})! (+${totalAwarded} Zen Point${totalAwarded > 1 ? 's' : ''})`,
-        '#f59e0b',
+        `🏆 Milestone Block Reached: ${lastTitle} (Block ${lastTier})! (+${totalAwarded} XP)`,
+        '#10b981',
         3500,
       );
       refreshHud();
     }
-  }, [refreshHud, triggerNotification]);
+  }, [addPlayerXP, refreshHud, triggerNotification]);
+
+  // --- SAVE / LOAD SYSTEM & PAYLOAD BUILDER ---
+  const buildSavePayload = useCallback((): Omit<FullSaveState, 'metadata'> => {
+    return {
+      gameState: { ...gameStateRef.current },
+      plantedBonsais: JSON.parse(JSON.stringify(plantedBonsaisRef.current)),
+      deployedStructures: JSON.parse(JSON.stringify(deployedStructuresRef.current)),
+      storedPottedBonsais: JSON.parse(JSON.stringify(storedPottedBonsaisRef.current)),
+      storedSaplings: JSON.parse(JSON.stringify(storedSaplingsRef.current)),
+      sanctuaryInventory: JSON.parse(JSON.stringify(sanctuaryInventoryRef.current)),
+      zenSkills: JSON.parse(JSON.stringify(zenSkillsRef.current)),
+      stats: JSON.parse(JSON.stringify(statsRef.current)),
+      bondexDiscovery: JSON.parse(JSON.stringify(bondexDiscoveryRef.current)),
+      areaDiscovery: JSON.parse(JSON.stringify(areaDiscoveryRef.current)),
+      installedCraftingArms: installedCraftingArmsRef.current,
+      autoFabricatorLanes: JSON.parse(JSON.stringify(autoFabricatorLanesRef.current)),
+      globalAutoUnloaderSettings: JSON.parse(JSON.stringify(globalAutoUnloaderSettingsRef.current)),
+      globalCareDispenserLimits: JSON.parse(JSON.stringify(globalCareDispenserLimitsRef.current)),
+      masterQuests: JSON.parse(JSON.stringify(masterQuestsRef.current)),
+      activeCrafting: activeCraftingRef.current ? JSON.parse(JSON.stringify(activeCraftingRef.current)) : null,
+      craftingQueue: JSON.parse(JSON.stringify(craftingQueueRef.current)),
+      avatarPos: { x: avatarRef.current.x, y: avatarRef.current.y },
+    };
+  }, []);
+
+  const handleSaveGame = useCallback(
+    (slot: SaveSlotId, isSilent = false) => {
+      const payload = buildSavePayload();
+      const meta = saveGame(slot, payload);
+      setCurrentActiveSaveSlot(slot);
+
+      if (!isSilent) {
+        gameAudio?.playConfirmSelect?.();
+        const slotLabel = slot === 'autosave' ? 'Autosave Slot' : `Manual Slot ${slot}`;
+        triggerNotification(`💾 Game successfully saved to ${slotLabel}!`, '#10b981', 3000);
+      }
+      return meta;
+    },
+    [buildSavePayload, triggerNotification],
+  );
+
+  const applyLoadedSave = useCallback(
+    (loaded: { fullState: FullSaveState; elapsedSeconds: number; offlineSummary?: OfflineSummary }, slotId: SaveSlotId) => {
+      const fs = loaded.fullState;
+
+      plantedBonsaisRef.current = fs.plantedBonsais || [];
+      deployedStructuresRef.current = fs.deployedStructures || [];
+      storedPottedBonsaisRef.current = fs.storedPottedBonsais || [];
+      storedSaplingsRef.current = fs.storedSaplings || [];
+      sanctuaryInventoryRef.current = fs.sanctuaryInventory || sanctuaryInventoryRef.current;
+      zenSkillsRef.current = fs.zenSkills || zenSkillsRef.current;
+      statsRef.current = fs.stats || statsRef.current;
+      bondexDiscoveryRef.current = fs.bondexDiscovery || {};
+      areaDiscoveryRef.current = fs.areaDiscovery || {
+        species: { FOOTHILLS: [], HIGHLANDS: [], OVERGROWTH: [] },
+        maturities: { FOOTHILLS: [], HIGHLANDS: [], OVERGROWTH: [] },
+        resources: { FOOTHILLS: [], HIGHLANDS: [], OVERGROWTH: [] },
+      };
+      installedCraftingArmsRef.current = fs.installedCraftingArms || 0;
+      autoFabricatorLanesRef.current = fs.autoFabricatorLanes || [];
+      globalAutoUnloaderSettingsRef.current = fs.globalAutoUnloaderSettings || DEFAULT_AUTO_UNLOADER_SETTINGS;
+      setGlobalAutoUnloaderSettings(globalAutoUnloaderSettingsRef.current);
+      globalCareDispenserLimitsRef.current = fs.globalCareDispenserLimits || DEFAULT_CARE_DISPENSER_LIMITS;
+      setGlobalCareDispenserLimits(globalCareDispenserLimitsRef.current);
+      masterQuestsRef.current = fs.masterQuests || masterQuestsRef.current;
+      activeCraftingRef.current = fs.activeCrafting || null;
+      craftingQueueRef.current = fs.craftingQueue || [];
+
+      if (fs.avatarPos) {
+        avatarRef.current.x = fs.avatarPos.x;
+        avatarRef.current.y = fs.avatarPos.y;
+        sanctuaryPlayerPosRef.current = { x: fs.avatarPos.x, y: fs.avatarPos.y };
+      }
+
+      setCurrentActiveSaveSlot(slotId);
+      setLocation('SANCTUARY');
+      locationRef.current = 'SANCTUARY';
+
+      setGameState({
+        status: 'PLAYING',
+        score: fs.gameState?.score || 0,
+        level: fs.gameState?.level || 1,
+        masterQuest: masterQuestsRef.current,
+        masterQuests: masterQuestsRef.current,
+      });
+
+      offscreenTerrainDirtyRef.current = true;
+      invalidateSynergiesCache();
+      refreshHud();
+      refreshMasterQuests();
+
+      gameAudio?.playPowerupChime?.();
+      const slotLabel = slotId === 'autosave' ? 'Autosave Slot' : `Manual Slot ${slotId}`;
+      triggerNotification(`📂 Loaded ${slotLabel}!`, '#38bdf8', 3500);
+
+      // Check if offline progression occurred
+      if (loaded.offlineSummary && loaded.elapsedSeconds >= 10) {
+        setOfflineSummaryData(loaded.offlineSummary);
+        setOfflineSummaryModalOpen(true);
+      }
+    },
+    [invalidateSynergiesCache, refreshHud, refreshMasterQuests, triggerNotification],
+  );
+
+  const handleLoadGame = useCallback(
+    (slot: SaveSlotId) => {
+      const result = loadGame(slot);
+      if (!result) {
+        gameAudio?.playErrorBuzz?.();
+        triggerNotification(`Save slot ${slot} is empty or unreadable!`, '#ef4444');
+        return;
+      }
+      applyLoadedSave(result, slot);
+    },
+    [applyLoadedSave, triggerNotification],
+  );
+
+  const handleDeleteSaveSlot = useCallback(
+    (slot: SaveSlotId) => {
+      const success = deleteSaveSlot(slot);
+      if (success) {
+        gameAudio?.playCrispClick?.();
+        const slotLabel = slot === 'autosave' ? 'Autosave Slot' : `Slot ${slot}`;
+        triggerNotification(`Cleared ${slotLabel}.`, '#f59e0b', 3000);
+        refreshHud();
+      }
+    },
+    [refreshHud, triggerNotification],
+  );
+
+  // Autosave interval every 30 seconds while playing
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (gameStateRef.current.status === 'PLAYING') {
+        handleSaveGame('autosave', true);
+      }
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [handleSaveGame]);
 
   // Initialize or Restart Game
   const initGame = useCallback(() => {
@@ -13991,8 +14342,12 @@ export default function App() {
       licenseT1: 0,
       licenseT2: 0,
       licenseT3: 0,
-      player_level: 1,
+      player_level: 0,
       player_exp: 0,
+      level: 0,
+      xp: 0,
+      playerLevel: 0,
+      playerXP: 0,
       scrap_metal: 25,
       copper_wire: 25,
       brass_gears: 25,
@@ -14238,15 +14593,45 @@ export default function App() {
     };
 
     zenSkillsRef.current = {
-      steady_hands: 0,
       carefulTrowel: 0,
+      steady_hands: 0,
       broadSpade: 0,
-      greenThumb: 0,
-      hydrodynamics: 0,
       botanicalForaging: 0,
+      perpetuum_mobile: 0,
+      resourceProspectingArea1: 0,
+      resourceProspectingArea2: 0,
+      resourceProspectingArea3: 0,
+      botanicalDowsingArea1: 0,
+      botanicalDowsingArea2: 0,
+      botanicalDowsingArea3: 0,
+      artifactHunterArea1: 0,
+      artifactHunterArea2: 0,
+      artifactHunterArea3: 0,
+      greenThumb: 0,
+      hydrodynamicsSprinklerT1: 0,
+      hydrodynamicsSprinklerT2: 0,
+      hydrodynamicsSprinklerT3: 0,
+      automatonGreenThumb: 0,
+      automatonHydrodynamics: 0,
+      hydrodynamicsIrrigationT1: 0,
+      hydrodynamicsIrrigationT2: 0,
+      hydrodynamicsIrrigationT3: 0,
+      expertNegotiator: 0,
+      discountHunter: 0,
+      solarExpert: 0,
+      windExpert: 0,
+      efficientComposts: 0,
+      efficientFertilizers: 0,
+      efficientSpeedGrows: 0,
+      efficientWireProduction: 0,
+      efficientGearsProduction: 0,
+      efficientCircuitProduction: 0,
+      efficientChipProduction: 0,
+      experiencedPresenter: 0,
+      bigHands: 0,
+      hydrodynamics: 0,
       resourceProspecting: 0,
       botanicalDowsing: 0,
-      perpetuum_mobile: 0,
     };
 
     avatarRef.current = {
@@ -14266,6 +14651,9 @@ export default function App() {
       y: 220,
     };
 
+    hasMovedOffSpawnRef.current = false;
+    setHasMovedOffSpawn(false);
+
     roverRef.current = {
       tileX: 0,
       tileY: 0,
@@ -14279,6 +14667,8 @@ export default function App() {
       isMovingAnim: false,
       moveCooldown: 0,
       maxDistanceReached: 0,
+      hasMovedOffSpawn: false,
+      stepsTaken: 0,
     };
 
     cameraRef.current = {
@@ -14356,6 +14746,8 @@ export default function App() {
       status: 'PLAYING',
       score: 0,
       level: 1,
+      masterQuest: masterQuestsRef.current,
+      masterQuests: masterQuestsRef.current,
     });
 
     setIsGameMenuOpen(false);
@@ -14366,6 +14758,62 @@ export default function App() {
       sdk.startGame();
     }
   }, [sdk, refreshHud]);
+
+  // Title Screen Keyboard and Menu Navigation
+  useEffect(() => {
+    if (gameState.status !== 'START') return;
+
+    const maxItems = hasExistingSave ? 4 : 3;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        setTitleMenuIdx((i) => Math.max(0, i - 1));
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        setTitleMenuIdx((i) => Math.min(maxItems, i + 1));
+        gameAudio.playHoverMicroTone();
+      } else if (e.key === 'e' || e.key === 'E' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (hasExistingSave) {
+          if (titleMenuIdx === 0) {
+            handleLoadGame('autosave');
+            if (sdk) sdk.startGame();
+          } else if (titleMenuIdx === 1) {
+            initGame();
+            if (sdk) sdk.startGame();
+          } else if (titleMenuIdx === 2) {
+            setIsSaveLoadModalOpen(true);
+            gameAudio.playCrispClick();
+          } else if (titleMenuIdx === 3) {
+            setIsHowToPlayOpen(true);
+            gameAudio.playCrispClick();
+          } else if (titleMenuIdx === 4) {
+            setIsGameMenuOpen(true);
+            gameAudio.playCrispClick();
+          }
+        } else {
+          if (titleMenuIdx === 0) {
+            setGameState((prev) => ({...prev, status: 'PLAYING'}));
+            gameAudio.playPowerupChime();
+            if (sdk) sdk.startGame();
+          } else if (titleMenuIdx === 1) {
+            setIsSaveLoadModalOpen(true);
+            gameAudio.playCrispClick();
+          } else if (titleMenuIdx === 2) {
+            setIsHowToPlayOpen(true);
+            gameAudio.playCrispClick();
+          } else if (titleMenuIdx === 3) {
+            setIsGameMenuOpen(true);
+            gameAudio.playCrispClick();
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [gameState.status, titleMenuIdx, hasExistingSave, sdk, handleLoadGame, initGame]);
 
   // Cancel Digging Minigame safely without spending strikes or failing
   const cancelDiggingMinigame = useCallback(() => {
@@ -14422,9 +14870,6 @@ export default function App() {
           disc.resources[curArea].push(rt);
         }
 
-        const expGain = RESOURCE_HARVEST_EXP[rt] || (isDoubleScrap ? 16 : isDoubleWire ? 24 : 8);
-        gainPlayerExp(expGain, rt);
-
         const nameMap: Record<ResourceItemKey, string> = {
           scrap_metal: '🔩 Scrap Metal (0.8kg)',
           copper_wire: '⚡ Copper Wire (0.5kg)',
@@ -14434,7 +14879,7 @@ export default function App() {
           scrap_metal_double: '🔩 Heavy Scrap Metal Cache (2x, 1.6kg)',
           copper_wire_double: '⚡ Heavy Copper Wire Bundle (2x, 1.0kg)',
         };
-        triggerNotification(`Harvested ${nameMap[rt]}! (+${expGain} EXP)`, '#f59e0b');
+        triggerNotification(`Harvested ${nameMap[rt]}! Secured in cargo bed.`, '#f59e0b');
         refreshHud();
       } else {
         gameAudio.playErrorBuzz();
@@ -14463,24 +14908,35 @@ export default function App() {
     }
   }, [gameState.status]);
 
+  // Helper to calculate discounted price using Discount Hunter skill (-2% per rank)
+  const getDiscountedCost = useCallback((baseCost: number) => {
+    const discountHunterLvl =
+      zenSkillsRef.current.discountHunter ||
+      (zenSkillsRef.current as any)['discount_hunter'] ||
+      0;
+    const discountMultiplier = Math.max(0.1, 1 - discountHunterLvl * 0.02);
+    return Math.max(1, Math.round(baseCost * discountMultiplier));
+  }, []);
+
   // --- ECONOMY: PURCHASE CARTOGRAPHY MAPS ---
   const buyExpeditionMap = useCallback(
     (mapKey: 'has_map_highlands' | 'has_map_overgrowth', cost: number, mapName: string) => {
       const inv = sanctuaryInventoryRef.current;
       if (inv[mapKey]) return;
 
-      if (inv.coins >= cost) {
-        inv.coins -= cost;
+      const effectiveCost = getDiscountedCost(cost);
+      if (inv.coins >= effectiveCost) {
+        inv.coins = Number((inv.coins - effectiveCost).toFixed(2));
         inv[mapKey] = true;
         gameAudio.playLevelUpStinger();
         triggerNotification(`🗺️ Charted ${mapName}! Area unlocked for wilderness excursions!`, '#38bdf8');
         refreshHud();
       } else {
         gameAudio.playErrorBuzz();
-        triggerNotification(`Need ${cost} Verdure to purchase ${mapName}! Donate mature bonsais.`, '#ef4444');
+        triggerNotification(`Need ${effectiveCost} Verdure to purchase ${mapName}! Donate mature bonsais.`, '#ef4444');
       }
     },
-    [refreshHud, triggerNotification],
+    [getDiscountedCost, refreshHud, triggerNotification],
   );
 
   // --- ECONOMY: PURCHASE SANCTUARY GREENHOUSE EXPANSIONS ---
@@ -14489,8 +14945,9 @@ export default function App() {
       const inv = sanctuaryInventoryRef.current;
       if (inv.sanctuary_expansion_tier >= targetTier) return;
 
-      if (inv.coins >= cost) {
-        inv.coins -= cost;
+      const effectiveCost = getDiscountedCost(cost);
+      if (inv.coins >= effectiveCost) {
+        inv.coins = Number((inv.coins - effectiveCost).toFixed(2));
         inv.sanctuary_expansion_tier = targetTier;
         offscreenTerrainDirtyRef.current = true;
         invalidateSynergiesCache();
@@ -14499,10 +14956,10 @@ export default function App() {
         refreshHud();
       } else {
         gameAudio.playErrorBuzz();
-        triggerNotification(`Need ${cost} Verdure to purchase ${name}! Donate cultivated trees.`, '#ef4444');
+        triggerNotification(`Need ${effectiveCost} Verdure to purchase ${name}! Donate cultivated trees.`, '#ef4444');
       }
     },
-    [refreshHud, triggerNotification],
+    [getDiscountedCost, refreshHud, triggerNotification],
   );
 
   // --- ECOLOGICAL RESTORATION: DONATE BONSAI (PLANTED OR STORED) ---
@@ -14518,13 +14975,14 @@ export default function App() {
         return;
       }
 
-      const basePayout = calculateDonationValue(bonsai);
+      // Base payout includes Expert Negotiator skill (+10%/lvl) and is floored to 2 decimals
+      const basePayout = calculateDonationValue(bonsai, zenSkillsRef.current);
 
       // Check Eco Quest active Botanical Request matching
       const eco = masterQuestsRef.current.eco;
       const match = checkMatchesEcoRequest(bonsai, eco.activeRequestIndex, eco.requestCounts);
       const isMatch = match.matches;
-      const finalPayout = isMatch ? Number((basePayout * 2).toFixed(2)) : basePayout;
+      const finalPayout = isMatch ? Math.floor((basePayout * 2 + 1e-9) * 100) / 100 : basePayout;
 
       const inv = sanctuaryInventoryRef.current;
       if (bonsai.automatonTier > 0) {
@@ -14599,13 +15057,14 @@ export default function App() {
         return;
       }
 
-      const basePayout = calculateDonationValue(bonsai);
+      // Base payout includes Expert Negotiator skill (+10%/lvl) and is floored to 2 decimals
+      const basePayout = calculateDonationValue(bonsai, zenSkillsRef.current);
 
       // Check Eco Quest active Botanical Request matching
       const eco = masterQuestsRef.current.eco;
       const match = checkMatchesEcoRequest(bonsai, eco.activeRequestIndex, eco.requestCounts);
       const isMatch = match.matches;
-      const finalPayout = isMatch ? Number((basePayout * 2).toFixed(2)) : basePayout;
+      const finalPayout = isMatch ? Math.floor((basePayout * 2 + 1e-9) * 100) / 100 : basePayout;
 
       sanctuaryInventoryRef.current.coins = Number(
         (sanctuaryInventoryRef.current.coins + finalPayout).toFixed(2),
@@ -14686,10 +15145,17 @@ export default function App() {
   const handleCompleteDiscoveryTier1 = useCallback(() => {
     if (masterQuestsRef.current.discovery.tier1Completed) return;
     masterQuestsRef.current.discovery.tier1Completed = true;
+    (masterQuestsRef.current.discovery as any).rank = 2;
+    (masterQuestsRef.current.discovery as any).completedRank = 1;
     sanctuaryInventoryRef.current.coins = Number((sanctuaryInventoryRef.current.coins + 250).toFixed(2));
     sanctuaryInventoryRef.current.zen_essence += 5;
     gameAudio.playVictoryFanfare();
     triggerNotification('🎉 Discovery Quest Rank 1 Completed! (+250 Verdure, 🌸 +5 Zen Points)', '#10b981', 4500);
+    setGameState((prev) => ({
+      ...prev,
+      masterQuest: masterQuestsRef.current,
+      masterQuests: masterQuestsRef.current,
+    }));
     refreshMasterQuests();
     refreshHud();
   }, [refreshMasterQuests, refreshHud, triggerNotification]);
@@ -14702,10 +15168,17 @@ export default function App() {
   const handleCompleteEcoTier1 = useCallback(() => {
     if (masterQuestsRef.current.eco.tier1Completed) return;
     masterQuestsRef.current.eco.tier1Completed = true;
+    (masterQuestsRef.current.eco as any).rank = 2;
+    (masterQuestsRef.current.eco as any).completedRank = 1;
     sanctuaryInventoryRef.current.coins = Number((sanctuaryInventoryRef.current.coins + 500).toFixed(2));
     sanctuaryInventoryRef.current.zen_essence += 5;
     gameAudio.playVictoryFanfare();
     triggerNotification('🎉 Eco Quest Rank 1 Completed! (+500 Verdure, 🌸 +5 Zen Points)', '#10b981', 4500);
+    setGameState((prev) => ({
+      ...prev,
+      masterQuest: masterQuestsRef.current,
+      masterQuests: masterQuestsRef.current,
+    }));
     refreshMasterQuests();
     refreshHud();
   }, [refreshMasterQuests, refreshHud, triggerNotification]);
@@ -14782,10 +15255,11 @@ export default function App() {
 
   const buyRoverBatteryUpgrade = useCallback(() => {
     const inv = sanctuaryInventoryRef.current;
-    const cost = getRoverBatteryCost(inv.rover_battery_level);
+    const baseCost = getRoverBatteryCost(inv.rover_battery_level);
+    const cost = getDiscountedCost(baseCost);
 
     if (inv.coins >= cost) {
-      inv.coins -= cost;
+      inv.coins = Number((inv.coins - cost).toFixed(2));
       inv.rover_battery_level += 1;
       gameAudio.playPowerupChime();
       triggerNotification(
@@ -14797,14 +15271,15 @@ export default function App() {
       gameAudio.playErrorBuzz();
       triggerNotification(`Need ${cost} Verdure to upgrade Battery! Donate mature bonsais.`, '#ef4444');
     }
-  }, [getMaxRoverBattery, getRoverBatteryCost, refreshHud, triggerNotification]);
+  }, [getDiscountedCost, getMaxRoverBattery, getRoverBatteryCost, refreshHud, triggerNotification]);
 
   const buyRoverCargoUpgrade = useCallback(() => {
     const inv = sanctuaryInventoryRef.current;
-    const cost = getRoverCargoCost(inv.rover_cargo_level);
+    const baseCost = getRoverCargoCost(inv.rover_cargo_level);
+    const cost = getDiscountedCost(baseCost);
 
     if (inv.coins >= cost) {
-      inv.coins -= cost;
+      inv.coins = Number((inv.coins - cost).toFixed(2));
       inv.rover_cargo_level += 1;
       gameAudio.playPowerupChime();
       triggerNotification(
@@ -14816,7 +15291,7 @@ export default function App() {
       gameAudio.playErrorBuzz();
       triggerNotification(`Need ${cost} Verdure to upgrade Cargo Bed! Donate mature bonsais.`, '#ef4444');
     }
-  }, [getMaxRoverCargo, getRoverCargoCost, refreshHud, triggerNotification]);
+  }, [getDiscountedCost, getMaxRoverCargo, getRoverCargoCost, refreshHud, triggerNotification]);
 
   // --- MODULAR ROVER LOADOUT ATTACH & DETACH SYSTEM ---
   const attachRoverModule = useCallback((modType: RoverModuleType) => {
@@ -15106,16 +15581,16 @@ export default function App() {
       inv.organic_waste += organicWasteCount;
       inv.organicWaste = inv.organic_waste;
 
-      // 2. Botanist EXP Reward with XP Boosted (Zen Rock Formation) synergy multiplier
-      const baseExpReward = 25 + 2 * bonsai.level;
-      const expReward = Math.round(baseExpReward * synergies.expMultiplier);
-      gainPlayerExp(expReward);
+      // 2. Botanist EXP Reward (Activity 2: Bonsai Leveling Up: XP = 1.0 * Maturity Factor * Species Finding Odds * ((Growth Duration Seconds / 100) + 1))
+      const prevLevel = Math.max(0, bonsai.level - 1);
+      const expReward = calculateBonsaiLevelUpXP(prevLevel, bonsai, bonsai);
+      addPlayerXP(expReward, `${getBonsaiDisplayName(bonsai)} Level Up`);
 
       gameAudio.playLevelUpStinger();
       addFloatingText(
         bonsai.x,
         bonsai.y - 65,
-        `★ Tree Level ${bonsai.level}! (+${expReward} EXP) ★`,
+        `★ Tree Level ${bonsai.level}! (+${expReward} XP) ★`,
         '#10b981',
       );
       addFloatingText(
@@ -15237,17 +15712,15 @@ export default function App() {
       inv[invKey] = Math.max(0, (inv[invKey] || 0) - 1);
 
       const def = STATION_RECIPES[invKey];
+      const compostDurationMult = 1 + (zenSkillsRef.current.efficientComposts || 0) * 0.10;
+      const durationSeconds = Math.round(def.effectDurationSeconds * compostDurationMult);
       bonsai.organicBuff = {
         multiplier: def.effectMultiplier,
-        expiresAt: Date.now() + def.effectDurationSeconds * 1000,
+        expiresAt: Date.now() + durationSeconds * 1000,
         tier: def.tier,
       };
 
       gameAudio.playPowerupChime();
-
-      // Award Botanist EXP with synergy multiplier
-      const expReward = Math.round((def.tier === 'L' ? 40 : def.tier === 'M' ? 25 : 15) * synergies.expMultiplier);
-      gainPlayerExp(expReward, def.name);
 
       for (let i = 0; i < 6; i++) {
         const pAngle = Math.random() * Math.PI * 2;
@@ -15265,7 +15738,7 @@ export default function App() {
 
       const boostPct = Math.round(def.effectMultiplier * 100);
       addFloatingText(bonsai.x, bonsai.y - 45, `🍂 +${boostPct}% Growth (${def.effectDurationSeconds}s)!`, '#84cc16');
-      triggerNotification(`🍂 Applied ${def.name} to ${getBonsaiDisplayName(bonsai)}! +${boostPct}% Growth Speed for ${def.effectDurationSeconds}s (+${expReward} EXP)`, '#84cc16');
+      triggerNotification(`🍂 Applied ${def.name} to ${getBonsaiDisplayName(bonsai)}! +${boostPct}% Growth Speed for ${def.effectDurationSeconds}s`, '#84cc16');
 
       refreshHud();
     },
@@ -15326,9 +15799,11 @@ export default function App() {
       inv[invKey] = Math.max(0, (inv[invKey] || 0) - 1);
 
       const def = STATION_RECIPES[invKey];
+      const fertDurationMult = 1 + (zenSkillsRef.current.efficientFertilizers || 0) * 0.10;
+      const durationSeconds = Math.round(def.effectDurationSeconds * fertDurationMult);
       bonsai.chemicalBuff = {
         multiplier: def.effectMultiplier,
-        expiresAt: Date.now() + def.effectDurationSeconds * 1000,
+        expiresAt: Date.now() + durationSeconds * 1000,
         tier: def.tier,
       };
 
@@ -15406,7 +15881,8 @@ export default function App() {
         L: 3600,
         XL: 28800,
       };
-      const addSeconds = secondsMap[tier];
+      const speedGrowMult = 1 + (zenSkillsRef.current.efficientSpeedGrows || 0) * 0.10;
+      const addSeconds = Math.round(secondsMap[tier] * speedGrowMult);
 
       // Advance tree growth/hydration by specified seconds, triggering any level-ups!
       advanceBonsaiProgress(bonsai, addSeconds);
@@ -15441,8 +15917,17 @@ export default function App() {
       if (!inv.unlockedBlueprints) inv.unlockedBlueprints = [];
       if (inv.unlockedBlueprints.includes(bp.id)) return;
 
-      if (inv.coins >= bp.price) {
-        inv.coins = Number((inv.coins - bp.price).toFixed(2));
+      const reqRank = getBlueprintRequiredRank(bp);
+      const maxBranchRank = getMaxMasterQuestBranchRank(masterQuestsRef.current);
+      if (reqRank > 0 && maxBranchRank < reqRank) {
+        gameAudio.playErrorBuzz();
+        triggerNotification(`Locked: Requires finishing at least 1 Master Quest Branch to Rank ${reqRank}!`, '#ef4444');
+        return;
+      }
+
+      const effectivePrice = getDiscountedCost(bp.price);
+      if (inv.coins >= effectivePrice) {
+        inv.coins = Number((inv.coins - effectivePrice).toFixed(2));
         inv.unlockedBlueprints = [...inv.unlockedBlueprints, bp.id];
 
         // Sync legacy boolean flags if applicable
@@ -15758,8 +16243,9 @@ export default function App() {
           return;
         }
       }
-      if (inv.coins >= cost) {
-        inv.coins = Number((inv.coins - cost).toFixed(2));
+      const effectiveCost = getDiscountedCost(cost);
+      if (inv.coins >= effectiveCost) {
+        inv.coins = Number((inv.coins - effectiveCost).toFixed(2));
         if (decorType === 'empty_crystal_pedestal') {
           inv.empty_crystal_pedestal_inv = (inv.empty_crystal_pedestal_inv || 0) + 1;
         } else if (decorType === 'seven_lucky_gods') {
@@ -15836,8 +16322,9 @@ export default function App() {
   const buyEngineeringLicense = useCallback(
     (tier: 1 | 2 | 3, cost: number) => {
       const inv = sanctuaryInventoryRef.current;
-      if (inv.coins >= cost) {
-        inv.coins = Number((inv.coins - cost).toFixed(2));
+      const effectiveCost = getDiscountedCost(cost);
+      if (inv.coins >= effectiveCost) {
+        inv.coins = Number((inv.coins - effectiveCost).toFixed(2));
         const key = `license_t${tier}`;
         const altKey = `licenseT${tier}`;
         inv[key] = (inv[key] || 0) + 1;
@@ -15850,18 +16337,19 @@ export default function App() {
         refreshHud();
       } else {
         gameAudio.playErrorBuzz();
-        triggerNotification(`Need ${cost} Verdure to purchase T${tier} License! Donate mature bonsais.`, '#ef4444');
+        triggerNotification(`Need ${effectiveCost} Verdure to purchase T${tier} License! Donate mature bonsais.`, '#ef4444');
       }
     },
-    [refreshHud, triggerNotification],
+    [getDiscountedCost, refreshHud, triggerNotification],
   );
 
   // --- ECONOMY: PURCHASE MANUAL IRRIGATION SYSTEMS ---
   const buyManualIrrigation = useCallback(
     (type: 'irrigation_t1' | 'irrigation_t2' | 'irrigation_t3', cost: number, name: string) => {
       const inv = sanctuaryInventoryRef.current;
-      if (inv.coins >= cost) {
-        inv.coins = Number((inv.coins - cost).toFixed(2));
+      const effectiveCost = getDiscountedCost(cost);
+      if (inv.coins >= effectiveCost) {
+        inv.coins = Number((inv.coins - effectiveCost).toFixed(2));
         const key = `${type}_inv`;
         inv[key] = (inv[key] || 0) + 1;
         gameAudio.playCoinPickup();
@@ -15869,10 +16357,10 @@ export default function App() {
         refreshHud();
       } else {
         gameAudio.playErrorBuzz();
-        triggerNotification(`Need ${cost} Verdure to purchase ${name}! Donate mature bonsais.`, '#ef4444');
+        triggerNotification(`Need ${effectiveCost} Verdure to purchase ${name}! Donate mature bonsais.`, '#ef4444');
       }
     },
-    [refreshHud, triggerNotification],
+    [getDiscountedCost, refreshHud, triggerNotification],
   );
 
   // --- ECONOMY: PURCHASE NURSERY TOOLS (COMPOST HEAP, FERTILIZER STATION & STONE WELL) ---
@@ -15883,8 +16371,9 @@ export default function App() {
       name: string,
     ) => {
       const inv = sanctuaryInventoryRef.current;
-      if (inv.coins >= cost) {
-        inv.coins = Number((inv.coins - cost).toFixed(2));
+      const effectiveCost = getDiscountedCost(cost);
+      if (inv.coins >= effectiveCost) {
+        inv.coins = Number((inv.coins - effectiveCost).toFixed(2));
         const key = `${toolType}_inv`;
         inv[key] = (inv[key] || 0) + 1;
         if (toolType === 'fertilizer_station') {
@@ -15903,17 +16392,18 @@ export default function App() {
         refreshHud();
       } else {
         gameAudio.playErrorBuzz();
-        triggerNotification(`Need ${cost} Verdure to purchase ${name}! Donate mature bonsais.`, '#ef4444');
+        triggerNotification(`Need ${effectiveCost} Verdure to purchase ${name}! Donate mature bonsais.`, '#ef4444');
       }
     },
-    [refreshHud, triggerNotification],
+    [getDiscountedCost, refreshHud, triggerNotification],
   );
 
   const buyBiochemicalsItem = useCallback(
     (cost: number) => {
       const inv = sanctuaryInventoryRef.current;
-      if (inv.coins >= cost) {
-        inv.coins = Number((inv.coins - cost).toFixed(2));
+      const effectiveCost = getDiscountedCost(cost);
+      if (inv.coins >= effectiveCost) {
+        inv.coins = Number((inv.coins - effectiveCost).toFixed(2));
         inv.biochemicals = (inv.biochemicals || 0) + 1;
         if (inv.resources) inv.resources.biochemicals = inv.biochemicals;
         gameAudio.playCoinPickup();
@@ -15921,10 +16411,10 @@ export default function App() {
         refreshHud();
       } else {
         gameAudio.playErrorBuzz();
-        triggerNotification(`Need ${cost} Verdure to purchase Biochemicals! Donate mature bonsais.`, '#ef4444');
+        triggerNotification(`Need ${effectiveCost} Verdure to purchase Biochemicals! Donate mature bonsais.`, '#ef4444');
       }
     },
-    [refreshHud, triggerNotification],
+    [getDiscountedCost, refreshHud, triggerNotification],
   );
   const buyFertilizerItem = buyBiochemicalsItem;
 
@@ -17334,8 +17824,28 @@ export default function App() {
         }
       }
 
-      // Check materials supporting both snake_case, camelCase, resources sub-object, and licenses
-      const costs = recipe.costs;
+      // Check materials across all aliases (incorporating Efficient Production skills)
+      const rawCosts = recipe.costs;
+      const wireDiscount = recipeId === 'craft_copper_wire'
+        ? (zenSkillsRef.current.efficientWireProduction || (zenSkillsRef.current as any)['efficient_wire_production'] || 0)
+        : 0;
+      const gearsDiscount = recipeId === 'craft_gears'
+        ? (zenSkillsRef.current.efficientGearsProduction || (zenSkillsRef.current as any)['efficient_gears_production'] || 0)
+        : 0;
+      const circuitDiscount = recipeId === 'craft_microcircuits'
+        ? (zenSkillsRef.current.efficientCircuitProduction || (zenSkillsRef.current as any)['efficient_circuit_production'] || 0)
+        : 0;
+      const chipDiscount = recipeId === 'craft_quantum_chips'
+        ? (zenSkillsRef.current.efficientChipProduction || (zenSkillsRef.current as any)['efficient_chip_production'] || 0)
+        : 0;
+
+      const costs = {
+        ...rawCosts,
+        scrap_metal: recipeId === 'craft_copper_wire' ? Math.max(1, 10 - wireDiscount) : rawCosts.scrap_metal,
+        copper_wire: recipeId === 'craft_gears' ? Math.max(1, 8 - gearsDiscount) : rawCosts.copper_wire,
+        brass_gears: recipeId === 'craft_microcircuits' ? Math.max(1, 6 - circuitDiscount) : rawCosts.brass_gears,
+        circuit_boards: recipeId === 'craft_quantum_chips' ? Math.max(1, (rawCosts.circuit_boards ?? 4) - chipDiscount) : rawCosts.circuit_boards,
+      };
       const curScrap = inv.scrap_metal ?? inv.scrapMetal ?? inv.resources?.scrap_metal ?? inv.resources?.scrapMetal ?? 0;
       const curWire = inv.copper_wire ?? inv.copperWire ?? inv.resources?.copper_wire ?? inv.resources?.copperWire ?? 0;
       const curGears = inv.brass_gears ?? inv.gears ?? inv.resources?.brass_gears ?? inv.resources?.gears ?? 0;
@@ -17467,21 +17977,35 @@ export default function App() {
   const cancelQueuedCraft = useCallback(
     (index: number) => {
       const inv = sanctuaryInventoryRef.current;
+      const getRecipeRefundCosts = (recipeId: CraftingRecipeId, rawCosts: CraftingRecipeDef['costs']) => {
+        const wireDisc = recipeId === 'craft_copper_wire' ? (zenSkillsRef.current.efficientWireProduction || (zenSkillsRef.current as any)['efficient_wire_production'] || 0) : 0;
+        const gearsDisc = recipeId === 'craft_gears' ? (zenSkillsRef.current.efficientGearsProduction || (zenSkillsRef.current as any)['efficient_gears_production'] || 0) : 0;
+        const circuitDisc = recipeId === 'craft_microcircuits' ? (zenSkillsRef.current.efficientCircuitProduction || (zenSkillsRef.current as any)['efficient_circuit_production'] || 0) : 0;
+        const chipDisc = recipeId === 'craft_quantum_chips' ? (zenSkillsRef.current.efficientChipProduction || (zenSkillsRef.current as any)['efficient_chip_production'] || 0) : 0;
+        return {
+          ...rawCosts,
+          scrap_metal: recipeId === 'craft_copper_wire' ? Math.max(1, 10 - wireDisc) : rawCosts.scrap_metal,
+          copper_wire: recipeId === 'craft_gears' ? Math.max(1, 8 - gearsDisc) : rawCosts.copper_wire,
+          brass_gears: recipeId === 'craft_microcircuits' ? Math.max(1, 6 - circuitDisc) : rawCosts.brass_gears,
+          circuit_boards: recipeId === 'craft_quantum_chips' ? Math.max(1, (rawCosts.circuit_boards ?? 4) - chipDisc) : rawCosts.circuit_boards,
+        };
+      };
+
       if (index === -1) {
         // Cancel active craft
         const active = activeCraftingRef.current;
         if (!active) return;
         const recipe = WORKBENCH_RECIPES[active.recipeId];
-          if (recipe) {
-            // Refund materials
-            const c = recipe.costs;
-            if (!inv.resources) inv.resources = {};
-            if (c.condensed_organic_material) {
-              inv.condensed_organic_material = (inv.condensed_organic_material || 0) + c.condensed_organic_material;
-              inv.condensedOrganicMaterial = inv.condensed_organic_material;
-              inv.resources.condensed_organic_material = inv.condensed_organic_material;
-              inv.resources.condensedOrganicMaterial = inv.condensed_organic_material;
-            }
+        if (recipe) {
+          // Refund materials
+          const c = getRecipeRefundCosts(active.recipeId, recipe.costs);
+          if (!inv.resources) inv.resources = {};
+          if (c.condensed_organic_material) {
+            inv.condensed_organic_material = (inv.condensed_organic_material || 0) + c.condensed_organic_material;
+            inv.condensedOrganicMaterial = inv.condensed_organic_material;
+            inv.resources.condensed_organic_material = inv.condensed_organic_material;
+            inv.resources.condensedOrganicMaterial = inv.condensed_organic_material;
+          }
           if (c.license_t1) {
             inv.license_t1 = (inv.license_t1 || 0) + c.license_t1;
             inv.licenseT1 = inv.license_t1;
@@ -17548,7 +18072,7 @@ export default function App() {
         const item = craftingQueueRef.current[index];
         const recipe = WORKBENCH_RECIPES[item.recipeId];
         if (recipe) {
-          const c = recipe.costs;
+          const c = getRecipeRefundCosts(item.recipeId, recipe.costs);
           if (!inv.resources) inv.resources = {};
           if (c.condensed_organic_material) {
             inv.condensed_organic_material = (inv.condensed_organic_material || 0) + c.condensed_organic_material;
@@ -17624,25 +18148,65 @@ export default function App() {
     [refreshHud, triggerNotification],
   );
 
-  // --- ZEN SKILLS UPGRADE HANDLER ---
+  // --- ZEN SKILLS UPGRADE HANDLER (36 SKILLS WITH RANK GATING) ---
   const upgradeZenSkill = useCallback((skillKey: keyof ZenSkills) => {
     const inv = sanctuaryInventoryRef.current;
-    const skillConfig = SKILL_CONFIGS[skillKey as string];
+    const skillConfig = SKILL_BY_ID.get(skillKey as string);
     if (!skillConfig) return;
     const currentRank = (zenSkillsRef.current[skillKey as string] as number) || 0;
 
-    if (currentRank >= skillConfig.maxRank) {
-      triggerNotification('Skill already at Maximum Rank!', '#38bdf8');
+    if (currentRank >= skillConfig.maxLevel) {
+      triggerNotification('Skill already at Maximum Level!', '#38bdf8');
       return;
     }
 
-    const cost = skillConfig.costs[currentRank] || 5;
+    if (skillConfig.isGreyedOut) {
+      gameAudio.playErrorBuzz();
+      triggerNotification('System in development', '#f59e0b');
+      return;
+    }
+
+    const nextLevelData = skillConfig.levels[currentRank];
+    if (!nextLevelData) return;
+
+    if (nextLevelData.requiredBranchRank) {
+      const maxRank = getMaxMasterQuestBranchRank(masterQuestsRef.current);
+      if (maxRank < nextLevelData.requiredBranchRank) {
+        gameAudio.playErrorBuzz();
+        triggerNotification(
+          `Requires finishing 1 Master Quest Branch to Rank ${nextLevelData.requiredBranchRank}`,
+          '#ef4444',
+        );
+        return;
+      }
+    }
+
+    const cost = nextLevelData.cost;
     if (inv.zen_essence >= cost) {
       inv.zen_essence -= cost;
       zenSkillsRef.current[skillKey as string] = currentRank + 1;
+      // Sync snake_case and legacy aliases if applicable
+      const snakeAliases: Record<string, string> = {
+        expertNegotiator: 'expert_negotiator',
+        discountHunter: 'discount_hunter',
+        efficientWireProduction: 'efficient_wire_production',
+        efficientGearsProduction: 'efficient_gears_production',
+        efficientCircuitProduction: 'efficient_circuit_production',
+        efficientChipProduction: 'efficient_chip_production',
+        resourceProspectingArea1: 'resourceProspecting',
+        botanicalDowsingArea1: 'botanicalDowsing',
+      };
+      if (snakeAliases[skillKey as string]) {
+        (zenSkillsRef.current as any)[snakeAliases[skillKey as string]] = currentRank + 1;
+      }
+      setGameState((prev) => ({
+        ...prev,
+        skills: { ...zenSkillsRef.current },
+      }));
+
       gameAudio.playPowerupChime();
       triggerNotification(
-        `Upgraded ${skillConfig.name} to Rank ${zenSkillsRef.current[skillKey as string]}!`,
+        `Upgraded ${skillConfig.name} to Level ${zenSkillsRef.current[skillKey as string]}!`,
         '#ec4899',
       );
       refreshHud();
@@ -18533,9 +19097,12 @@ export default function App() {
       bonsai.pruneBoostTimer = 1.0; // 1.0s duration
       bonsai.lastPruneTime = Date.now();
 
-      // Earning EXP: Manual Pruning with XP Boosted synergy multiplier
-      const expGain = Math.round(2 * synergies.expMultiplier);
-      gainPlayerExp(expGain);
+      // Earning EXP: Manual Pruning & Care XP = 0.4 * Maturity Factor * Species Finding Odds Multiplier (strictly rounded to closest integer)
+      const pruneXP = calculatePruningXP(
+        bonsai.maturityRating || bonsai.maturity,
+        bonsai.leafType || bonsai.species || bonsai,
+      );
+      gainPlayerExp(pruneXP);
 
       gameAudio.playCrispClick();
 
@@ -18558,7 +19125,7 @@ export default function App() {
         id: `ft_${Date.now()}_${Math.random()}`,
         x: bonsai.x + (Math.random() - 0.5) * 16,
         y: bonsai.y - 45,
-        text: `✂️ -${advanceText}s [${matDef.kanji}] Care! (+${expGain} EXP)`,
+        text: `✂️ -${advanceText}s [${matDef.kanji}] Care! (+${pruneXP} XP)`,
         color: matDef.color,
         alpha: 1,
         life: 0,
@@ -18786,8 +19353,6 @@ export default function App() {
       }
       backpackInventoryRef.current.crystals.push(res.crystalItem);
       const cWeight = res.crystalItem.strength === 1.0 ? 1.0 : 0.5;
-      const expGain = res.crystalItem.strength === 1.0 ? 100 : 50;
-      gainPlayerExp(expGain, res.crystalItem.name);
 
       const nodeKey = `${digStateRef.current.tileX},${digStateRef.current.tileY}`;
       const node = excursionNodesRef.current.get(nodeKey);
@@ -18796,7 +19361,7 @@ export default function App() {
       }
       setExcavationResult(null);
       gameAudio.playCoinPickup();
-      triggerNotification(`💎 Successfully extracted ${res.crystalItem.name} (${cWeight}kg)! Added to Rover Cargo.`, res.crystalItem.color);
+      triggerNotification(`💎 Successfully extracted ${res.crystalItem.name} (${cWeight}kg)! Secured in cargo bed.`, res.crystalItem.color);
       refreshHud();
       return;
     }
@@ -18823,11 +19388,8 @@ export default function App() {
       discoveredAreaId: activeBiomeIdRef.current,
     } as any);
 
-    const digExp = SEEDLING_DIG_EXP[res.leafType] || getLeafTypeDef(res.leafType).digExp || 40;
-    gainPlayerExp(digExp, dName);
-
     triggerNotification(
-      `🌿 Collected ${dName} (Avg Precision: ${res.averagePrecision}%)! (+${digExp} EXP)`,
+      `🌿 Collected ${dName} (Avg Precision: ${res.averagePrecision}%)! Secured in cargo bed.`,
       '#38bdf8',
     );
 
@@ -19045,7 +19607,7 @@ export default function App() {
     if (!isGameMenuOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      const menuOptionsCount = 7;
+      const menuOptionsCount = 8;
       if (e.key === 'w' || e.key === 'W') {
         e.preventDefault();
         setFocusedMenuIdx((i) => Math.max(0, i - 1));
@@ -19061,20 +19623,23 @@ export default function App() {
           if (gameState.status === 'START') setGameState((p) => ({...p, status: 'PLAYING'}));
           gameAudio.playCrispClick();
         } else if (focusedMenuIdx === 1) {
-          toggleFullscreen();
+          setIsSaveLoadModalOpen(true);
           gameAudio.playCrispClick();
         } else if (focusedMenuIdx === 2) {
-          setIsGoalModalOpen(true);
+          toggleFullscreen();
           gameAudio.playCrispClick();
         } else if (focusedMenuIdx === 3) {
-          setIsHowToPlayOpen(true);
+          setIsGoalModalOpen(true);
           gameAudio.playCrispClick();
         } else if (focusedMenuIdx === 4) {
+          setIsHowToPlayOpen(true);
+          gameAudio.playCrispClick();
+        } else if (focusedMenuIdx === 5) {
           const muted = gameAudio.toggleMute();
           setIsSfxMuted(muted);
-        } else if (focusedMenuIdx === 5) {
-          setIsMusicMuted((p) => !p);
         } else if (focusedMenuIdx === 6) {
+          setIsMusicMuted((p) => !p);
+        } else if (focusedMenuIdx === 7) {
           initGame();
         }
       } else if (e.key === 'Escape') {
@@ -19163,6 +19728,17 @@ export default function App() {
       }
 
       if (e.key === 'Escape') {
+        if (offlineSummaryModalOpen) {
+          e.preventDefault();
+          setOfflineSummaryModalOpen(false);
+          setOfflineSummaryData(null);
+          return;
+        }
+        if (isSaveLoadModalOpen) {
+          e.preventDefault();
+          setIsSaveLoadModalOpen(false);
+          return;
+        }
         if (inspectingLoaderId || inspectingLoaderIdRef.current) {
           e.preventDefault();
           e.stopPropagation();
@@ -19431,6 +20007,11 @@ export default function App() {
           // If strictly positioned right on top of base camp tile: Finish Excursion and return with 100% loot!
           if (roverRef.current.tileX === 0 && roverRef.current.tileY === 0) {
             e.preventDefault();
+            if (!hasMovedOffSpawnRef.current) {
+              gameAudio.playErrorBuzz();
+              triggerNotification('Explore the sector before returning to sanctuary', '#f59e0b');
+              return;
+            }
             finishExcursion(false);
           } else {
             const node = findNearbyExcursionNode();
@@ -19584,6 +20165,11 @@ export default function App() {
           executeDigAttempt();
         } else if (locationRef.current === 'EXCURSION' && roverRef.current.tileX === 0 && roverRef.current.tileY === 0) {
           e.preventDefault();
+          if (!hasMovedOffSpawnRef.current) {
+            gameAudio.playErrorBuzz();
+            triggerNotification('Explore the sector before returning to sanctuary', '#f59e0b');
+            return;
+          }
           finishExcursion(false);
         } else if (locationRef.current === 'EXCURSION') {
           const node = findNearbyExcursionNode();
@@ -20154,6 +20740,11 @@ export default function App() {
             }
           } else if (locationRef.current === 'EXCURSION') {
             if (roverRef.current.tileX === 0 && roverRef.current.tileY === 0) {
+              if (!hasMovedOffSpawnRef.current) {
+                gameAudio.playErrorBuzz();
+                triggerNotification('Explore the sector before returning to sanctuary', '#f59e0b');
+                return;
+              }
               finishExcursion(false);
             } else {
               const node = findNearbyExcursionNode();
@@ -20170,6 +20761,15 @@ export default function App() {
 
         // Button 1 (B / Circle): Cancel / Close / Back / Leave
         if (justPressed(1)) {
+          if (offlineSummaryModalOpen) {
+            setOfflineSummaryModalOpen(false);
+            setOfflineSummaryData(null);
+            return;
+          }
+          if (isSaveLoadModalOpen) {
+            setIsSaveLoadModalOpen(false);
+            return;
+          }
           if (inspectingLoaderId || inspectingLoaderIdRef.current) {
             setInspectingLoaderId(null);
             gameAudio?.playCrispClick?.();
@@ -20427,6 +21027,8 @@ export default function App() {
       // 2. Sanctuary Avatar Movement (only when in Sanctuary & no blocking modal/overlay)
       const isAnyModalBlockingInput =
         isGameMenuOpen ||
+        isSaveLoadModalOpen ||
+        offlineSummaryModalOpen ||
         isHowToPlayOpen ||
         excursionReport !== null ||
         excavationResult !== null ||
@@ -20575,6 +21177,7 @@ export default function App() {
 
       // Build Set/Map of plots covered by active Sprinklers and running Irrigation Systems
       const activeSprinklerMap = new Map<string, number>(); // 'col,row' -> speedMultiplier
+      const activeWateringMap = new Map<string, number>();  // 'col,row' -> watering growth velocity (1 + skillLevel)
       const activeIrrigatedPlotSet = new Set<string>();     // 'col,row'
 
       deployedStructuresRef.current.forEach((s) => {
@@ -20583,7 +21186,7 @@ export default function App() {
 
         if (s.type === 'automaton_t1' || s.type === 'automaton_t2' || s.type === 'automaton_t3') {
           if (power.isPowerSufficient) {
-            const speed = s.type === 'automaton_t3' ? 5.0 : s.type === 'automaton_t2' ? 2.5 : 1.0;
+            const speed = calculateWateringGrowthRate(s.type, zenSkillsRef.current);
             const plots = getStructureCoveredPlots(
               s.type,
               sc,
@@ -20594,12 +21197,15 @@ export default function App() {
             );
             plots.forEach(({ col, row }) => {
               const key = `${col},${row}`;
-              const prev = activeSprinklerMap.get(key) || 0;
-              if (speed > prev) activeSprinklerMap.set(key, speed);
+              const prev = activeWateringMap.get(key) || 0;
+              if (speed > prev) activeWateringMap.set(key, speed);
+              const prevSprinkler = activeSprinklerMap.get(key) || 0;
+              if (speed > prevSprinkler) activeSprinklerMap.set(key, speed);
             });
           }
         } else if (s.type === 'irrigation_t1' || s.type === 'irrigation_t2' || s.type === 'irrigation_t3') {
           if ((s.waterDuration || 0) > 0) {
+            const speed = calculateWateringGrowthRate(s.type, zenSkillsRef.current);
             const plots = getStructureCoveredPlots(
               s.type,
               sc,
@@ -20609,7 +21215,10 @@ export default function App() {
               s.orientation || 'horizontal',
             );
             plots.forEach(({ col, row }) => {
-              activeIrrigatedPlotSet.add(`${col},${row}`);
+              const key = `${col},${row}`;
+              const prev = activeWateringMap.get(key) || 0;
+              if (speed > prev) activeWateringMap.set(key, speed);
+              activeIrrigatedPlotSet.add(key);
             });
           }
         }
@@ -20641,14 +21250,14 @@ export default function App() {
         const bW = bonsai.width || 1;
         const bH = bonsai.height || 1;
 
-        let sprinklerSpeed = 0;
+        let wateringSpeed = 0;
         let isCoveredByIrrigation = false;
 
         for (let c = bCol; c < bCol + bW; c++) {
           for (let r = bRow; r < bRow + bH; r++) {
             const plotKey = `${c},${r}`;
-            const sSpeed = activeSprinklerMap.get(plotKey) || 0;
-            if (sSpeed > sprinklerSpeed) sprinklerSpeed = sSpeed;
+            const wSpeed = activeWateringMap.get(plotKey) || 0;
+            if (wSpeed > wateringSpeed) wateringSpeed = wSpeed;
             if (activeIrrigatedPlotSet.has(plotKey)) isCoveredByIrrigation = true;
           }
         }
@@ -20657,36 +21266,41 @@ export default function App() {
           bonsai.wateredTimer = Math.max(bonsai.wateredTimer || 0, 1.0);
         }
 
-        // Deployed Sprinkler watering (boosted by both organic growth buff and chemical hydration buff)
-        if (sprinklerSpeed > 0 && !synergies.isStalled && bonsai.level < 100) {
-          bonsai.waterSprayAnim = (bonsai.waterSprayAnim + dt * 4 * sprinklerSpeed) % (Math.PI * 2);
+        // Active Watering (Sprinklers and running Manual Irrigation Systems)
+        if (wateringSpeed > 0 && !synergies.isStalled && bonsai.level < 100) {
+          bonsai.waterSprayAnim = (bonsai.waterSprayAnim + dt * 4 * wateringSpeed) % (Math.PI * 2);
           const effectiveGrowth =
-            dt * growthMult * pruneMult * hydroMult * sprinklerSpeed * synergies.growthMultiplier * organicMult * chemicalMult;
+            wateringSpeed * dt * growthMult * pruneMult * synergies.growthMultiplier * organicMult * chemicalMult;
           advanceBonsaiProgress(bonsai, effectiveGrowth);
         }
 
         // Groundwater / Manual irrigation hydration
         if (bonsai.wateredTimer && bonsai.wateredTimer > 0) {
           bonsai.wateredTimer = Math.max(0, bonsai.wateredTimer - dt);
-          if (!synergies.isStalled && bonsai.level < 100 && sprinklerSpeed === 0) {
+          if (!synergies.isStalled && bonsai.level < 100 && wateringSpeed === 0) {
             bonsai.waterSprayAnim = (bonsai.waterSprayAnim + dt * 4) % (Math.PI * 2);
-            advanceBonsaiProgress(bonsai, dt * growthMult * synergies.growthMultiplier * organicMult * chemicalMult);
+            advanceBonsaiProgress(bonsai, 1.0 * dt * growthMult * synergies.growthMultiplier * organicMult * chemicalMult);
           }
         }
 
         // Legacy individual attached automaton
         let tierSpeed = 0;
         if (bonsai.automatonTier > 0) {
-          const tConf = getAutomatonConfig(bonsai.automatonTier);
-          tierSpeed = tConf?.speedMultiplier || 1.0;
+          const structKey =
+            bonsai.automatonTier === 3
+              ? 'automaton_t3'
+              : bonsai.automatonTier === 2
+              ? 'automaton_t2'
+              : 'automaton_t1';
+          tierSpeed = calculateWateringGrowthRate(structKey, zenSkillsRef.current);
         }
 
-        if (bonsai.automatonTier > 0 && power.isPowerSufficient && bonsai.level < 100 && !synergies.isStalled && sprinklerSpeed === 0) {
+        if (bonsai.automatonTier > 0 && power.isPowerSufficient && bonsai.level < 100 && !synergies.isStalled && wateringSpeed === 0) {
           const effectiveGrowth =
-            dt * growthMult * pruneMult * hydroMult * tierSpeed * synergies.growthMultiplier * organicMult * chemicalMult;
+            tierSpeed * dt * growthMult * pruneMult * synergies.growthMultiplier * organicMult * chemicalMult;
           bonsai.waterSprayAnim = (bonsai.waterSprayAnim + dt * 4 * tierSpeed) % (Math.PI * 2);
           advanceBonsaiProgress(bonsai, effectiveGrowth);
-        } else if (bonsai.automatonTier > 0 && power.isPowerSufficient && sprinklerSpeed === 0) {
+        } else if (bonsai.automatonTier > 0 && power.isPowerSufficient && wateringSpeed === 0) {
           bonsai.waterSprayAnim = (bonsai.waterSprayAnim + dt * 1.5) % (Math.PI * 2);
         }
       });
@@ -21332,6 +21946,28 @@ export default function App() {
             const curWaste = inv.organic_waste ?? inv.organicWaste ?? inv.resources?.organic_waste ?? inv.resources?.organicWaste ?? 0;
             const curBio = inv.biochemicals ?? inv.resources?.biochemicals ?? 0;
             const curCondensed = inv.condensed_organic_material ?? inv.condensedOrganicMaterial ?? inv.resources?.condensed_organic_material ?? 0;
+
+            const rawCosts = targetRecipe.costs;
+            const wireDiscount = targetRecipe.id === 'craft_copper_wire'
+              ? (zenSkillsRef.current.efficientWireProduction || (zenSkillsRef.current as any)['efficient_wire_production'] || 0)
+              : 0;
+            const gearsDiscount = targetRecipe.id === 'craft_gears'
+              ? (zenSkillsRef.current.efficientGearsProduction || (zenSkillsRef.current as any)['efficient_gears_production'] || 0)
+              : 0;
+            const circuitDiscount = targetRecipe.id === 'craft_microcircuits'
+              ? (zenSkillsRef.current.efficientCircuitProduction || (zenSkillsRef.current as any)['efficient_circuit_production'] || 0)
+              : 0;
+            const chipDiscount = targetRecipe.id === 'craft_quantum_chips'
+              ? (zenSkillsRef.current.efficientChipProduction || (zenSkillsRef.current as any)['efficient_chip_production'] || 0)
+              : 0;
+
+            const costs = {
+              ...rawCosts,
+              scrap_metal: targetRecipe.id === 'craft_copper_wire' ? Math.max(1, 10 - wireDiscount) : rawCosts.scrap_metal,
+              copper_wire: targetRecipe.id === 'craft_gears' ? Math.max(1, 8 - gearsDiscount) : rawCosts.copper_wire,
+              brass_gears: targetRecipe.id === 'craft_microcircuits' ? Math.max(1, 6 - circuitDiscount) : rawCosts.brass_gears,
+              circuit_boards: targetRecipe.id === 'craft_quantum_chips' ? Math.max(1, (rawCosts.circuit_boards ?? 4) - chipDiscount) : rawCosts.circuit_boards,
+            };
 
             const hasMaterials =
               (!costs.scrap_metal || curScrap >= costs.scrap_metal) &&
@@ -25726,9 +26362,18 @@ export default function App() {
         ctx.fillText('🏕️ BASECAMP HUB (0,0)', 0, 48);
 
         const atBase = rover.tileX === 0 && rover.tileY === 0;
-        ctx.fillStyle = atBase ? '#34d399' : '#94a3b8';
+        const canReturn = hasMovedOffSpawnRef.current;
+        ctx.fillStyle = atBase ? (canReturn ? '#34d399' : '#f59e0b') : '#94a3b8';
         ctx.font = 'bold 10px system-ui';
-        ctx.fillText(atBase ? '★ [E] Return to Sanctuary (100%) ★' : `${biome.name} Basecamp Return Point`, 0, 62);
+        ctx.fillText(
+          atBase
+            ? canReturn
+              ? '★ [E] Return to Sanctuary (100%) ★'
+              : '🔒 Explore the sector before returning to sanctuary'
+            : `${biome.name} Basecamp Return Point`,
+          0,
+          62,
+        );
         ctx.restore();
 
         // Harvest Nodes on the Grid (Grounded, Homogenized Cozy Warm Timber & Brass Style)
@@ -27679,16 +28324,24 @@ export default function App() {
             <div className="w-14 sm:w-20 bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700">
               <div
                 style={{
-                  width: `${Math.min(
-                    100,
-                    (inv.player_exp / getExpRequiredForLevel(inv.player_level)) * 100,
-                  )}%`,
+                  width: `${
+                    inv.player_level >= 100
+                      ? 100
+                      : Math.min(
+                          100,
+                          (inv.player_exp / getXPRequirementForLevel(inv.player_level + 1)) * 100,
+                        )
+                  }%`,
                 }}
                 className="bg-gradient-to-r from-emerald-500 via-teal-300 to-pink-400 h-full transition-all duration-300"
               />
             </div>
             <span className="text-[10px] text-slate-300 font-mono hidden sm:inline">
-              {inv.player_exp}/{getExpRequiredForLevel(inv.player_level)} EXP
+              {inv.player_level >= 100 ? (
+                <span className="text-amber-300 font-bold">MAX</span>
+              ) : (
+                `${Math.floor(inv.player_exp)} / ${getXPRequirementForLevel(inv.player_level + 1)} XP`
+              )}
             </span>
             <span className="text-slate-600 font-light">|</span>
             <div className="flex items-center gap-1 text-pink-300 font-bold">
@@ -27743,6 +28396,18 @@ export default function App() {
         <div className="flex items-center gap-1.5 sm:gap-2">
           {location === 'SANCTUARY' ? (
             <>
+              {/* 💾 Save & Load Archives */}
+              <button
+                onClick={() => {
+                  setIsSaveLoadModalOpen(true);
+                  gameAudio.playCrispClick();
+                }}
+                title="Manage Save Slots &amp; Autosave"
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition-transform active:scale-95 border border-slate-700 cursor-pointer">
+                <Save className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Save/Load</span>
+              </button>
+
               {/* 📦 Nursery Inventory */}
               <button
                 onClick={() => {
@@ -27783,23 +28448,43 @@ export default function App() {
 
               {/* Return / Tow Emergency Button */}
               <button
+                disabled={rover.tileX === 0 && rover.tileY === 0 && !hasMovedOffSpawn}
                 onClick={() => {
                   if (rover.tileX === 0 && rover.tileY === 0) {
+                    if (!hasMovedOffSpawn) {
+                      gameAudio.playErrorBuzz();
+                      triggerNotification('Explore the sector before returning to sanctuary', '#f59e0b');
+                      return;
+                    }
                     finishExcursion(false);
                   } else {
                     finishExcursion(true);
                   }
                 }}
+                title={
+                  rover.tileX === 0 && rover.tileY === 0 && !hasMovedOffSpawn
+                    ? 'Explore the sector before returning to sanctuary'
+                    : undefined
+                }
                 className={`text-white text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow transition-transform active:scale-95 ${
                   rover.tileX === 0 && rover.tileY === 0
-                    ? 'bg-emerald-600 hover:bg-emerald-500'
-                    : 'bg-rose-700 hover:bg-rose-600'
+                    ? !hasMovedOffSpawn
+                      ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-60 shadow-none'
+                      : 'bg-emerald-600 hover:bg-emerald-500 cursor-pointer'
+                    : 'bg-rose-700 hover:bg-rose-600 cursor-pointer'
                 }`}>
                 {rover.tileX === 0 && rover.tileY === 0 ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Unload (100%)</span>
-                  </>
+                  !hasMovedOffSpawn ? (
+                    <>
+                      <Lock className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Explore Sector First</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Unload (100%)</span>
+                    </>
+                  )
                 ) : (
                   <>
                     <AlertTriangle className="w-3.5 h-3.5" />
@@ -28865,8 +29550,8 @@ export default function App() {
                 masterQuestsRef.current.eco.activeRequestIndex,
                 masterQuestsRef.current.eco.requestCounts,
               ).matches;
-              const basePayout = calculateDonationValue(nearbyBonsai);
-              const displayPayout = ecoMatch ? Number((basePayout * 2).toFixed(2)) : basePayout;
+              const basePayout = calculateDonationValue(nearbyBonsai, zenSkillsRef.current);
+              const displayPayout = ecoMatch ? Math.floor((basePayout * 2 + 1e-9) * 100) / 100 : basePayout;
 
               return (
                 <>
@@ -29203,10 +29888,21 @@ export default function App() {
               }
 
               if (rover.tileX === 0 && rover.tileY === 0) {
+                if (!hasMovedOffSpawn) {
+                  return (
+                    <button
+                      disabled
+                      title="Explore the sector before returning to sanctuary"
+                      className="bg-slate-800 text-slate-500 border border-slate-700 font-bold px-3 py-1.5 rounded-xl cursor-not-allowed opacity-75 flex items-center gap-1.5 text-xs">
+                      <Lock className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Explore the sector before returning to sanctuary</span>
+                    </button>
+                  );
+                }
                 return (
                   <button
                     onClick={() => finishExcursion(false)}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-xl shadow transition-transform active:scale-95">
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-xl shadow transition-transform active:scale-95 cursor-pointer">
                     ✅ Return to Sanctuary (100%)
                   </button>
                 );
@@ -29246,6 +29942,7 @@ export default function App() {
         <QuickBonsaiRadialMenu
           bonsai={quickRadialBonsai}
           inventory={sanctuaryInventoryRef.current}
+          skills={zenSkillsRef.current}
           isEcoMatch={
             checkMatchesEcoRequest(
               quickRadialBonsai,
@@ -29681,6 +30378,7 @@ export default function App() {
         onClose={() => setIsUnifiedStorageOpen(false)}
         isInspecting={Boolean(inspectingBonsaiId)}
         inventory={sanctuaryInventoryRef.current}
+        skills={zenSkillsRef.current}
         storageTab={storageTab}
         setStorageTab={setStorageTab}
         storedPottedBonsais={storedPottedBonsaisRef.current}
@@ -30200,6 +30898,7 @@ export default function App() {
         onBuyManualIrrigation={buyManualIrrigation}
         assets={assets}
         deployedStructures={deployedStructuresRef.current}
+        discountRate={(zenSkillsRef.current.discountHunter || 0) * 0.02}
       />
 
       {/* ========================================================================= */}
@@ -30270,6 +30969,7 @@ export default function App() {
         }
         powerSufficient={power.isPowerSufficient}
         inventory={inv}
+        skills={zenSkillsRef.current}
         greenThumbRank={zenSkillsRef.current.greenThumb || 0}
         isEcoRequestMatch={
           inspectingBonsai
@@ -30312,7 +31012,11 @@ export default function App() {
         onCompleteEcoTier1={handleCompleteEcoTier1}
         stats={statsRef.current || (gameState as any)?.stats || DEFAULT_STATS}
         claimAchievement={claimAchievement}
-        onAwardMilestoneZen={checkAndAwardMilestones}
+        onAwardMilestoneXP={(amount, title, tier) => {
+          addPlayerXP(amount, `Milestone: ${title}`);
+          triggerNotification(`🏆 Milestone Block Reached: ${title} (Block ${tier})! (+${amount} XP)`, '#10b981', 3500);
+        }}
+        addPlayerXP={addPlayerXP}
         plantedBonsais={plantedBonsaisRef.current}
         storedPottedBonsais={storedPottedBonsaisRef.current}
         discoveredSpeciesMap={bondexDiscoveryRef.current}
@@ -30369,7 +31073,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center text-xs mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs mb-4">
               <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
                 <div className="text-slate-400">Max Distance</div>
                 <div className="text-base font-black text-amber-300">{excursionReport.distanceReached} steps</div>
@@ -30381,6 +31085,10 @@ export default function App() {
               <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
                 <div className="text-slate-400">Total Weight</div>
                 <div className="text-base font-black text-emerald-300">{excursionReport.totalWeight} kg</div>
+              </div>
+              <div className="bg-slate-950/80 p-2.5 rounded-xl border border-emerald-500/60 shadow-[0_0_12px_rgba(52,211,153,0.25)]">
+                <div className="text-emerald-400 font-bold">XP Gained</div>
+                <div className="text-base font-black text-emerald-300 font-mono">+{excursionReport.totalExpeditionXP || 0} XP</div>
               </div>
             </div>
 
@@ -30416,9 +31124,11 @@ export default function App() {
 
             <button
               onClick={depositHaulAndReturnToSanctuary}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg min-h-[44px] flex items-center justify-center gap-2 text-sm">
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg min-h-[44px] flex items-center justify-center gap-2 text-sm cursor-pointer">
               <CheckCircle2 className="w-5 h-5" />
-              Deposit Retained Loot & Return to Sanctuary
+              {excursionReport.totalExpeditionXP && excursionReport.totalExpeditionXP > 0
+                ? `Deposit Retained Loot & Claim +${excursionReport.totalExpeditionXP} XP`
+                : 'Deposit Retained Loot & Return to Sanctuary'}
             </button>
           </div>
         </MenuOverlay>
@@ -30431,6 +31141,7 @@ export default function App() {
         isOpen={isWorkbenchModalOpen}
         onClose={() => setIsWorkbenchModalOpen(false)}
         inventory={sanctuaryInventoryRef.current}
+        skills={zenSkillsRef.current}
         unlockedBlueprints={sanctuaryInventoryRef.current.unlockedBlueprints || []}
         activeCraft={activeCraftingRef.current}
         craftingQueue={craftingQueueRef.current}
@@ -30477,6 +31188,7 @@ export default function App() {
         discoveredAreaSpecies={areaDiscoveryRef.current.species}
         stats={statsRef.current || (gameState as any)?.stats || DEFAULT_STATS}
         claimAchievement={claimAchievement}
+        masterQuests={masterQuestsRef.current}
       />
 
       {/* ========================================================================= */}
@@ -30541,54 +31253,145 @@ export default function App() {
             </p>
 
             <div className="w-full space-y-2 max-w-xs">
-              <button
-                onClick={() => {
-                  setGameState((prev) => ({...prev, status: 'PLAYING'}));
-                  gameAudio.playPowerupChime();
-                  if (sdk) {
-                    sdk.startGame();
-                  }
-                }}
-                autoFocus
-                className={`w-full font-black text-sm sm:text-base py-3 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                  titleMenuIdx === 0
-                    ? 'bg-emerald-400 hover:bg-emerald-300 text-slate-950 ring-4 ring-emerald-300/80 scale-105 shadow-[0_0_25px_rgba(52,211,153,0.7)]'
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                }`}>
-                <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
-                <span>{titleMenuIdx === 0 ? '► START GAME [E / A]' : 'START GAME [E / A]'}</span>
-              </button>
+              {hasExistingSave ? (
+                <>
+                  <button
+                    onClick={() => {
+                      handleLoadGame('autosave');
+                      if (sdk) sdk.startGame();
+                    }}
+                    autoFocus
+                    className={`w-full font-black text-sm sm:text-base py-3 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      titleMenuIdx === 0
+                        ? 'bg-emerald-400 hover:bg-emerald-300 text-slate-950 ring-4 ring-emerald-300/80 scale-105 shadow-[0_0_25px_rgba(52,211,153,0.7)]'
+                        : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    }`}>
+                    <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
+                    <span>{titleMenuIdx === 0 ? '► CONTINUE SAVED RUN' : 'CONTINUE SAVED RUN'}</span>
+                  </button>
 
-              <button
-                onClick={() => {
-                  setIsHowToPlayOpen(true);
-                  gameAudio.playCrispClick();
-                }}
-                className={`w-full font-bold text-xs sm:text-sm py-2.5 rounded-2xl transition-all flex items-center justify-center gap-2 border cursor-pointer ${
-                  titleMenuIdx === 1
-                    ? 'bg-slate-700 text-white ring-4 ring-emerald-400/80 scale-105 border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.5)]'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
-                }`}>
-                <HelpCircle className="w-4 h-4 text-emerald-400" />
-                <span>{titleMenuIdx === 1 ? '► How to Play [E/A]' : '📖 How to Play (6 Chapters)'}</span>
-              </button>
+                  <button
+                    onClick={() => {
+                      initGame();
+                      if (sdk) sdk.startGame();
+                    }}
+                    className={`w-full font-bold text-xs sm:text-sm py-2 rounded-2xl transition-all flex items-center justify-center gap-2 border cursor-pointer ${
+                      titleMenuIdx === 1
+                        ? 'bg-slate-700 text-white ring-4 ring-emerald-400/80 scale-105 border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.5)]'
+                        : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700/80'
+                    }`}>
+                    <RotateCw className="w-4 h-4 text-emerald-400" />
+                    <span>{titleMenuIdx === 1 ? '► Start New Game' : 'Start New Game'}</span>
+                  </button>
 
-              <button
-                onClick={() => {
-                  setIsGameMenuOpen(true);
-                  gameAudio.playCrispClick();
-                }}
-                className={`w-full font-bold text-xs sm:text-sm py-2 rounded-2xl transition-all flex items-center justify-center gap-2 border cursor-pointer ${
-                  titleMenuIdx === 2
-                    ? 'bg-slate-700 text-white ring-4 ring-sky-400/80 scale-105 border-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.5)]'
-                    : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700/80'
-                }`}>
-                <Wrench className="w-4 h-4 text-sky-400" />
-                <span>{titleMenuIdx === 2 ? '► Settings [E/A]' : '⚙️ Settings & Controls'}</span>
-              </button>
+                  <button
+                    onClick={() => {
+                      setIsSaveLoadModalOpen(true);
+                      gameAudio.playCrispClick();
+                    }}
+                    className={`w-full font-bold text-xs sm:text-sm py-2 rounded-2xl transition-all flex items-center justify-center gap-2 border cursor-pointer ${
+                      titleMenuIdx === 2
+                        ? 'bg-slate-700 text-white ring-4 ring-sky-400/80 scale-105 border-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.5)]'
+                        : 'bg-slate-800/80 hover:bg-slate-700 text-sky-300 border-slate-700/80'
+                    }`}>
+                    <Save className="w-4 h-4 text-sky-400" />
+                    <span>{titleMenuIdx === 2 ? '► Save & Load Slots' : '💾 Save & Load Slots'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsHowToPlayOpen(true);
+                      gameAudio.playCrispClick();
+                    }}
+                    className={`w-full font-bold text-xs sm:text-sm py-2 rounded-2xl transition-all flex items-center justify-center gap-2 border cursor-pointer ${
+                      titleMenuIdx === 3
+                        ? 'bg-slate-700 text-white ring-4 ring-amber-400/80 scale-105 border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.5)]'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                    }`}>
+                    <HelpCircle className="w-4 h-4 text-amber-400" />
+                    <span>{titleMenuIdx === 3 ? '► How to Play' : '📖 How to Play Guide'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsGameMenuOpen(true);
+                      gameAudio.playCrispClick();
+                    }}
+                    className={`w-full font-bold text-xs sm:text-sm py-1.5 rounded-2xl transition-all flex items-center justify-center gap-2 border cursor-pointer ${
+                      titleMenuIdx === 4
+                        ? 'bg-slate-700 text-white ring-4 ring-slate-400/80 scale-105 border-slate-400'
+                        : 'bg-slate-800/60 hover:bg-slate-700 text-slate-400 border-slate-700/60'
+                    }`}>
+                    <Wrench className="w-3.5 h-3.5" />
+                    <span>{titleMenuIdx === 4 ? '► Settings' : '⚙️ Settings'}</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      setGameState((prev) => ({...prev, status: 'PLAYING'}));
+                      gameAudio.playPowerupChime();
+                      if (sdk) {
+                        sdk.startGame();
+                      }
+                    }}
+                    autoFocus
+                    className={`w-full font-black text-sm sm:text-base py-3 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      titleMenuIdx === 0
+                        ? 'bg-emerald-400 hover:bg-emerald-300 text-slate-950 ring-4 ring-emerald-300/80 scale-105 shadow-[0_0_25px_rgba(52,211,153,0.7)]'
+                        : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    }`}>
+                    <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
+                    <span>{titleMenuIdx === 0 ? '► START GAME [E / A]' : 'START GAME [E / A]'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsSaveLoadModalOpen(true);
+                      gameAudio.playCrispClick();
+                    }}
+                    className={`w-full font-bold text-xs sm:text-sm py-2 rounded-2xl transition-all flex items-center justify-center gap-2 border cursor-pointer ${
+                      titleMenuIdx === 1
+                        ? 'bg-slate-700 text-white ring-4 ring-sky-400/80 scale-105 border-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.5)]'
+                        : 'bg-slate-800/80 hover:bg-slate-700 text-sky-300 border-slate-700/80'
+                    }`}>
+                    <Save className="w-4 h-4 text-sky-400" />
+                    <span>{titleMenuIdx === 1 ? '► Save & Load Slots' : '💾 Save & Load Slots'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsHowToPlayOpen(true);
+                      gameAudio.playCrispClick();
+                    }}
+                    className={`w-full font-bold text-xs sm:text-sm py-2.5 rounded-2xl transition-all flex items-center justify-center gap-2 border cursor-pointer ${
+                      titleMenuIdx === 2
+                        ? 'bg-slate-700 text-white ring-4 ring-emerald-400/80 scale-105 border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.5)]'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                    }`}>
+                    <HelpCircle className="w-4 h-4 text-emerald-400" />
+                    <span>{titleMenuIdx === 2 ? '► How to Play [E/A]' : '📖 How to Play (6 Chapters)'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsGameMenuOpen(true);
+                      gameAudio.playCrispClick();
+                    }}
+                    className={`w-full font-bold text-xs sm:text-sm py-2 rounded-2xl transition-all flex items-center justify-center gap-2 border cursor-pointer ${
+                      titleMenuIdx === 3
+                        ? 'bg-slate-700 text-white ring-4 ring-sky-400/80 scale-105 border-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.5)]'
+                        : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700/80'
+                    }`}>
+                    <Wrench className="w-4 h-4 text-sky-400" />
+                    <span>{titleMenuIdx === 3 ? '► Settings [E/A]' : '⚙️ Settings & Controls'}</span>
+                  </button>
+                </>
+              )}
             </div>
             <div className="mt-4 text-[11px] text-slate-400 font-mono">
-              🎮 [W/S / D-Pad] Select Option • [E / Enter / A / Space] Start Game
+              🎮 [W/S / D-Pad] Select Option • [E / Enter / A / Space] Choose
             </div>
           </div>
         </div>
@@ -30598,7 +31401,7 @@ export default function App() {
       {isGameMenuOpen && (
         <MenuOverlay tone="neutral" zIndex={1010}>
           <div className="w-full max-w-md bg-slate-900 border-2 border-slate-700 rounded-2xl p-6 shadow-2xl flex flex-col items-center">
-            <h2 className="text-2xl font-black text-emerald-400 mb-6">⚙️ GAME MENU & SETTINGS</h2>
+            <h2 className="text-2xl font-black text-emerald-400 mb-6">⚙️ GAME MENU &amp; SETTINGS</h2>
 
             <div className="w-full space-y-3 mb-6">
               <button
@@ -30618,6 +31421,21 @@ export default function App() {
                 {gameState.status === 'START' ? 'Enter Sanctuary [E / A]' : 'Resume Cultivation [E / A]'}
               </button>
 
+              {/* Save & Load Slots Button */}
+              <button
+                onClick={() => {
+                  setIsSaveLoadModalOpen(true);
+                  gameAudio.playCrispClick();
+                }}
+                className={`w-full font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[44px] border ${
+                  focusedMenuIdx === 1
+                    ? 'bg-emerald-700 text-white border-emerald-400 ring-2 ring-emerald-400/50 scale-[1.02]'
+                    : 'bg-slate-800 hover:bg-slate-700 text-emerald-300 border-emerald-500/40 shadow-sm'
+                }`}>
+                <Save className="w-4 h-4 text-emerald-400" />
+                <span>💾 Save &amp; Load Archives (Slots 1-3 &amp; Autosave)</span>
+              </button>
+
               {/* Fullscreen Mode Toggle Button */}
               <button
                 onClick={() => {
@@ -30625,7 +31443,7 @@ export default function App() {
                   gameAudio.playCrispClick();
                 }}
                 className={`w-full font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[44px] border ${
-                  focusedMenuIdx === 1
+                  focusedMenuIdx === 2
                     ? 'bg-sky-500 text-slate-950 border-sky-300 ring-2 ring-sky-300/80 scale-[1.02] shadow-[0_0_15px_rgba(56,189,248,0.5)]'
                     : isFullscreen
                     ? 'bg-sky-950/80 hover:bg-sky-900 text-sky-200 border-sky-500/50'
@@ -30641,7 +31459,7 @@ export default function App() {
                   gameAudio.playCrispClick();
                 }}
                 className={`w-full font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[44px] border ${
-                  focusedMenuIdx === 2
+                  focusedMenuIdx === 3
                     ? 'bg-yellow-900 text-yellow-100 border-yellow-400 ring-2 ring-yellow-400/50 scale-[1.02]'
                     : 'bg-yellow-950/80 hover:bg-yellow-900 text-yellow-200 border-yellow-500/40'
                 }`}>
@@ -30655,7 +31473,7 @@ export default function App() {
                   gameAudio.playCrispClick();
                 }}
                 className={`w-full font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[44px] border ${
-                  focusedMenuIdx === 3
+                  focusedMenuIdx === 4
                     ? 'bg-slate-700 text-white border-emerald-400 ring-2 ring-emerald-400/50 scale-[1.02]'
                     : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
                 }`}>
@@ -30670,7 +31488,7 @@ export default function App() {
                     setIsSfxMuted(muted);
                   }}
                   className={`font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[44px] border ${
-                    focusedMenuIdx === 4
+                    focusedMenuIdx === 5
                       ? 'bg-slate-700 text-white border-sky-400 ring-2 ring-sky-400/50 scale-[1.02]'
                       : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
                   }`}>
@@ -30681,7 +31499,7 @@ export default function App() {
                 <button
                   onClick={() => setIsMusicMuted((prev) => !prev)}
                   className={`font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[44px] border ${
-                    focusedMenuIdx === 5
+                    focusedMenuIdx === 6
                       ? 'bg-slate-700 text-white border-sky-400 ring-2 ring-sky-400/50 scale-[1.02]'
                       : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
                   }`}>
@@ -30693,7 +31511,7 @@ export default function App() {
               <button
                 onClick={initGame}
                 className={`w-full font-semibold text-xs py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 min-h-[44px] border ${
-                  focusedMenuIdx === 6
+                  focusedMenuIdx === 7
                     ? 'bg-amber-900/90 text-amber-200 border-amber-400 ring-2 ring-amber-400/50 scale-[1.02]'
                     : 'bg-slate-800/80 hover:bg-slate-700 text-amber-400 border-slate-700'
                 }`}>
@@ -31108,7 +31926,7 @@ export default function App() {
                       <span>Botanist Level & Zen Point Economy</span>
                     </h4>
                     <p className="text-slate-300 text-xs leading-relaxed">
-                      Earn Botanist EXP through manual pruning, harvesting resource nodes, successfully excavating seedlings, applying compost, and tree level-ups. Every time your Botanist Level increases, you gain <strong>+2 Zen Points (🌸)</strong> to spend at the Zen Library!
+                      Earn Botanist EXP through manual pruning, harvesting resource nodes, successfully excavating seedlings, applying compost, and tree level-ups. Every time your Botanist Level increases, you gain <strong>+5 Zen Points (🌸)</strong> to spend at the Zen Library!
                     </p>
                   </div>
 
@@ -31190,6 +32008,26 @@ export default function App() {
           </div>
         </MenuOverlay>
       )}
+
+      {/* --- OVERLAYS: SAVE & LOAD ARCHIVES MODAL --- */}
+      <SaveLoadModal
+        isOpen={isSaveLoadModalOpen}
+        onClose={() => setIsSaveLoadModalOpen(false)}
+        onSaveToSlot={(slot) => handleSaveGame(slot, false)}
+        onLoadFromSlot={handleLoadGame}
+        onDeleteSlot={handleDeleteSaveSlot}
+        currentSaveSlot={currentActiveSaveSlot}
+      />
+
+      {/* --- OVERLAYS: OFFLINE SANCTUARY CATCH-UP REPORT MODAL --- */}
+      <OfflineReportModal
+        isOpen={offlineSummaryModalOpen}
+        onClose={() => {
+          setOfflineSummaryModalOpen(false);
+          setOfflineSummaryData(null);
+        }}
+        summary={offlineSummaryData}
+      />
 
       {/* --- OVERLAYS: VICTORY SCREEN --- */}
       {gameState.status === 'VICTORY' && (

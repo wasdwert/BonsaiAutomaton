@@ -1940,4 +1940,11 @@ export function isEcoRequestComplete(
   return req.targets.every((t) => (currentCounts[t.key] || 0) >= t.count);
 }
 
+export type {
+  SaveSlotId,
+  SaveSlotMetadata,
+  FullSaveState,
+  OfflineSummary,
+} from './saveManager';
+
 
