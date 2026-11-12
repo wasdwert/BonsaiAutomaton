@@ -6,6 +6,10 @@ import {
   Maximize2,
   Wrench,
   Info,
+  CheckCircle2,
+  Lock,
+  Trophy,
+  Sparkles,
 } from 'lucide-react';
 import {
   SanctuaryInventory,
@@ -17,9 +21,12 @@ import {
 } from './App';
 import { BlueprintDef } from './blueprints';
 import { gameAudio } from './utils/helper';
+import { MasterQuestsState } from './types';
+import { getMaxMasterQuestBranchRank } from './ZenLibraryModal';
 
 export type MarketTabKey =
   | 'maps'
+  | 'grid_expansions'
   | 'expansions'
   | 'decorations'
   | 'equipment'
@@ -32,7 +39,7 @@ export interface MarketModalProps {
   unlockedBlueprints?: string[];
   verdureBalance: number;
   onPurchaseBlueprint?: (blueprint: BlueprintDef) => void;
-  onBuyExpeditionMap: (mapKey: 'has_map_highlands' | 'has_map_overgrowth', cost: number, mapName: string) => void;
+  onBuyExpeditionMap: (mapKey: string, cost: number, mapName: string) => void;
   onBuySanctuaryExpansion: (targetTier: number, cost: number, name: string) => void;
   onBuyDecoration: (decorType: any, cost: number, name: string) => void;
   onBuyEngineeringLicense: (tier: 1 | 2 | 3, cost: number) => void;
@@ -44,6 +51,524 @@ export interface MarketModalProps {
   activeTab?: MarketTabKey;
   onTabChange?: (tab: MarketTabKey) => void;
   discountRate?: number;
+  masterQuests?: MasterQuestsState;
+  maxBranchRank?: number;
+}
+
+export interface MapProductDef {
+  id: string;
+  name: string;
+  areaNumber: 1 | 2 | 3;
+  stepsLabel: string;
+  cost: number;
+  showRank: number;
+  prereqId?: string;
+  prereqName?: string;
+  themeColor: string;
+  accentColor: string;
+  description: string;
+}
+
+export const MAPS_CATALOG: MapProductDef[] = [
+  // Area 1 Maps
+  {
+    id: 'area1_exp1',
+    name: 'Area 1 – Expansion Map #1 (61-80 Steps)',
+    areaNumber: 1,
+    stepsLabel: '61-80 Steps',
+    cost: 50,
+    showRank: 0,
+    themeColor: '#10b981',
+    accentColor: '#34d399',
+    description: 'Expands allowed travel radius in Sunlit Foothills to 80 steps from camp. Unlocks richer scrap caches and copper wire.',
+  },
+  {
+    id: 'area1_exp2',
+    name: 'Area 1 – Expansion Map #2 (81-100 Steps)',
+    areaNumber: 1,
+    stepsLabel: '81-100 Steps',
+    cost: 100,
+    showRank: 0,
+    prereqId: 'area1_exp1',
+    prereqName: 'Area 1 Map #1',
+    themeColor: '#10b981',
+    accentColor: '#34d399',
+    description: 'Expands allowed travel radius in Sunlit Foothills to 100 steps from camp. Unlocks brass gears and notable root nodes.',
+  },
+  {
+    id: 'area1_exp3',
+    name: 'Area 1 – Expansion Map #3 (101-120 Steps)',
+    areaNumber: 1,
+    stepsLabel: '101-120 Steps',
+    cost: 250,
+    showRank: 1,
+    prereqId: 'area1_exp2',
+    prereqName: 'Area 1 Map #2',
+    themeColor: '#10b981',
+    accentColor: '#34d399',
+    description: 'Expands allowed travel radius in Sunlit Foothills to 120 steps from camp. Unlocks deep scrap deposits and crystal shards.',
+  },
+  {
+    id: 'area1_exp4',
+    name: 'Area 1 – Expansion Map #4 (121-140 Steps)',
+    areaNumber: 1,
+    stepsLabel: '121-140 Steps',
+    cost: 500,
+    showRank: 1,
+    prereqId: 'area1_exp3',
+    prereqName: 'Area 1 Map #3',
+    themeColor: '#10b981',
+    accentColor: '#34d399',
+    description: 'Expands allowed travel radius in Sunlit Foothills to 140 steps from camp. Unlocks refined root specimens and double gear caches.',
+  },
+  {
+    id: 'area1_exp5',
+    name: 'Area 1 – Expansion Map #5 (141-160 Steps)',
+    areaNumber: 1,
+    stepsLabel: '141-160 Steps',
+    cost: 1000,
+    showRank: 2,
+    prereqId: 'area1_exp4',
+    prereqName: 'Area 1 Map #4',
+    themeColor: '#10b981',
+    accentColor: '#34d399',
+    description: 'Expands allowed travel radius in Sunlit Foothills to max 160 steps from camp. Unlocks circuit boards and high-tier flora.',
+  },
+
+  // Area 2 Maps
+  {
+    id: 'area2_base',
+    name: 'Area 2 – Base Map (1-60 Steps)',
+    areaNumber: 2,
+    stepsLabel: '1-60 Steps',
+    cost: 250,
+    showRank: 1,
+    themeColor: '#0ea5e9',
+    accentColor: '#38bdf8',
+    description: 'Unlocks wilderness expeditions to Area 2: Misty Highlands up to 60 steps from basecamp.',
+  },
+  {
+    id: 'area2_exp1',
+    name: 'Area 2 – Expansion Map #1 (61-80 Steps)',
+    areaNumber: 2,
+    stepsLabel: '61-80 Steps',
+    cost: 100,
+    showRank: 1,
+    prereqId: 'area2_base',
+    prereqName: 'Area 2 Base Map',
+    themeColor: '#0ea5e9',
+    accentColor: '#38bdf8',
+    description: 'Expands allowed travel radius in Misty Highlands to 80 steps from camp. Higher crystal artifact frequency.',
+  },
+  {
+    id: 'area2_exp2',
+    name: 'Area 2 – Expansion Map #2 (81-100 Steps)',
+    areaNumber: 2,
+    stepsLabel: '81-100 Steps',
+    cost: 250,
+    showRank: 1,
+    prereqId: 'area2_exp1',
+    prereqName: 'Area 2 Map #1',
+    themeColor: '#0ea5e9',
+    accentColor: '#38bdf8',
+    description: 'Expands allowed travel radius in Misty Highlands to 100 steps from camp. Yields gear nodes and refined specimens.',
+  },
+  {
+    id: 'area2_exp3',
+    name: 'Area 2 – Expansion Map #3 (101-120 Steps)',
+    areaNumber: 2,
+    stepsLabel: '101-120 Steps',
+    cost: 500,
+    showRank: 2,
+    prereqId: 'area2_exp2',
+    prereqName: 'Area 2 Map #2',
+    themeColor: '#0ea5e9',
+    accentColor: '#38bdf8',
+    description: 'Expands allowed travel radius in Misty Highlands to 120 steps from camp. Heavy scrap caches and high crystal odds.',
+  },
+  {
+    id: 'area2_exp4',
+    name: 'Area 2 – Expansion Map #4 (121-140 Steps)',
+    areaNumber: 2,
+    stepsLabel: '121-140 Steps',
+    cost: 1000,
+    showRank: 2,
+    prereqId: 'area2_exp3',
+    prereqName: 'Area 2 Map #3',
+    themeColor: '#0ea5e9',
+    accentColor: '#38bdf8',
+    description: 'Expands allowed travel radius in Misty Highlands to 140 steps from camp. Rare circuit components and notable flora.',
+  },
+  {
+    id: 'area2_exp5',
+    name: 'Area 2 – Expansion Map #5 (141-160 Steps)',
+    areaNumber: 2,
+    stepsLabel: '141-160 Steps',
+    cost: 1500,
+    showRank: 3,
+    prereqId: 'area2_exp4',
+    prereqName: 'Area 2 Map #4',
+    themeColor: '#0ea5e9',
+    accentColor: '#38bdf8',
+    description: 'Expands allowed travel radius in Misty Highlands to max 160 steps from camp. High density circuits and crystal artifacts.',
+  },
+
+  // Area 3 Maps
+  {
+    id: 'area3_base',
+    name: 'Area 3 – Base Map (1-60 Steps)',
+    areaNumber: 3,
+    stepsLabel: '1-60 Steps',
+    cost: 1000,
+    showRank: 2,
+    themeColor: '#a855f7',
+    accentColor: '#c084fc',
+    description: 'Unlocks wilderness expeditions to Area 3: Ancient Caldera / Overgrowth up to 60 steps from basecamp.',
+  },
+  {
+    id: 'area3_exp1',
+    name: 'Area 3 – Expansion Map #1 (61-80 Steps)',
+    areaNumber: 3,
+    stepsLabel: '61-80 Steps',
+    cost: 250,
+    showRank: 2,
+    prereqId: 'area3_base',
+    prereqName: 'Area 3 Base Map',
+    themeColor: '#a855f7',
+    accentColor: '#c084fc',
+    description: 'Expands allowed travel radius in Ancient Caldera to 80 steps from camp. High crystal artifact frequency (0.60%).',
+  },
+  {
+    id: 'area3_exp2',
+    name: 'Area 3 – Expansion Map #2 (81-100 Steps)',
+    areaNumber: 3,
+    stepsLabel: '81-100 Steps',
+    cost: 500,
+    showRank: 2,
+    prereqId: 'area3_exp1',
+    prereqName: 'Area 3 Map #1',
+    themeColor: '#a855f7',
+    accentColor: '#c084fc',
+    description: 'Expands allowed travel radius in Ancient Caldera to 100 steps from camp. Refined specimens and brass gear caches.',
+  },
+  {
+    id: 'area3_exp3',
+    name: 'Area 3 – Expansion Map #3 (101-120 Steps)',
+    areaNumber: 3,
+    stepsLabel: '101-120 Steps',
+    cost: 1000,
+    showRank: 3,
+    prereqId: 'area3_exp2',
+    prereqName: 'Area 3 Map #2',
+    themeColor: '#a855f7',
+    accentColor: '#c084fc',
+    description: 'Expands allowed travel radius in Ancient Caldera to 120 steps from camp. Premium flora and circuit boards.',
+  },
+  {
+    id: 'area3_exp4',
+    name: 'Area 3 – Expansion Map #4 (121-140 Steps)',
+    areaNumber: 3,
+    stepsLabel: '121-140 Steps',
+    cost: 1500,
+    showRank: 3,
+    prereqId: 'area3_exp3',
+    prereqName: 'Area 3 Map #3',
+    themeColor: '#a855f7',
+    accentColor: '#c084fc',
+    description: 'Expands allowed travel radius in Ancient Caldera to 140 steps from camp. Rich crystal presence (1.05%) and electronic circuits.',
+  },
+  {
+    id: 'area3_exp5',
+    name: 'Area 3 – Expansion Map #5 (141-160 Steps)',
+    areaNumber: 3,
+    stepsLabel: '141-160 Steps',
+    cost: 2000,
+    showRank: 3,
+    prereqId: 'area3_exp4',
+    prereqName: 'Area 3 Map #4',
+    themeColor: '#a855f7',
+    accentColor: '#c084fc',
+    description: 'Expands allowed travel radius in Ancient Caldera to max 160 steps from camp. Peak crystal artifact rate (1.20%) and double circuits.',
+  },
+];
+
+/**
+ * Helper to determine whether a plot is unlocked at a given expansion tier.
+ */
+export function isPlotUnlockedAtTier(
+  field: 'left' | 'main' | 'right',
+  r: number,
+  c: number,
+  tier: number,
+): boolean {
+  if (field === 'left') {
+    return tier >= 5;
+  }
+  if (field === 'right') {
+    return tier >= 6;
+  }
+  // main field (16x16)
+  if (r <= 3) {
+    if (tier >= 2) return true;
+    if (tier === 1) return c >= 4 && c <= 11;
+    return c >= 6 && c <= 9; // starter 16 plots
+  }
+  if (r <= 5) return tier >= 3;
+  if (r <= 7) return tier >= 4;
+  if (r <= 11) return tier >= 7;
+  return tier >= 8;
+}
+
+export type PlotVisualStatus = 'unlocked' | 'pending' | 'locked';
+
+export function getPlotVisualStatus(
+  field: 'left' | 'main' | 'right',
+  r: number,
+  c: number,
+  currentTier: number,
+  targetTier?: number,
+): PlotVisualStatus {
+  if (isPlotUnlockedAtTier(field, r, c, currentTier)) {
+    return 'unlocked';
+  }
+  if (targetTier !== undefined && isPlotUnlockedAtTier(field, r, c, targetTier)) {
+    return 'pending';
+  }
+  return 'locked';
+}
+
+/**
+ * Interactive SVG Mini-Map of the Tri-Field Sanctuary Greenhouse.
+ * Geometry:
+ * - Left Field (8x8): rows 0..7, cols 0..7
+ * - Central Greenhouse (16x16): rows 0..15, cols 0..15, vertically offset 3 rows below side fields
+ * - Right Field (8x8): rows 0..7, cols 0..7
+ */
+export function SanctuaryMiniMap({
+  currentTier,
+  targetTier,
+  isAllUnlocked,
+}: {
+  currentTier: number;
+  targetTier?: number;
+  isAllUnlocked: boolean;
+}) {
+  const step = 12;
+  const tileSize = 10;
+
+  // Left field starts at y = 32
+  const leftFieldX = 22;
+  const leftFieldY = 32;
+
+  // Main field starts 3 rows below side fields: 32 + 3 * 12 = 68
+  const mainFieldX = 22 + 8 * step - 2 + 18; // 134
+  const mainFieldY = 68;
+
+  // Right field starts at y = 32, after main field (134 + 16 * 12 - 2 + 18 = 342)
+  const rightFieldX = 342;
+  const rightFieldY = 32;
+
+  const renderField = (
+    field: 'left' | 'main' | 'right',
+    startX: number,
+    startY: number,
+    cols: number,
+    rows: number,
+  ) => {
+    const rects: React.ReactNode[] = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const status = getPlotVisualStatus(field, r, c, currentTier, targetTier);
+        const px = startX + c * step;
+        const py = startY + r * step;
+
+        let fill = '#1F2937';
+        let stroke = '#374151';
+        let strokeWidth = 1;
+        let opacity = 0.55;
+        let className = '';
+
+        if (status === 'unlocked') {
+          fill = '#10B981';
+          stroke = '#059669';
+          strokeWidth = 1;
+          opacity = 0.95;
+        } else if (status === 'pending') {
+          fill = '#F59E0B';
+          stroke = '#FDE047';
+          strokeWidth = 1.5;
+          opacity = 1;
+          className = 'pending-plot';
+        }
+
+        rects.push(
+          <rect
+            key={`${field}_${r}_${c}`}
+            x={px}
+            y={py}
+            width={tileSize}
+            height={tileSize}
+            rx={2}
+            fill={fill}
+            stroke={stroke}
+            strokeWidth={strokeWidth}
+            opacity={opacity}
+            className={className}
+          />,
+        );
+      }
+    }
+    return rects;
+  };
+
+  return (
+    <div className="w-full flex flex-col items-center select-none">
+      <svg
+        viewBox="0 0 458 282"
+        className="w-full max-w-lg h-auto aspect-[458/282] drop-shadow-xl">
+        <defs>
+          <style>{`
+            @keyframes pulsePlot {
+              0%, 100% { fill: #f59e0b; stroke: #fde047; stroke-width: 1.5; filter: drop-shadow(0 0 3px rgba(251, 191, 36, 0.7)); }
+              50% { fill: #fbbf24; stroke: #ffffff; stroke-width: 2; filter: drop-shadow(0 0 7px rgba(251, 191, 36, 1)); }
+            }
+            .pending-plot {
+              animation: pulsePlot 1.6s ease-in-out infinite;
+            }
+          `}</style>
+          <filter id="miniSanctuaryGlow" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#000000" floodOpacity="0.6" />
+          </filter>
+        </defs>
+
+        {/* Greenhouse Master Backdrop Container */}
+        <rect
+          x="10"
+          y="8"
+          width="438"
+          height="266"
+          rx="12"
+          fill="#090d16"
+          stroke="#1e293b"
+          strokeWidth="1.5"
+          filter="url(#miniSanctuaryGlow)"
+        />
+
+        {/* Left Field Container */}
+        <rect
+          x={leftFieldX - 4}
+          y={leftFieldY - 4}
+          width={8 * step - 2 + 8}
+          height={8 * step - 2 + 8}
+          rx={6}
+          fill="#0c1220"
+          stroke={targetTier === 5 ? '#f59e0b' : currentTier >= 5 ? '#10b981' : '#1e293b'}
+          strokeWidth={targetTier === 5 ? 1.5 : 1}
+          strokeDasharray={currentTier >= 5 ? undefined : '3 3'}
+        />
+
+        {/* Main Field Container */}
+        <rect
+          x={mainFieldX - 4}
+          y={mainFieldY - 4}
+          width={16 * step - 2 + 8}
+          height={16 * step - 2 + 8}
+          rx={6}
+          fill="#0c1220"
+          stroke={targetTier && [1, 2, 3, 4, 7, 8].includes(targetTier) ? '#f59e0b' : '#10b981'}
+          strokeWidth={targetTier && [1, 2, 3, 4, 7, 8].includes(targetTier) ? 1.5 : 1}
+        />
+
+        {/* Right Field Container */}
+        <rect
+          x={rightFieldX - 4}
+          y={rightFieldY - 4}
+          width={8 * step - 2 + 8}
+          height={8 * step - 2 + 8}
+          rx={6}
+          fill="#0c1220"
+          stroke={targetTier === 6 ? '#f59e0b' : currentTier >= 6 ? '#10b981' : '#1e293b'}
+          strokeWidth={targetTier === 6 ? 1.5 : 1}
+          strokeDasharray={currentTier >= 6 ? undefined : '3 3'}
+        />
+
+        {/* Pathway Lines */}
+        <line
+          x1={124}
+          y1={24}
+          x2={124}
+          y2={220}
+          stroke="#334155"
+          strokeWidth="2"
+          strokeDasharray="2 3"
+          opacity="0.6"
+        />
+        <line
+          x1={333}
+          y1={24}
+          x2={333}
+          y2={220}
+          stroke="#334155"
+          strokeWidth="2"
+          strokeDasharray="2 3"
+          opacity="0.6"
+        />
+        <line
+          x1={leftFieldX + 20}
+          y1={50}
+          x2={rightFieldX + 74}
+          y2={50}
+          stroke="#334155"
+          strokeWidth="1.5"
+          strokeDasharray="2 3"
+          opacity="0.4"
+        />
+
+        {/* Field Header Labels */}
+        <text
+          x={leftFieldX + 47}
+          y={leftFieldY - 8}
+          textAnchor="middle"
+          fill={targetTier === 5 ? '#f59e0b' : currentTier >= 5 ? '#34d399' : '#64748b'}
+          fontSize="7.5"
+          fontWeight="bold"
+          fontFamily="system-ui">
+          WEST TERRACE (8×8)
+        </text>
+
+        <text
+          x={mainFieldX + 95}
+          y={mainFieldY - 8}
+          textAnchor="middle"
+          fill={targetTier && [1, 2, 3, 4, 7, 8].includes(targetTier) ? '#f59e0b' : '#34d399'}
+          fontSize="7.5"
+          fontWeight="bold"
+          fontFamily="system-ui">
+          CENTRAL GREENHOUSE (16×16)
+        </text>
+
+        <text
+          x={rightFieldX + 47}
+          y={rightFieldY - 8}
+          textAnchor="middle"
+          fill={targetTier === 6 ? '#f59e0b' : currentTier >= 6 ? '#34d399' : '#64748b'}
+          fontSize="7.5"
+          fontWeight="bold"
+          fontFamily="system-ui">
+          EAST TERRACE (8×8)
+        </text>
+
+        {/* Plots for Left Field */}
+        {renderField('left', leftFieldX, leftFieldY, 8, 8)}
+
+        {/* Plots for Main Field */}
+        {renderField('main', mainFieldX, mainFieldY, 16, 16)}
+
+        {/* Plots for Right Field */}
+        {renderField('right', rightFieldX, rightFieldY, 8, 8)}
+      </svg>
+    </div>
+  );
 }
 
 export default function MarketModal({
@@ -63,33 +588,249 @@ export default function MarketModal({
   activeTab: externalTab,
   onTabChange,
   discountRate = 0,
+  masterQuests,
+  maxBranchRank: propMaxBranchRank,
 }: MarketModalProps) {
   const [internalTab, setInternalTab] = useState<MarketTabKey>('maps');
   const [focusedShopIdx, setFocusedShopIdx] = useState<number>(0);
 
   const rawTab = externalTab ?? internalTab;
-  const currentTab: 'maps' | 'expansions' | 'decorations' | 'equipment' =
-    rawTab === 'decor' ? 'decorations' : rawTab === 'blueprints' as any ? 'equipment' : (rawTab as any);
+  const currentTab: 'maps' | 'grid_expansions' | 'decorations' | 'equipment' =
+    rawTab === 'decor'
+      ? 'decorations'
+      : rawTab === 'expansions' || rawTab === 'grid_expansions'
+      ? 'grid_expansions'
+      : (rawTab as any) === 'blueprints'
+      ? 'equipment'
+      : (rawTab as any);
 
   const setTab = (t: MarketTabKey) => {
-    const normalized: MarketTabKey = t === 'decor' ? 'decorations' : t;
+    const normalized: MarketTabKey =
+      t === 'decor'
+        ? 'decorations'
+        : t === 'expansions' || t === 'grid_expansions'
+        ? 'grid_expansions'
+        : t;
     setInternalTab(normalized);
     onTabChange?.(normalized);
     setFocusedShopIdx(0);
     gameAudio?.playCrispClick?.();
   };
 
-  const tabs: MarketTabKey[] = ['maps', 'expansions', 'decorations', 'equipment'];
+  const tabs: MarketTabKey[] = ['maps', 'grid_expansions', 'decorations', 'equipment'];
 
   const discountMultiplier = Math.max(0.1, 1 - (discountRate || 0));
   const getPrice = (baseCost: number) => Math.max(1, Math.round(baseCost * discountMultiplier));
 
+  const effectiveBranchRank =
+    propMaxBranchRank ??
+    getMaxMasterQuestBranchRank(
+      masterQuests || (inventory as any)?.masterQuests || (inventory as any)?.masterQuest,
+    );
+
+  const currentTier = inventory.sanctuary_expansion_tier || 0;
+  const nextTier = currentTier + 1;
+  const isAllUnlocked = currentTier >= 8;
+  const activeExpansion = !isAllUnlocked && currentTier < SANCTUARY_EXPANSIONS.length
+    ? SANCTUARY_EXPANSIONS[currentTier]
+    : null;
+
+  // Calculate dynamic plots counts
+  let unlockedCount = 0;
+  let pendingCount = 0;
+  let lockedCount = 0;
+
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const stL = getPlotVisualStatus('left', r, c, currentTier, isAllUnlocked ? undefined : nextTier);
+      if (stL === 'unlocked') unlockedCount++;
+      else if (stL === 'pending') pendingCount++;
+      else lockedCount++;
+
+      const stR = getPlotVisualStatus('right', r, c, currentTier, isAllUnlocked ? undefined : nextTier);
+      if (stR === 'unlocked') unlockedCount++;
+      else if (stR === 'pending') pendingCount++;
+      else lockedCount++;
+    }
+  }
+
+  for (let r = 0; r < 16; r++) {
+    for (let c = 0; c < 16; c++) {
+      const stM = getPlotVisualStatus('main', r, c, currentTier, isAllUnlocked ? undefined : nextTier);
+      if (stM === 'unlocked') unlockedCount++;
+      else if (stM === 'pending') pendingCount++;
+      else lockedCount++;
+    }
+  }
+
+  // Exact 9-item catalog for Equipment submenu in prioritized sequence
+  const equipmentCatalog = [
+    {
+      id: 'irrigation_t1',
+      name: 'T1 Manual Irrigation System',
+      price: 10,
+      unlockRank: 0,
+      subtitle: 'Left & Right Plots (2 Total) • 30s',
+      description: 'Wooden stool with a water bucket and 2 outlet pipes extending Left and Right. Interacting [E] refills the reservoir for 30s of continuous watering.',
+      stock: getStructureInventoryCount(inventory, 'irrigation_t1'),
+      previewType: 'preview' as const,
+      itemKey: 'irrigation_t1',
+      borderTheme: 'border-sky-500/40',
+      badgeTheme: 'text-sky-400',
+      btnTheme: 'bg-sky-600 hover:bg-sky-500',
+      onBuy: () => onBuyManualIrrigation('irrigation_t1', 10, 'T1 Manual Irrigation System'),
+    },
+    {
+      id: 'irrigation_t2',
+      name: 'T2 Manual Irrigation System',
+      price: 20,
+      unlockRank: 0,
+      subtitle: '4-Way Cross Plots (4 Total) • 90s',
+      description: 'Sturdy timber trestle supporting a wooden water barrel with 4 pipes extending Up, Down, Left, Right. Interacting [E] refills for 90s of continuous watering.',
+      stock: getStructureInventoryCount(inventory, 'irrigation_t2'),
+      previewType: 'preview' as const,
+      itemKey: 'irrigation_t2',
+      borderTheme: 'border-sky-500/40',
+      badgeTheme: 'text-sky-400',
+      btnTheme: 'bg-sky-600 hover:bg-sky-500',
+      onBuy: () => onBuyManualIrrigation('irrigation_t2', 20, 'T2 Manual Irrigation System'),
+    },
+    {
+      id: 'irrigation_t3',
+      name: 'T3 Manual Irrigation System',
+      price: 50,
+      unlockRank: 0,
+      subtitle: 'All 8 Surrounding Plots (3x3 Grid) • 300s',
+      description: 'Heavy reinforced iron cistern on stone foundations with 8 branching conduits leading to all 8 surrounding plots (3x3). Interacting [E] refills for 300s (5 min) of watering.',
+      stock: getStructureInventoryCount(inventory, 'irrigation_t3'),
+      previewType: 'preview' as const,
+      itemKey: 'irrigation_t3',
+      borderTheme: 'border-sky-500/40',
+      badgeTheme: 'text-sky-400',
+      btnTheme: 'bg-sky-600 hover:bg-sky-500',
+      onBuy: () => onBuyManualIrrigation('irrigation_t3', 50, 'T3 Manual Irrigation System'),
+    },
+    {
+      id: 'tool_compost_heap',
+      name: 'Compost Heap',
+      price: 10,
+      unlockRank: 0,
+      subtitle: '20 Waste Capacity • Passive Decomposition',
+      description: 'Rustic slatted cedar timber compost bin box. Deposit up to 20 Organic Waste to passively decompose into usable Enriched Organic Compost (~10s per batch).',
+      stock: getStructureInventoryCount(inventory, 'tool_compost_heap'),
+      previewType: 'preview' as const,
+      itemKey: 'tool_compost_heap',
+      borderTheme: 'border-lime-500/40',
+      badgeTheme: 'text-lime-400',
+      btnTheme: 'bg-lime-600 hover:bg-lime-500',
+      onBuy: () => onBuyTool('tool_compost_heap', 10, 'Compost Heap'),
+    },
+    {
+      id: 'fertilizer_station',
+      name: 'Chemical Station',
+      price: 25,
+      unlockRank: 0,
+      subtitle: '2x2 Industrial Apparatus • 60s Cycle',
+      description: 'Expanded 2x2 high-tech chemical apparatus. Distills Waste & Biochemicals into powerful Fertilizer buffs (60s). Radiates Disrupted Zen 1 plot outwards (4x4 perimeter) unless fenced.',
+      stock: getStructureInventoryCount(inventory, 'fertilizer_station'),
+      previewType: 'preview' as const,
+      itemKey: 'fertilizer_station',
+      borderTheme: 'border-emerald-500/40',
+      badgeTheme: 'text-emerald-400',
+      btnTheme: 'bg-emerald-600 hover:bg-emerald-500',
+      onBuy: () => onBuyTool('fertilizer_station', 25, 'Chemical Station'),
+    },
+    {
+      id: 'biochemicals',
+      name: 'Biochemicals',
+      price: 5,
+      unlockRank: 0,
+      subtitle: 'Eco-Chemical Reagent',
+      description: 'Essential chemical catalyst reagent. Synthesizes Fertilizer at the Chemical Station when combined with Organic Waste.',
+      stock: inventory.biochemicals ?? inventory.resources?.biochemicals ?? 0,
+      previewType: 'icon' as const,
+      icon: '🧪',
+      badgeText: '',
+      borderTheme: 'border-cyan-500/40',
+      badgeTheme: 'text-cyan-300',
+      btnTheme: 'bg-cyan-600 hover:bg-cyan-500',
+      onBuy: () => onBuyBiochemicals(5),
+    },
+    {
+      id: 'license_t1',
+      name: 'T1 License',
+      price: 25,
+      unlockRank: 0,
+      subtitle: 'Tier 1 Engineering Certification',
+      description: 'Official certification required for crafting T1 Sprinklers, T1 Modules, and T1 equipment.',
+      stock: inventory.license_t1 ?? inventory.licenseT1 ?? 0,
+      previewType: 'icon' as const,
+      icon: '📜',
+      badgeText: 'T1',
+      borderTheme: 'border-amber-500/40',
+      badgeTheme: 'text-amber-300',
+      btnTheme: 'bg-amber-600 hover:bg-amber-500',
+      onBuy: () => onBuyEngineeringLicense(1, 25),
+    },
+    {
+      id: 'license_t2',
+      name: 'T2 License',
+      price: 75,
+      unlockRank: 1,
+      subtitle: 'Tier 2 Engineering • Requires Rank 1',
+      description: 'Advanced certification required for crafting T2 Sprinklers, T2 Workbench Upgrade, T2 Modules, and T2 Chassis.',
+      stock: inventory.license_t2 ?? inventory.licenseT2 ?? 0,
+      previewType: 'icon' as const,
+      icon: '📜',
+      badgeText: 'T2',
+      borderTheme: 'border-sky-500/40',
+      badgeTheme: 'text-sky-300',
+      btnTheme: 'bg-sky-600 hover:bg-sky-500',
+      onBuy: () => onBuyEngineeringLicense(2, 75),
+    },
+    {
+      id: 'license_t3',
+      name: 'T3 License',
+      price: 200,
+      unlockRank: 2,
+      subtitle: 'Tier 3 Master Engineering • Requires Rank 2',
+      description: 'Master certification required for crafting T3 Sprinklers, T3 Master Foundry Upgrade, T3 Modules, and T3 Vanguard Chassis.',
+      stock: inventory.license_t3 ?? inventory.licenseT3 ?? 0,
+      previewType: 'icon' as const,
+      icon: '📜',
+      badgeText: 'T3',
+      borderTheme: 'border-purple-500/40',
+      badgeTheme: 'text-purple-300',
+      btnTheme: 'bg-purple-600 hover:bg-purple-500',
+      onBuy: () => onBuyEngineeringLicense(3, 200),
+    },
+  ];
+
+  const visibleEquipment = equipmentCatalog.filter(
+    (item) => item.unlockRank <= effectiveBranchRank,
+  );
+
+  const isMapOwned = (mapId: string) => {
+    if (mapId === 'area2_base') {
+      return Boolean(inventory.has_map_highlands || inventory['area2_base'] || inventory.unlockedMaps?.includes('area2_base'));
+    }
+    if (mapId === 'area3_base') {
+      return Boolean(inventory.has_map_overgrowth || inventory['area3_base'] || inventory.unlockedMaps?.includes('area3_base'));
+    }
+    return Boolean(inventory[mapId] || inventory.unlockedMaps?.includes(mapId));
+  };
+
+  const visibleMaps = MAPS_CATALOG.filter(
+    (m) => m.showRank <= effectiveBranchRank && !isMapOwned(m.id),
+  );
+
   const tabLengths: Record<string, number> = {
-    maps: 2,
-    expansions: 4,
+    maps: visibleMaps.length,
+    grid_expansions: 1,
+    expansions: 1,
     decorations: 10,
     decor: 10,
-    equipment: 9,
+    equipment: visibleEquipment.length,
   };
 
   // Keyboard navigation for Botanical Market
@@ -111,17 +852,33 @@ export default function MarketModal({
         gameAudio?.playHoverMicroTone?.();
       } else if (e.key === 's' || e.key === 'S') {
         e.preventDefault();
-        const maxLen = tabLengths[currentTab] || 2;
+        const maxLen = tabLengths[currentTab] || 1;
         setFocusedShopIdx((i) => Math.min(maxLen - 1, i + 1));
         gameAudio?.playHoverMicroTone?.();
       } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'e' || e.key === 'E') {
         e.preventDefault();
         if (currentTab === 'maps') {
-          if (focusedShopIdx === 0) onBuyExpeditionMap('has_map_highlands', 250, 'Misty Highlands');
-          else if (focusedShopIdx === 1) onBuyExpeditionMap('has_map_overgrowth', 800, 'Ancient Overgrowth');
-        } else if (currentTab === 'expansions') {
-          const exp = SANCTUARY_EXPANSIONS[focusedShopIdx];
-          if (exp) onBuySanctuaryExpansion(exp.tier, exp.cost, exp.name);
+          const map = visibleMaps[focusedShopIdx];
+          if (map) {
+            const owned = isMapOwned(map.id);
+            const prereqMet = !map.prereqId || isMapOwned(map.prereqId);
+            const cost = getPrice(map.cost);
+            if (!owned && prereqMet && verdureBalance >= cost) {
+              onBuyExpeditionMap(map.id, map.cost, map.name);
+            }
+          }
+        } else if (currentTab === 'grid_expansions') {
+          if (!isAllUnlocked && activeExpansion) {
+            const discountedCost = getPrice(activeExpansion.cost);
+            const reqRank = (activeExpansion as any).reqRank || 0;
+            const isRankMet = effectiveBranchRank >= reqRank;
+            const canAfford = verdureBalance >= discountedCost;
+            if (isRankMet && canAfford) {
+              onBuySanctuaryExpansion(activeExpansion.tier, activeExpansion.cost, activeExpansion.name);
+            } else {
+              gameAudio?.playErrorBuzz?.();
+            }
+          }
         } else if (currentTab === 'decorations') {
           const decorList = [
             { type: 'bamboo_fence' as const, cost: 3, name: 'Bamboo Fence (Takegaki)' },
@@ -138,15 +895,8 @@ export default function MarketModal({
           const it = decorList[focusedShopIdx];
           if (it) onBuyDecoration(it.type, it.cost, it.name);
         } else if (currentTab === 'equipment') {
-          if (focusedShopIdx === 0) onBuyEngineeringLicense(1, 25);
-          else if (focusedShopIdx === 1) onBuyEngineeringLicense(2, 75);
-          else if (focusedShopIdx === 2) onBuyEngineeringLicense(3, 200);
-          else if (focusedShopIdx === 3) onBuyTool('tool_compost_heap', 20, 'Compost Heap');
-          else if (focusedShopIdx === 4) onBuyTool('fertilizer_station', 50, 'Chemical Station');
-          else if (focusedShopIdx === 5) onBuyBiochemicals(5);
-          else if (focusedShopIdx === 6) onBuyManualIrrigation('irrigation_t1', 10, 'T1 Manual Irrigation System');
-          else if (focusedShopIdx === 7) onBuyManualIrrigation('irrigation_t2', 25, 'T2 Manual Irrigation System');
-          else if (focusedShopIdx === 8) onBuyManualIrrigation('irrigation_t3', 75, 'T3 Manual Irrigation System');
+          const it = visibleEquipment[focusedShopIdx];
+          if (it) it.onBuy();
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
@@ -156,7 +906,7 @@ export default function MarketModal({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, currentTab, focusedShopIdx, onClose]);
+  }, [isOpen, currentTab, focusedShopIdx, visibleEquipment, activeExpansion, isAllUnlocked, effectiveBranchRank, verdureBalance, onClose]);
 
   if (!isOpen) return null;
 
@@ -193,7 +943,7 @@ export default function MarketModal({
         </div>
       </div>
 
-      {/* Shop Navigation Tabs (4 Harmonized Tabs without Blueprints, which are now in Zen Library) */}
+      {/* Shop Navigation Tabs */}
       <div className="grid grid-cols-4 gap-1.5 mb-3 shrink-0">
         <button
           onClick={() => setTab('maps')}
@@ -206,14 +956,14 @@ export default function MarketModal({
           <span>🗺️ Maps</span>
         </button>
         <button
-          onClick={() => setTab('expansions')}
+          onClick={() => setTab('grid_expansions')}
           className={`py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-            currentTab === 'expansions'
+            currentTab === 'grid_expansions'
               ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400/40'
               : 'bg-slate-800 text-slate-400 hover:bg-slate-750'
           }`}>
           <Maximize2 className="w-3.5 h-3.5" />
-          <span>🏡 Plots</span>
+          <span>🏡 Grid Expansions</span>
         </button>
         <button
           onClick={() => setTab('decorations')}
@@ -242,189 +992,303 @@ export default function MarketModal({
           <div className="text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800 flex items-center gap-2">
             <Info className="w-4 h-4 text-sky-400 shrink-0" />
             <span>
-              Purchased charts permanently unlock new wilderness regions with rich resource densities and rare saplings!
+              Base allowed travel is 60 steps. Purchase expansion maps to chart deeper wilderness and travel up to 160 steps from basecamp!
             </span>
           </div>
 
-          {/* Map 1: Misty Highlands Chart */}
-          <div className={`border p-4 rounded-2xl flex flex-col gap-2 transition-all ${
-            focusedShopIdx === 0
-              ? 'bg-slate-850 ring-4 ring-sky-400 border-sky-300 scale-[1.01] shadow-[0_0_20px_rgba(56,189,248,0.5)]'
-              : 'bg-slate-900/80 border-slate-800'
-          }`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-sky-950/80 border border-sky-500/50 flex items-center justify-center overflow-hidden">
-                  {assets['map_item']?.src ? (
-                    <img src={assets['map_item'].src} alt="Map" className="w-8 h-8 object-contain" />
-                  ) : (
-                    <MapIcon className="w-6 h-6 text-sky-400" />
-                  )}
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-2">
-                    {focusedShopIdx === 0 && <span className="text-sky-400 text-xs">► [E/A]</span>}
-                    Misty Highlands Chart
-                    {inv.has_map_highlands && (
-                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
-                        ✓ Owned
-                      </span>
-                    )}
-                  </h4>
-                  <span className="text-xs text-sky-300 font-semibold">
-                    Unlocks Area 2: Misty Highlands (2 kWh/step)
-                  </span>
-                </div>
-              </div>
-
-              <button
-                disabled={inv.has_map_highlands || verdureBalance < getPrice(250)}
-                onClick={() => onBuyExpeditionMap('has_map_highlands', 250, 'Misty Highlands')}
-                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center gap-1 cursor-pointer ${
-                  inv.has_map_highlands
-                    ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
-                    : verdureBalance >= getPrice(250)
-                    ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                }`}>
-                {!inv.has_map_highlands && <VerdureIcon className="w-3.5 h-3.5" />}
-                <span>
-                  {inv.has_map_highlands
-                    ? 'Discovered'
-                    : `Purchase (${getPrice(250)} Verdure)${discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}`}
-                </span>
-              </button>
+          {visibleMaps.length === 0 ? (
+            <div className="p-8 text-center bg-slate-900/40 rounded-2xl border border-slate-800 space-y-2">
+              <div className="text-3xl">🗺️</div>
+              <h4 className="text-sm font-bold text-slate-200">
+                All Available Wilderness Charts Acquired!
+              </h4>
+              <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                All expedition expansion maps for your current rank have been charted. Progress Zen Master Quests at the Bonsai Society to unlock higher rank wilderness charts.
+              </p>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              A topographic parchment revealing misty mountain ridges. Contains rich Copper Wire, Brass Gears, Circuit Boards, and Autumn Maple saplings.
-            </p>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {visibleMaps.map((map, idx) => {
+                const isFocused = focusedShopIdx === idx;
+                const owned = isMapOwned(map.id);
+                const prereqMet = !map.prereqId || isMapOwned(map.prereqId);
+                const discountedPrice = getPrice(map.cost);
+                const canAfford = verdureBalance >= discountedPrice;
 
-          {/* Map 2: Ancient Overgrowth Map */}
-          <div className={`border p-4 rounded-2xl flex flex-col gap-2 transition-all ${
-            focusedShopIdx === 1
-              ? 'bg-slate-850 ring-4 ring-purple-400 border-purple-300 scale-[1.01] shadow-[0_0_20px_rgba(168,85,247,0.5)]'
-              : 'bg-slate-900/80 border-slate-800'
-          }`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-950/80 border border-purple-500/50 flex items-center justify-center overflow-hidden">
-                  {assets['map_item']?.src ? (
-                    <img src={assets['map_item'].src} alt="Map" className="w-8 h-8 object-contain" />
-                  ) : (
-                    <MapIcon className="w-6 h-6 text-purple-400" />
-                  )}
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-2">
-                    {focusedShopIdx === 1 && <span className="text-purple-400 text-xs">► [E/A]</span>}
-                    Ancient Overgrowth Map
-                    {inv.has_map_overgrowth && (
-                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
-                        ✓ Owned
-                      </span>
-                    )}
-                  </h4>
-                  <span className="text-xs text-purple-300 font-semibold">
-                    Unlocks Area 3: Ancient Overgrowth (3 kWh/step)
-                  </span>
-                </div>
-              </div>
+                return (
+                  <div
+                    key={map.id}
+                    className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                      isFocused
+                        ? 'bg-slate-850 ring-4 ring-sky-400 border-sky-300 scale-[1.01] shadow-[0_0_20px_rgba(56,189,248,0.5)]'
+                        : 'bg-slate-900/80 border-slate-800'
+                    }`}>
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            style={{
+                              backgroundColor: `${map.themeColor}20`,
+                              borderColor: `${map.themeColor}50`,
+                            }}
+                            className="w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 shadow-inner">
+                            <MapIcon style={{ color: map.accentColor }} className="w-6 h-6" />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5 flex-wrap">
+                              {isFocused && <span className="text-sky-400 text-xs">► [E/A]</span>}
+                              <span>{map.name}</span>
+                              {owned && (
+                                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
+                                  ✓ Owned
+                                </span>
+                              )}
+                            </h4>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span
+                                style={{ color: map.accentColor }}
+                                className="text-[10px] font-bold font-mono">
+                                Area {map.areaNumber} • {map.stepsLabel}
+                              </span>
+                              {map.showRank > 0 && (
+                                <span className="text-[9px] text-slate-400 bg-slate-950 px-1.5 py-0.2 rounded border border-slate-700 font-mono">
+                                  Rank {map.showRank}+
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
 
-              <button
-                disabled={inv.has_map_overgrowth || verdureBalance < getPrice(800)}
-                onClick={() => onBuyExpeditionMap('has_map_overgrowth', 800, 'Ancient Overgrowth')}
-                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center gap-1 cursor-pointer ${
-                  inv.has_map_overgrowth
-                    ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
-                    : verdureBalance >= getPrice(800)
-                    ? 'bg-purple-600 hover:bg-purple-500 text-white active:scale-95'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                }`}>
-                {!inv.has_map_overgrowth && <VerdureIcon className="w-3.5 h-3.5" />}
-                <span>
-                  {inv.has_map_overgrowth
-                    ? 'Discovered'
-                    : `Purchase (${getPrice(800)} Verdure)${discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}`}
-                </span>
-              </button>
+                        <span className="text-xs font-mono font-bold text-slate-300 shrink-0 bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-800">
+                          {discountedPrice} Verdure
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-400 leading-relaxed mt-1">
+                        {map.description}
+                      </p>
+                    </div>
+
+                    <div className="pt-1">
+                      {owned ? (
+                        <button
+                          disabled
+                          className="w-full py-2 rounded-xl font-bold text-xs bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30 flex items-center justify-center gap-1.5">
+                          <span>✓ Owned / Purchased</span>
+                        </button>
+                      ) : !prereqMet ? (
+                        <button
+                          disabled
+                          className="w-full py-2 rounded-xl font-bold text-xs bg-slate-950/80 text-amber-400/80 cursor-not-allowed border border-amber-500/30 flex items-center justify-center gap-1.5">
+                          <span>🔒 Requires {map.prereqName || 'Prerequisite Map'}</span>
+                        </button>
+                      ) : (
+                        <button
+                          disabled={!canAfford}
+                          onClick={() => onBuyExpeditionMap(map.id, map.cost, map.name)}
+                          className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                            canAfford
+                              ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
+                              : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                          }`}>
+                          <VerdureIcon className="w-3.5 h-3.5" />
+                          <span>
+                            Purchase ({discountedPrice} Verdure)
+                            {discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              An ancient runic map leading into primeval forests. High density Electronic Chips, Circuit Boards, and the legendary <strong>Mythic Golden Ginkgo</strong>.
-            </p>
-          </div>
+          )}
         </div>
       )}
 
-      {/* TAB 2: SANCTUARY GREENHOUSE EXPANSIONS */}
-      {currentTab === 'expansions' && (
-        <div className="flex-1 space-y-2.5 mb-3 overflow-y-auto pr-1">
-          <div className="text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800 flex items-center gap-2">
-            <Info className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>
-              Unlock additional planting plots across the nursery floor to grow and automate more simultaneous bonsais!
-            </span>
+      {/* TAB 2: GRID EXPANSIONS (SINGLE PHASE PRESENTATION WITH INTERACTIVE SANCTUARY MINI-MAP) */}
+      {currentTab === 'grid_expansions' && (
+        <div className="flex-1 space-y-3 mb-3 overflow-y-auto pr-1">
+          {/* Header Banner */}
+          <div className="text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800 flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Maximize2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>
+                Sanctuary Cultivation Blueprint: Visualizes the tri-field layout (Central 16×16 &amp; Flanking 8×8 Wings).
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-bold text-emerald-300 bg-slate-950 px-2.5 py-1 rounded-lg border border-emerald-500/40">
+                Cultivated: <strong>{unlockedCount}</strong> / 384 Plots ({Math.round((unlockedCount / 384) * 100)}%)
+              </span>
+            </div>
           </div>
 
-          {SANCTUARY_EXPANSIONS.map((exp, expIdx) => {
-            const isOwned = inv.sanctuary_expansion_tier >= exp.tier;
-            const isPrevOwned = inv.sanctuary_expansion_tier >= exp.tier - 1;
-            const discountedExpCost = getPrice(exp.cost);
-            const canAfford = verdureBalance >= discountedExpCost;
-            const isFocused = focusedShopIdx === expIdx;
+          {/* Interactive Layout: Mini-Map on Left/Center & Single Phase Card on Right */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+            {/* MINI-MAP CONTAINER */}
+            <div className="lg:col-span-7 bg-slate-900/90 border border-slate-800 p-3 sm:p-4 rounded-2xl flex flex-col items-center shadow-lg">
+              <SanctuaryMiniMap
+                currentTier={currentTier}
+                targetTier={isAllUnlocked ? undefined : nextTier}
+                isAllUnlocked={isAllUnlocked}
+              />
 
-            return (
-              <div
-                key={exp.tier}
-                className={`border p-3.5 sm:p-4 rounded-2xl flex flex-col gap-2 transition-all ${
-                  isFocused
-                    ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
-                    : 'bg-slate-900/80 border-slate-800'
-                }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-950/80 border border-emerald-500/50 flex items-center justify-center">
-                      <Maximize2 className="w-5 h-5 text-emerald-400" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-2">
-                        {isFocused && <span className="text-emerald-400 text-xs">► [E/A]</span>}
-                        {exp.name}
-                        {isOwned && (
-                          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
-                            ✓ Unlocked
-                          </span>
-                        )}
-                      </h4>
-                      <span className="text-xs text-emerald-300 font-semibold">
-                        {exp.description}
-                      </span>
-                    </div>
+              {/* Color-Coded Mini-Map Legend */}
+              <div className="flex items-center justify-center gap-4 text-[11px] font-bold text-slate-300 mt-3 pt-2.5 border-t border-slate-800/80 w-full flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-xs bg-emerald-500 border border-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
+                  <span className="text-emerald-300">Unlocked ({unlockedCount})</span>
+                </div>
+                {!isAllUnlocked && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-xs bg-amber-500 border border-yellow-300 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+                    <span className="text-amber-300 font-black">Next Phase (+{pendingCount})</span>
                   </div>
-
-                  <button
-                    disabled={isOwned || !isPrevOwned || !canAfford}
-                    onClick={() => onBuySanctuaryExpansion(exp.tier, exp.cost, exp.name)}
-                    className={`px-4 py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center gap-1 cursor-pointer ${
-                      isOwned
-                        ? 'bg-slate-800 text-emerald-400 cursor-default border border-emerald-500/30'
-                        : isPrevOwned && canAfford
-                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}>
-                    {!isOwned && isPrevOwned && <VerdureIcon className="w-3.5 h-3.5" />}
-                    <span>
-                      {isOwned
-                        ? 'Active'
-                        : !isPrevOwned
-                        ? 'Requires Prev Tier'
-                        : `Unlock (${discountedExpCost} Verdure)${discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}`}
-                    </span>
-                  </button>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-xs bg-slate-800 border border-slate-700" />
+                  <span className="text-slate-500">Locked ({lockedCount})</span>
                 </div>
               </div>
-            );
-          })}
+            </div>
+
+            {/* SINGLE ACTIVE EXPANSION PHASE CARD OR COMPLETION BADGE */}
+            <div className="lg:col-span-5 flex flex-col justify-center">
+              {isAllUnlocked ? (
+                /* All 8 Expansions Unlocked Grand Completion Badge */
+                <div className="bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-950 border-2 border-emerald-400 p-6 rounded-2xl text-center space-y-4 shadow-2xl">
+                  <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-4xl shadow-[0_0_25px_rgba(52,211,153,0.5)] animate-pulse">
+                    🏆
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-emerald-300 tracking-wide">
+                      Sanctuary Fully Cultivated
+                    </h4>
+                    <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                      All 8 expansion phases completed! The entire tri-field sanctuary—including the central 16×16 greenhouse and both flanking 8×8 botanical terraces—is fully cultivated and flourishing with all 384 plots accessible.
+                    </p>
+                  </div>
+                  <div className="inline-flex items-center gap-2 bg-emerald-900/60 border border-emerald-400/60 px-3.5 py-1.5 rounded-full text-xs font-bold text-emerald-200 shadow">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>384 / 384 Plots Cultivated (100% Unlocked)</span>
+                  </div>
+                </div>
+              ) : activeExpansion ? (() => {
+                const reqRank = (activeExpansion as any).reqRank ?? (
+                  activeExpansion.tier <= 4 ? 0 : activeExpansion.tier <= 6 ? 1 : 2
+                );
+                const isRankMet = effectiveBranchRank >= reqRank;
+                const discountedExpCost = getPrice(activeExpansion.cost);
+                const canAfford = verdureBalance >= discountedExpCost;
+                const deficit = Math.max(0, discountedExpCost - verdureBalance);
+                const impactDesc = (activeExpansion as any).impact || activeExpansion.description;
+
+                return (
+                  <div className="bg-slate-900/95 border-2 border-amber-500/70 p-4 sm:p-5 rounded-2xl flex flex-col justify-between gap-3 shadow-xl">
+                    <div className="space-y-2.5">
+                      {/* Phase Tag & Status */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-[11px] font-mono font-bold uppercase tracking-wider bg-amber-950 text-amber-300 border border-amber-500/50 px-2.5 py-0.5 rounded-lg">
+                          Phase {activeExpansion.tier} of 8
+                        </span>
+                        <span className="text-xs font-mono font-bold text-emerald-400 bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-800">
+                          {activeExpansion.plots} Total Plots
+                        </span>
+                      </div>
+
+                      {/* Expansion Title */}
+                      <h4 className="text-base sm:text-lg font-black text-slate-100">
+                        {activeExpansion.name}
+                      </h4>
+
+                      {/* Impact Description Banner */}
+                      <div className="bg-amber-950/40 border border-amber-500/40 p-2.5 rounded-xl text-xs font-semibold text-amber-200">
+                        <span className="text-amber-400 font-bold block mb-0.5">Territory Impact:</span>
+                        <span>{impactDesc}</span>
+                      </div>
+
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {activeExpansion.description}
+                      </p>
+
+                      {/* Master Quest Rank Requirement Badge */}
+                      <div className="pt-1">
+                        {reqRank === 0 ? (
+                          <div className="flex items-center gap-2 text-xs text-emerald-300 font-bold bg-emerald-950/80 border border-emerald-500/40 px-3 py-1.5 rounded-xl shadow-sm">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <span>Rank 0 (Available from Start)</span>
+                          </div>
+                        ) : isRankMet ? (
+                          <div className="flex items-center gap-2 text-xs text-emerald-300 font-bold bg-emerald-950/80 border border-emerald-500/40 px-3 py-1.5 rounded-xl shadow-sm">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <span>✓ Rank {reqRank}+ Branch Finished (Current Max: Rank {effectiveBranchRank})</span>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 text-xs text-amber-300 font-bold bg-amber-950/90 border border-amber-500/70 px-3 py-1.5 rounded-xl shadow-sm">
+                              <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                              <span>🔒 Requires Rank {reqRank} Branch Finished (Current Max: Rank {effectiveBranchRank})</span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 leading-tight">
+                              Complete at least one Master Quest branch (Discovery, Competition, or Eco) to Rank {reqRank} at the Bonsai Society to qualify.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Pricing Breakdown */}
+                      <div className="bg-slate-950/90 border border-slate-800 p-2.5 rounded-xl flex items-center justify-between text-xs font-bold">
+                        <span className="text-slate-400">Expansion Price:</span>
+                        <div className="flex items-center gap-1.5">
+                          {discountRate > 0 && (
+                            <span className="line-through text-slate-500 text-xs font-mono">
+                              {activeExpansion.cost}
+                            </span>
+                          )}
+                          <span className="text-emerald-300 font-black font-mono text-sm">
+                            {discountedExpCost} Verdure
+                          </span>
+                          {discountRate > 0 && (
+                            <span className="text-[10px] text-amber-300 bg-amber-950 border border-amber-500/50 px-1.5 py-0.5 rounded font-mono">
+                              -{Math.round(discountRate * 100)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Interactive Action Button */}
+                    <div className="pt-2">
+                      {!isRankMet ? (
+                        <button
+                          disabled
+                          className="w-full py-3 rounded-xl font-bold text-xs bg-slate-850 text-amber-400/80 border border-amber-500/40 cursor-not-allowed flex items-center justify-center gap-2 shadow-sm">
+                          <Lock className="w-4 h-4 text-amber-400" />
+                          <span>🔒 Requires Rank {reqRank} Branch Finished</span>
+                        </button>
+                      ) : !canAfford ? (
+                        <button
+                          disabled
+                          className="w-full py-3 rounded-xl font-bold text-xs bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed flex items-center justify-center gap-2">
+                          <VerdureIcon className="w-4 h-4 opacity-50" />
+                          <span>Need {deficit.toFixed(0)} More Verdure</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onBuySanctuaryExpansion(activeExpansion.tier, activeExpansion.cost, activeExpansion.name)}
+                          className="w-full py-3 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/60 ring-1 ring-emerald-400/50 flex items-center justify-center gap-2 cursor-pointer transition-transform active:scale-95">
+                          <VerdureIcon className="w-4 h-4" />
+                          <span>Purchase Expansion ({discountedExpCost} Verdure)</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })() : null}
+            </div>
+          </div>
         </div>
       )}
 
@@ -854,399 +1718,89 @@ export default function MarketModal({
         </div>
       )}
 
-      {/* TAB 4: EQUIPMENT & NURSERY TOOLS */}
+      {/* TAB 4: EQUIPMENT & NURSERY TOOLS (2xX GRID) */}
       {currentTab === 'equipment' && (
         <div className="flex-1 space-y-2.5 mb-3 overflow-y-auto pr-1">
-          <div className="text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800 flex items-center gap-2">
-            <Wrench className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>
-              Acquire engineering licenses, deployable nursery tools, chemical stations &amp; manual irrigation systems!
-            </span>
-          </div>
-
-          {/* Engineering Licenses Section */}
-          <div className="space-y-2">
-            <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <span>📜</span>
-                <span>Engineering Licenses (Required for Advanced Crafting)</span>
-              </span>
-              <span className="text-[11px] text-slate-400 font-mono">
-                T1: {inv.license_t1 || inv.licenseT1 || 0} • T2: {inv.license_t2 || inv.licenseT2 || 0} • T3: {inv.license_t3 || inv.licenseT3 || 0}
+          <div className="text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800 flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                Manual irrigation systems, composting, chemical processors, and engineering licenses.
               </span>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {/* T1 License */}
-              <div className="bg-slate-900/90 border border-amber-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-xl bg-amber-950/80 border border-amber-500/50 flex items-center justify-center text-lg shrink-0">
-                        📜
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-xs sm:text-sm text-slate-100">T1 License</h4>
-                        <span className="text-[10px] text-amber-300 font-semibold">Tier 1 Engineering</span>
-                      </div>
-                    </div>
-                    <span className="text-xs bg-slate-950 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                      Owned: {inv.license_t1 || inv.licenseT1 || 0}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Official certification required for crafting T1 Sprinklers, T1 Modules, and T1 equipment.
-                  </p>
-                </div>
-
-                <button
-                  disabled={verdureBalance < getPrice(25)}
-                  onClick={() => onBuyEngineeringLicense(1, 25)}
-                  className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                    verdureBalance >= getPrice(25)
-                      ? 'bg-amber-600 hover:bg-amber-500 text-white active:scale-95'
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                  }`}>
-                  <VerdureIcon className="w-3.5 h-3.5" />
-                  <span>Purchase ({getPrice(25)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
-                </button>
-              </div>
-
-              {/* T2 License */}
-              <div className="bg-slate-900/90 border border-sky-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-xl bg-sky-950/80 border border-sky-500/50 flex items-center justify-center text-lg shrink-0">
-                        📜
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-xs sm:text-sm text-slate-100">T2 License</h4>
-                        <span className="text-[10px] text-sky-300 font-semibold">Tier 2 Engineering</span>
-                      </div>
-                    </div>
-                    <span className="text-xs bg-slate-950 text-sky-300 border border-sky-500/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                      Owned: {inv.license_t2 || inv.licenseT2 || 0}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Advanced certification required for crafting T2 Sprinklers, T2 Workbench Upgrade, T2 Modules, and T2 Chassis.
-                  </p>
-                </div>
-
-                <button
-                  disabled={verdureBalance < getPrice(75)}
-                  onClick={() => onBuyEngineeringLicense(2, 75)}
-                  className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                    verdureBalance >= getPrice(75)
-                      ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                  }`}>
-                  <VerdureIcon className="w-3.5 h-3.5" />
-                  <span>Purchase ({getPrice(75)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
-                </button>
-              </div>
-
-              {/* T3 License */}
-              <div className="bg-slate-900/90 border border-purple-500/40 p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow">
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-xl bg-purple-950/80 border border-purple-500/50 flex items-center justify-center text-lg shrink-0">
-                        📜
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-xs sm:text-sm text-slate-100">T3 License</h4>
-                        <span className="text-[10px] text-purple-300 font-semibold">Tier 3 Master Engineering</span>
-                      </div>
-                    </div>
-                    <span className="text-xs bg-slate-950 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                      Owned: {inv.license_t3 || inv.licenseT3 || 0}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Master certification required for crafting T3 Sprinklers, T3 Master Foundry Upgrade, T3 Modules, and T3 Vanguard Chassis.
-                  </p>
-                </div>
-
-                <button
-                  disabled={verdureBalance < getPrice(200)}
-                  onClick={() => onBuyEngineeringLicense(3, 200)}
-                  className={`w-full py-2 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                    verdureBalance >= getPrice(200)
-                      ? 'bg-purple-600 hover:bg-purple-500 text-white active:scale-95'
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                  }`}>
-                  <VerdureIcon className="w-3.5 h-3.5" />
-                  <span>Purchase ({getPrice(200)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
-                </button>
-              </div>
-            </div>
+            {effectiveBranchRank < 2 && (
+              <span className="text-[11px] font-mono font-bold text-amber-300/90 bg-amber-950/60 border border-amber-500/30 px-2 py-0.5 rounded-lg">
+                Higher tier licenses unlock with Master Quest branch ranks (Rank 1 &amp; 2)
+              </span>
+            )}
           </div>
 
-          {/* Nursery Equipment Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800">
-            {/* 1. Compost Heap (20 Verdure) */}
-            <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
-              focusedShopIdx === 3
-                ? 'bg-slate-850 ring-4 ring-lime-400 border-lime-300 scale-[1.01] shadow-[0_0_20px_rgba(163,230,53,0.5)]'
-                : 'bg-slate-900/80 border-lime-500/40'
-            }`}>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-lime-950/80 border border-lime-500/50 flex items-center justify-center overflow-hidden shrink-0">
-                      {assets['tool_compost_heap']?.src ? (
-                        <img src={assets['tool_compost_heap'].src} alt="Compost Heap" className="w-9 h-9 object-contain" />
-                      ) : (
-                        <span className="text-2xl">🍂</span>
-                      )}
+          {/* 2 by X Grid matching the Decorations tab layout */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {visibleEquipment.map((item, idx) => {
+              const isFocused = focusedShopIdx === idx;
+              const discountedPrice = getPrice(item.price);
+              const canAfford = verdureBalance >= discountedPrice;
+
+              return (
+                <div
+                  key={item.id}
+                  className={`border p-3.5 rounded-2xl flex flex-col justify-between gap-2 shadow transition-all ${
+                    isFocused
+                      ? 'bg-slate-850 ring-4 ring-amber-400 border-amber-300 scale-[1.01] shadow-[0_0_20px_rgba(251,191,36,0.5)]'
+                      : `bg-slate-900/80 ${item.borderTheme}`
+                  }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2.5">
+                        {item.previewType === 'preview' && item.itemKey ? (
+                          <ItemVectorPreview itemKey={item.itemKey} width={44} height={44} />
+                        ) : (
+                          <div className="w-[44px] h-[44px] rounded-xl border border-slate-700 bg-slate-950/80 shrink-0 shadow-inner flex flex-col items-center justify-center">
+                            <span className="text-xl">{item.icon}</span>
+                            {item.badgeText && (
+                              <span className="text-[9px] font-black font-mono text-amber-300 leading-none mt-0.5">
+                                {item.badgeText}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                            {isFocused && <span className="text-amber-400 text-xs">► [E/A]</span>}
+                            <span>{item.name}</span>
+                          </h4>
+                          <span className={`text-[10px] font-bold ${item.badgeTheme}`}>
+                            {item.subtitle}
+                          </span>
+                        </div>
+                      </div>
+                      <span className={`text-xs bg-slate-950 border px-2 py-0.5 rounded-lg font-mono font-bold ${item.badgeTheme} border-slate-700`}>
+                        Stock: {item.stock}
+                      </span>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
-                        {focusedShopIdx === 3 && <span className="text-lime-400 text-xs">► [E/A]</span>}
-                        <span>Compost Heap</span>
-                      </h4>
-                      <span className="text-xs text-lime-400 font-bold">20 Waste Capacity • Passive Compost</span>
-                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      {item.description}
+                    </p>
                   </div>
-                  <span className="text-xs bg-slate-950 text-lime-300 border border-lime-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                    Stock: {getStructureInventoryCount(inv, 'tool_compost_heap')}
-                  </span>
+
+                  <button
+                    disabled={!canAfford}
+                    onClick={item.onBuy}
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
+                      canAfford
+                        ? `${item.btnTheme} text-white active:scale-95`
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}>
+                    <VerdureIcon className="w-3.5 h-3.5" />
+                    <span>
+                      Purchase ({discountedPrice} Verdure)
+                      {discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}
+                    </span>
+                  </button>
                 </div>
-
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Rustic slatted cedar timber compost bin box. Deposit up to 20 Organic Waste to passively decompose into usable Enriched Organic Compost (~10s per batch).
-                </p>
-              </div>
-
-              <button
-                disabled={verdureBalance < getPrice(20)}
-                onClick={() => onBuyTool('tool_compost_heap', 20, 'Compost Heap')}
-                className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= getPrice(20)
-                    ? 'bg-lime-600 hover:bg-lime-500 text-white active:scale-95'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                }`}>
-                <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase Compost Heap ({getPrice(20)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
-              </button>
-            </div>
-
-            {/* 2. Chemical Station (50 Verdure) */}
-            <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
-              focusedShopIdx === 4
-                ? 'bg-slate-850 ring-4 ring-emerald-400 border-emerald-300 scale-[1.01] shadow-[0_0_20px_rgba(52,211,153,0.5)]'
-                : 'bg-slate-900/80 border-emerald-500/40'
-            }`}>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-emerald-950/80 border border-emerald-500/50 flex items-center justify-center overflow-hidden shrink-0">
-                      <span className="text-2xl">🧪</span>
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
-                        {focusedShopIdx === 4 && <span className="text-emerald-400 text-xs">► [E/A]</span>}
-                        <span>Chemical Station</span>
-                      </h4>
-                      <span className="text-xs text-emerald-400 font-bold">2x2 Industrial Apparatus • 60s Cycle</span>
-                    </div>
-                  </div>
-                  <span className="text-xs bg-slate-950 text-emerald-300 border border-emerald-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                    Stock: {getStructureInventoryCount(inv, 'fertilizer_station')}
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Expanded 2x2 high-tech chemical apparatus. Distills 3 Waste + 1 Biochemical into 1 Fertilizer (60s). Radiates Disrupted Zen 1 plot outwards (4x4 perimeter) unless fenced.
-                </p>
-              </div>
-
-              <button
-                disabled={verdureBalance < getPrice(50)}
-                onClick={() => onBuyTool('fertilizer_station', 50, 'Chemical Station')}
-                className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= getPrice(50)
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                }`}>
-                <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase Chemical Station ({getPrice(50)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
-              </button>
-            </div>
-
-            {/* 3. Biochemicals (5 Verdure each) */}
-            <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
-              focusedShopIdx === 5
-                ? 'bg-slate-850 ring-4 ring-cyan-400 border-cyan-300 scale-[1.01] shadow-[0_0_20px_rgba(6,182,212,0.5)]'
-                : 'bg-slate-900/80 border-cyan-500/40'
-            }`}>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-cyan-950/80 border border-cyan-500/50 flex items-center justify-center overflow-hidden shrink-0">
-                      <span className="text-2xl">🧪</span>
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
-                        {focusedShopIdx === 5 && <span className="text-cyan-400 text-xs">► [E/A]</span>}
-                        <span>Biochemicals</span>
-                      </h4>
-                      <span className="text-xs text-cyan-300 font-bold">Eco-Chemical Reagent</span>
-                    </div>
-                  </div>
-                  <span className="text-xs bg-slate-950 text-cyan-300 border border-cyan-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                    Stock: {inv.biochemicals ?? inv.resources?.biochemicals ?? 0}
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Essential chemical catalyst reagent. Synthesizes Fertilizer at the Fertilizer Station when combined with Organic Waste (3 Waste + 1 Biochemical &rarr; 1 Fertilizer).
-                </p>
-              </div>
-
-              <button
-                disabled={verdureBalance < getPrice(5)}
-                onClick={() => onBuyBiochemicals(5)}
-                className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= getPrice(5)
-                    ? 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                }`}>
-                <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase Biochemical ({getPrice(5)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
-              </button>
-            </div>
-
-            {/* 4. T1 Manual Irrigation System (10 Verdure) */}
-            <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
-              focusedShopIdx === 6
-                ? 'bg-slate-850 ring-4 ring-sky-400 border-sky-300 scale-[1.01] shadow-[0_0_20px_rgba(56,189,248,0.5)]'
-                : 'bg-slate-900/80 border-sky-500/40'
-            }`}>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-sky-950/80 border border-sky-500/50 flex items-center justify-center overflow-hidden shrink-0">
-                      <span className="text-2xl">💧</span>
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
-                        {focusedShopIdx === 6 && <span className="text-sky-400 text-xs">► [E/A]</span>}
-                        <span>T1 Manual Irrigation System</span>
-                      </h4>
-                      <span className="text-xs text-sky-400 font-bold">Left &amp; Right Plots (2 Total) • 30 Seconds</span>
-                    </div>
-                  </div>
-                  <span className="text-xs bg-slate-950 text-sky-300 border border-sky-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                    Stock: {getStructureInventoryCount(inv, 'irrigation_t1')}
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Wooden stool with a water bucket and 2 outlet pipes extending Left and Right. Interacting [E] refills the reservoir for 30s of continuous watering.
-                </p>
-              </div>
-
-              <button
-                disabled={verdureBalance < getPrice(10)}
-                onClick={() => onBuyManualIrrigation('irrigation_t1', 10, 'T1 Manual Irrigation System')}
-                className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= getPrice(10)
-                    ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                }`}>
-                <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase T1 Irrigation ({getPrice(10)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
-              </button>
-            </div>
-
-            {/* 5. T2 Manual Irrigation System (25 Verdure) */}
-            <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
-              focusedShopIdx === 7
-                ? 'bg-slate-850 ring-4 ring-sky-400 border-sky-300 scale-[1.01] shadow-[0_0_20px_rgba(56,189,248,0.5)]'
-                : 'bg-slate-900/80 border-sky-500/40'
-            }`}>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-sky-950/80 border border-sky-500/50 flex items-center justify-center overflow-hidden shrink-0">
-                      <span className="text-2xl">💧</span>
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
-                        {focusedShopIdx === 7 && <span className="text-sky-400 text-xs">► [E/A]</span>}
-                        <span>T2 Manual Irrigation System</span>
-                      </h4>
-                      <span className="text-xs text-sky-400 font-bold">4-Way Cross Plots (4 Total) • 90 Seconds</span>
-                    </div>
-                  </div>
-                  <span className="text-xs bg-slate-950 text-sky-300 border border-sky-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                    Stock: {getStructureInventoryCount(inv, 'irrigation_t2')}
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Sturdy timber trestle supporting a wooden water barrel with 4 pipes extending Up, Down, Left, Right. Interacting [E] refills for 90s of continuous watering.
-                </p>
-              </div>
-
-              <button
-                disabled={verdureBalance < getPrice(25)}
-                onClick={() => onBuyManualIrrigation('irrigation_t2', 25, 'T2 Manual Irrigation System')}
-                className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= getPrice(25)
-                    ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                }`}>
-                <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase T2 Irrigation ({getPrice(25)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
-              </button>
-            </div>
-
-            {/* 6. T3 Manual Irrigation System (75 Verdure) */}
-            <div className={`border p-4 rounded-2xl flex flex-col justify-between gap-3 shadow transition-all ${
-              focusedShopIdx === 8
-                ? 'bg-slate-850 ring-4 ring-sky-400 border-sky-300 scale-[1.01] shadow-[0_0_20px_rgba(56,189,248,0.5)]'
-                : 'bg-slate-900/80 border-sky-500/40'
-            }`}>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-sky-950/80 border border-sky-500/50 flex items-center justify-center overflow-hidden shrink-0">
-                      <span className="text-2xl">💧</span>
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
-                        {focusedShopIdx === 8 && <span className="text-sky-400 text-xs">► [E/A]</span>}
-                        <span>T3 Manual Irrigation System</span>
-                      </h4>
-                      <span className="text-xs text-sky-400 font-bold">All 8 Surrounding Plots (3x3 Grid) • 300 Seconds</span>
-                    </div>
-                  </div>
-                  <span className="text-xs bg-slate-950 text-sky-300 border border-sky-600/40 px-2 py-0.5 rounded-lg font-mono font-bold">
-                    Stock: {getStructureInventoryCount(inv, 'irrigation_t3')}
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Heavy reinforced iron cistern on stone foundations with 8 branching conduits leading to all 8 surrounding plots (3x3). Interacting [E] refills for 300s (5 min) of watering.
-                </p>
-              </div>
-
-              <button
-                disabled={verdureBalance < getPrice(75)}
-                onClick={() => onBuyManualIrrigation('irrigation_t3', 75, 'T3 Manual Irrigation System')}
-                className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer ${
-                  verdureBalance >= getPrice(75)
-                    ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                }`}>
-                <VerdureIcon className="w-3.5 h-3.5" />
-                <span>Purchase T3 Irrigation ({getPrice(75)} Verdure){discountRate > 0 ? ` [${Math.round(discountRate * 100)}% off]` : ''}</span>
-              </button>
-            </div>
+              );
+            })}
           </div>
         </div>
       )}

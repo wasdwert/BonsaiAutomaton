@@ -20,7 +20,6 @@ import {
   MasterQuestsState,
   ECO_REQUESTS,
 } from './types';
-import { VerdureIcon } from './App';
 import {
   DeployedStructure,
   GameStats,
@@ -1064,12 +1063,8 @@ export default function SocietyModal({
                 <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-xs text-slate-300">
                     <span className="text-amber-400 font-bold">Rank 1 Reward:</span>
-                    <span className="bg-amber-950/80 text-amber-300 border border-amber-500/50 px-2 py-0.5 rounded-lg font-mono font-bold flex items-center gap-1">
-                      <VerdureIcon className="w-3 h-3" />
-                      <span>+250.00 Verdure</span>
-                    </span>
-                    <span className="bg-pink-950/80 text-pink-300 border border-pink-500/50 px-2 py-0.5 rounded-lg font-mono font-bold">
-                      🌸 +5 Zen Points
+                    <span className="text-emerald-400 font-bold">
+                      Unlocks new blueprints &amp; skills
                     </span>
                   </div>
 
@@ -1152,12 +1147,8 @@ export default function SocietyModal({
                 <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-xs text-slate-300">
                     <span className="text-amber-400 font-bold">Rank 1 Reward:</span>
-                    <span className="bg-amber-950/80 text-amber-300 border border-amber-500/50 px-2 py-0.5 rounded-lg font-mono font-bold flex items-center gap-1">
-                      <VerdureIcon className="w-3 h-3" />
-                      <span>+300.00 Verdure</span>
-                    </span>
-                    <span className="bg-pink-950/80 text-pink-300 border border-pink-500/50 px-2 py-0.5 rounded-lg font-mono font-bold">
-                      🌸 +5 Zen Points
+                    <span className="text-sky-400 font-bold">
+                      Unlocks new blueprints &amp; skills
                     </span>
                   </div>
 
@@ -1308,12 +1299,8 @@ export default function SocietyModal({
                 <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-xs text-slate-300">
                     <span className="text-amber-400 font-bold">Rank 1 Reward:</span>
-                    <span className="bg-amber-950/80 text-amber-300 border border-amber-500/50 px-2 py-0.5 rounded-lg font-mono font-bold flex items-center gap-1">
-                      <VerdureIcon className="w-3 h-3" />
-                      <span>+500.00 Verdure</span>
-                    </span>
-                    <span className="bg-pink-950/80 text-pink-300 border border-pink-500/50 px-2 py-0.5 rounded-lg font-mono font-bold">
-                      🌸 +5 Zen Points
+                    <span className="text-amber-300 font-bold">
+                      Unlocks new blueprints &amp; skills
                     </span>
                   </div>
 

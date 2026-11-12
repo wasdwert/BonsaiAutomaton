@@ -229,10 +229,12 @@ import {
   GlobalCareDispenserLimits,
   DEFAULT_CARE_DISPENSER_LIMITS,
 } from './types';
+export type { RoverModuleType };
 export { calculateBaseAesthetic };
 import BonsaiExcavationModal, { ExcavationResultData } from './BonsaiExcavationModal';
 import BonsaiInspectionModal from './BonsaiInspectionModal';
 import DeploymentModal, { BonsaiStyleThumbnail } from './DeploymentModal';
+import RoverModal from './RoverModal';
 import { SeedlingItem } from './types';
 import SaveLoadModal from './SaveLoadModal';
 import OfflineReportModal from './OfflineReportModal';
@@ -253,127 +255,28 @@ import {
 const BACKGROUND_MUSIC_URL =
   'https://storage.googleapis.com/assets-gen-playground/musiclibrary/verdant_bloom.mp3';
 
-// Grid Configuration for Sanctuary (16 columns x 8 rows matrix, 128 total plots with vertical scrolling)
-export const SANCTUARY_GRID = {
-  cols: 16,
-  rows: 8,
-  cellW: 72,
-  cellH: 74,
-  startX: 100, // cols 0..15 -> 100 to 1180 (Center = 640)
-  startY: 306, // rows 0..7 -> 306 to 824 (clean 16px gap below station frame at 240)
-};
-
-export const SANCTUARY_WORLD_HEIGHT = 1040;
-
-export interface SanctuaryPlotInfo {
-  col: number;
-  row: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  centerX: number;
-  centerY: number;
-  isUnlocked: boolean;
-}
-
-/**
- * Returns the exact sanctuary plot physically bounding the player avatar's coordinate.
- * Returns null strictly if the player is off-grid (e.g. on the gravel promenade or outside grid perimeter).
- */
-export function getPlotAtCoords(
-  playerX: number,
-  playerY: number,
-  expansionTier = 0,
-): SanctuaryPlotInfo | null {
-  const halfTileW = (SANCTUARY_GRID.cellW - 8) / 2;
-  const halfTileH = (SANCTUARY_GRID.cellH - 8) / 2;
-  const tileW = halfTileW * 2;
-  const tileH = halfTileH * 2;
-
-  const gridLeft = SANCTUARY_GRID.startX - SANCTUARY_GRID.cellW / 2;
-  const gridRight = SANCTUARY_GRID.startX + (SANCTUARY_GRID.cols - 0.5) * SANCTUARY_GRID.cellW;
-  const gridTop = SANCTUARY_GRID.startY - SANCTUARY_GRID.cellH / 2;
-  const gridBottom = SANCTUARY_GRID.startY + (SANCTUARY_GRID.rows - 0.5) * SANCTUARY_GRID.cellH;
-
-  // Player is physically outside the sanctuary plots grid perimeter (e.g. promenade or borders)
-  if (playerX < gridLeft || playerX >= gridRight || playerY < gridTop || playerY >= gridBottom) {
-    return null;
-  }
-
-  const c = Math.floor((playerX - gridLeft) / SANCTUARY_GRID.cellW);
-  const r = Math.floor((playerY - gridTop) / SANCTUARY_GRID.cellH);
-
-  if (c < 0 || c >= SANCTUARY_GRID.cols || r < 0 || r >= SANCTUARY_GRID.rows) {
-    return null;
-  }
-
-  const centerX = SANCTUARY_GRID.startX + c * SANCTUARY_GRID.cellW;
-  const centerY = SANCTUARY_GRID.startY + r * SANCTUARY_GRID.cellH;
-  const plotX = centerX - halfTileW;
-  const plotY = centerY - halfTileH;
-
-  let isUnlocked = false;
-  if (expansionTier >= 4) isUnlocked = true;
-  else if (expansionTier === 3) isUnlocked = r >= 0 && r <= 5;
-  else if (expansionTier === 2) isUnlocked = r >= 0 && r <= 3;
-  else if (expansionTier === 1) isUnlocked = c >= 4 && c <= 11 && r >= 0 && r <= 3;
-  else isUnlocked = c >= 6 && c <= 9 && r >= 0 && r <= 3;
-
-  return {
-    col: c,
-    row: r,
-    x: plotX,
-    y: plotY,
-    width: tileW,
-    height: tileH,
-    centerX,
-    centerY,
-    isUnlocked,
-  };
-}
-
-/**
- * Returns the sanctuary plot info for placement preview.
- * Clamps coordinates to the nearest valid grid plot bounds so preview is immediately active.
- */
-export function getPreviewPlot(
-  playerX: number,
-  playerY: number,
-  expansionTier = 0,
-): SanctuaryPlotInfo {
-  const halfTileW = (SANCTUARY_GRID.cellW - 8) / 2;
-  const halfTileH = (SANCTUARY_GRID.cellH - 8) / 2;
-  const gridLeft = SANCTUARY_GRID.startX - SANCTUARY_GRID.cellW / 2;
-  const gridTop = SANCTUARY_GRID.startY - SANCTUARY_GRID.cellH / 2;
-
-  const c = Math.max(0, Math.min(SANCTUARY_GRID.cols - 1, Math.floor((playerX - gridLeft) / SANCTUARY_GRID.cellW)));
-  const r = Math.max(0, Math.min(SANCTUARY_GRID.rows - 1, Math.floor((playerY - gridTop) / SANCTUARY_GRID.cellH)));
-
-  const centerX = SANCTUARY_GRID.startX + c * SANCTUARY_GRID.cellW;
-  const centerY = SANCTUARY_GRID.startY + r * SANCTUARY_GRID.cellH;
-  const plotX = centerX - halfTileW;
-  const plotY = centerY - halfTileH;
-
-  let isUnlocked = false;
-  if (expansionTier >= 4) isUnlocked = true;
-  else if (expansionTier === 3) isUnlocked = r >= 0 && r <= 5;
-  else if (expansionTier === 2) isUnlocked = r >= 0 && r <= 3;
-  else if (expansionTier === 1) isUnlocked = c >= 4 && c <= 11 && r >= 0 && r <= 3;
-  else isUnlocked = c >= 6 && c <= 9 && r >= 0 && r <= 3;
-
-  return {
-    col: c,
-    row: r,
-    x: plotX,
-    y: plotY,
-    width: halfTileW * 2,
-    height: halfTileH * 2,
-    centerX,
-    centerY,
-    isUnlocked,
-  };
-}
+export {
+  SANCTUARY_LAYOUT,
+  SANCTUARY_GRID,
+  SANCTUARY_WORLD_WIDTH,
+  SANCTUARY_WORLD_HEIGHT,
+  SANCTUARY_EXPANSIONS,
+  type SanctuaryPlotInfo,
+  getPlotAtCoords,
+  getPreviewPlot,
+  isGridPlotUnlocked,
+} from './SanctuaryCanvas';
+import {
+  SANCTUARY_LAYOUT,
+  SANCTUARY_GRID,
+  SANCTUARY_WORLD_WIDTH,
+  SANCTUARY_WORLD_HEIGHT,
+  SANCTUARY_EXPANSIONS,
+  SanctuaryPlotInfo,
+  getPlotAtCoords,
+  getPreviewPlot,
+  isGridPlotUnlocked,
+} from './SanctuaryCanvas';
 
 // Excursion Grid Tile Size (64px per step)
 export const EXCURSION_TILE_SIZE = 64;
@@ -433,6 +336,7 @@ export interface DeployedStructure {
   gridY: number;
   col?: number;
   row?: number;
+  field?: 'main' | 'left' | 'right';
   rotation?: number;
   variant?: number;
   godIndex?: number;
@@ -2332,6 +2236,57 @@ export const BIOME_CODEX_RESOURCES: Record<ExpeditionBiomeId, ResourceItemKey[]>
   OVERGROWTH: ['scrap_metal', 'copper_wire', 'scrap_metal_double', 'copper_wire_double', 'brass_gears'],
 };
 
+export function getAvailableCodexMaturities(
+  biomeId: ExpeditionBiomeId,
+  maxSteps: number,
+): MaturityTier[] {
+  if (biomeId === 'FOOTHILLS') {
+    const list: MaturityTier[] = ['sprout', 'sapling', 'notable'];
+    if (maxSteps >= 80) list.push('refined');
+    if (maxSteps >= 100) list.push('premium');
+    return list;
+  }
+  if (biomeId === 'HIGHLANDS') {
+    const list: MaturityTier[] = ['sprout', 'sapling', 'notable', 'refined'];
+    if (maxSteps >= 80) list.push('premium');
+    return list;
+  }
+  // OVERGROWTH (Ancient Caldera)
+  return ['sprout', 'sapling', 'notable', 'refined', 'premium'];
+}
+
+export function getAvailableCodexResources(
+  biomeId: ExpeditionBiomeId,
+  maxSteps: number,
+): ResourceItemKey[] {
+  if (biomeId === 'FOOTHILLS') {
+    const list: ResourceItemKey[] = ['scrap_metal', 'copper_wire', 'scrap_metal_double'];
+    if (maxSteps >= 80) list.push('copper_wire_double');
+    if (maxSteps >= 100) list.push('brass_gears');
+    if (maxSteps >= 120) list.push('scrap_metal_triple');
+    if (maxSteps >= 140) list.push('brass_gears_double');
+    if (maxSteps >= 160) list.push('circuit_boards');
+    return list;
+  }
+  if (biomeId === 'HIGHLANDS') {
+    const list: ResourceItemKey[] = ['scrap_metal', 'copper_wire', 'scrap_metal_double', 'copper_wire_double'];
+    if (maxSteps >= 80) list.push('brass_gears');
+    if (maxSteps >= 100) list.push('scrap_metal_triple');
+    if (maxSteps >= 120) list.push('brass_gears_double');
+    if (maxSteps >= 140) list.push('circuit_boards');
+    if (maxSteps >= 160) list.push('copper_wire_triple');
+    return list;
+  }
+  // OVERGROWTH (Ancient Caldera)
+  const list: ResourceItemKey[] = ['scrap_metal', 'copper_wire', 'scrap_metal_double', 'copper_wire_double', 'brass_gears'];
+  if (maxSteps >= 80) list.push('scrap_metal_triple');
+  if (maxSteps >= 100) list.push('brass_gears_double');
+  if (maxSteps >= 120) list.push('circuit_boards');
+  if (maxSteps >= 140) list.push('copper_wire_triple');
+  if (maxSteps >= 160) list.push('circuit_boards_double');
+  return list;
+}
+
 export const CODEX_RESOURCE_ICONS: Record<ResourceItemKey, string> = {
   scrap_metal: '🔩',
   copper_wire: '⚡',
@@ -2340,6 +2295,10 @@ export const CODEX_RESOURCE_ICONS: Record<ResourceItemKey, string> = {
   electronic_chips: '💎',
   scrap_metal_double: '🔩x2',
   copper_wire_double: '⚡x2',
+  scrap_metal_triple: '🔩x3',
+  copper_wire_triple: '⚡x3',
+  brass_gears_double: '⚙️x2',
+  circuit_boards_double: '🟩x2',
 };
 
 /**
@@ -2406,6 +2365,61 @@ function CodexResourceVectorArt({ resKey }: { resKey: ResourceItemKey }) {
     );
   }
 
+  if (resKey === 'scrap_metal_triple') {
+    return (
+      <svg className="w-6 h-6 drop-shadow" viewBox="0 0 28 24" fill="none">
+        {/* Trio of layered metallic scrap plates/sheets with gold rivets */}
+        {/* Layer 1 - Back Left */}
+        <g transform="translate(-2, 2) scale(0.85)">
+          <path
+            d="M3 6.5L14.5 4.5L16.2 16.5L4.8 18.5Z"
+            fill="#78350f"
+            stroke="#fde047"
+            strokeWidth="1.1"
+            strokeLinejoin="round"
+          />
+          <path d="M4.8 7.5L13.8 5.8L15 15.6L6 17.2Z" fill="#92400e" />
+          <circle cx="6" cy="8.6" r="0.9" fill="#fef08a" stroke="#78350f" strokeWidth="0.4" />
+          <circle cx="13" cy="7.2" r="0.9" fill="#fef08a" stroke="#78350f" strokeWidth="0.4" />
+          <circle cx="6.8" cy="15.8" r="0.9" fill="#fef08a" stroke="#78350f" strokeWidth="0.4" />
+        </g>
+        {/* Shadow behind middle plate */}
+        <path d="M6 7L16 5.5L17.5 16L7.5 17.5Z" fill="rgba(0,0,0,0.35)" />
+        {/* Layer 2 - Middle Center */}
+        <g transform="translate(4, 0) scale(0.88)">
+          <path
+            d="M3 6.5L14.5 4.5L16.2 16.5L4.8 18.5Z"
+            fill="#92400e"
+            stroke="#fde047"
+            strokeWidth="1.1"
+            strokeLinejoin="round"
+          />
+          <path d="M4.8 7.5L13.8 5.8L15 15.6L6 17.2Z" fill="#b45309" />
+          <circle cx="6" cy="8.6" r="0.9" fill="#fef08a" stroke="#78350f" strokeWidth="0.4" />
+          <circle cx="13" cy="7.2" r="0.9" fill="#fef08a" stroke="#78350f" strokeWidth="0.4" />
+          <circle cx="14" cy="14.8" r="0.9" fill="#fef08a" stroke="#78350f" strokeWidth="0.4" />
+        </g>
+        {/* Shadow behind front plate */}
+        <path d="M12 6L22.5 4.5L24 16L13.5 17.5Z" fill="rgba(0,0,0,0.4)" />
+        {/* Layer 3 - Front Right */}
+        <g transform="translate(10, -1) scale(0.92)">
+          <path
+            d="M3 6.5L14.5 4.5L16.2 16.5L4.8 18.5Z"
+            fill="#b45309"
+            stroke="#fef08a"
+            strokeWidth="1.2"
+            strokeLinejoin="round"
+          />
+          <path d="M4.8 7.5L13.8 5.8L15 15.6L6 17.2Z" fill="#d97706" />
+          <circle cx="6" cy="8.6" r="1.0" fill="#fef08a" stroke="#78350f" strokeWidth="0.5" />
+          <circle cx="13" cy="7.2" r="1.0" fill="#fef08a" stroke="#78350f" strokeWidth="0.5" />
+          <circle cx="14" cy="14.8" r="1.0" fill="#fef08a" stroke="#78350f" strokeWidth="0.5" />
+          <circle cx="6.8" cy="15.8" r="1.0" fill="#fef08a" stroke="#78350f" strokeWidth="0.5" />
+        </g>
+      </svg>
+    );
+  }
+
   if (resKey === 'copper_wire') {
     return (
       <svg className="w-5 h-5 drop-shadow" viewBox="0 0 24 24" fill="none">
@@ -2449,6 +2463,44 @@ function CodexResourceVectorArt({ resKey }: { resKey: ResourceItemKey }) {
     );
   }
 
+  if (resKey === 'copper_wire_triple') {
+    return (
+      <svg className="w-6 h-6 drop-shadow" viewBox="0 0 28 24" fill="none">
+        {/* Trio of overlapping coiled copper wire spools */}
+        {/* Left Spool */}
+        <g transform="translate(-4, -1) scale(0.75)">
+          <ellipse cx="11" cy="6" rx="6.5" ry="2.7" fill="#78350f" stroke="#fb923c" strokeWidth="1.1" />
+          <ellipse cx="11" cy="18" rx="6.5" ry="2.7" fill="#78350f" stroke="#fb923c" strokeWidth="1.1" />
+          <rect x="5.5" y="6" width="11" height="12" fill="#ea580c" />
+          <line x1="5.5" y1="9" x2="16.5" y2="9" stroke="#fed7aa" strokeWidth="1.1" />
+          <line x1="5.5" y1="12" x2="16.5" y2="12" stroke="#fed7aa" strokeWidth="1.1" />
+          <line x1="5.5" y1="15" x2="16.5" y2="15" stroke="#fed7aa" strokeWidth="1.1" />
+          <ellipse cx="11" cy="6" rx="2.6" ry="1.2" fill="#fef08a" stroke="#b45309" strokeWidth="0.5" />
+        </g>
+        {/* Right Spool */}
+        <g transform="translate(10, -1) scale(0.75)">
+          <ellipse cx="11" cy="6" rx="6.5" ry="2.7" fill="#78350f" stroke="#fb923c" strokeWidth="1.1" />
+          <ellipse cx="11" cy="18" rx="6.5" ry="2.7" fill="#78350f" stroke="#fb923c" strokeWidth="1.1" />
+          <rect x="5.5" y="6" width="11" height="12" fill="#ea580c" />
+          <line x1="5.5" y1="9" x2="16.5" y2="9" stroke="#fed7aa" strokeWidth="1.1" />
+          <line x1="5.5" y1="12" x2="16.5" y2="12" stroke="#fed7aa" strokeWidth="1.1" />
+          <line x1="5.5" y1="15" x2="16.5" y2="15" stroke="#fed7aa" strokeWidth="1.1" />
+          <ellipse cx="11" cy="6" rx="2.6" ry="1.2" fill="#fef08a" stroke="#b45309" strokeWidth="0.5" />
+        </g>
+        {/* Center / Front Spool */}
+        <g transform="translate(3, 2) scale(0.8)">
+          <ellipse cx="11" cy="6" rx="6.5" ry="2.7" fill="#78350f" stroke="#fb923c" strokeWidth="1.1" />
+          <ellipse cx="11" cy="18" rx="6.5" ry="2.7" fill="#78350f" stroke="#fb923c" strokeWidth="1.1" />
+          <rect x="5.5" y="6" width="11" height="12" fill="#f97316" />
+          <line x1="5.5" y1="9" x2="16.5" y2="9" stroke="#fed7aa" strokeWidth="1.2" />
+          <line x1="5.5" y1="12" x2="16.5" y2="12" stroke="#fed7aa" strokeWidth="1.2" />
+          <line x1="5.5" y1="15" x2="16.5" y2="15" stroke="#fed7aa" strokeWidth="1.2" />
+          <ellipse cx="11" cy="6" rx="2.6" ry="1.2" fill="#fef08a" stroke="#b45309" strokeWidth="0.5" />
+        </g>
+      </svg>
+    );
+  }
+
   if (resKey === 'brass_gears') {
     return (
       <svg className="w-5 h-5 drop-shadow" viewBox="0 0 24 24" fill="none">
@@ -2460,6 +2512,36 @@ function CodexResourceVectorArt({ resKey }: { resKey: ResourceItemKey }) {
         />
         <circle cx="12" cy="12" r="4.2" fill="#78350f" stroke="#fde047" strokeWidth="1" />
         <circle cx="12" cy="12" r="2.2" fill="#fef08a" />
+      </svg>
+    );
+  }
+
+  if (resKey === 'brass_gears_double') {
+    return (
+      <svg className="w-6 h-6 drop-shadow" viewBox="0 0 28 24" fill="none">
+        {/* Pair of interlocking brass/bronze mechanical cogs */}
+        {/* Left Primary Cog */}
+        <g transform="translate(-1, 2) scale(0.82)">
+          <path
+            d="M12 2L13.5 4.5L16.5 4L16.8 7L19.8 8L18.8 11L21 13L19 15.5L19.8 18.5L16.8 19L15.5 21.8L12.5 20.8L10 22.5L8.5 20L5.5 20.5L5.2 17.5L2.2 16.5L3.2 13.5L1 11.5L3 9L2.2 6L5.2 5.5L6.5 2.8L9.5 3.8Z"
+            fill="#f59e0b"
+            stroke="#fde047"
+            strokeWidth="1.2"
+          />
+          <circle cx="12" cy="12" r="4.2" fill="#78350f" stroke="#fde047" strokeWidth="1" />
+          <circle cx="12" cy="12" r="2.2" fill="#fef08a" />
+        </g>
+        {/* Right Interlocking Cog */}
+        <g transform="translate(13, -2) scale(0.68) rotate(22 12 12)">
+          <path
+            d="M12 2L13.5 4.5L16.5 4L16.8 7L19.8 8L18.8 11L21 13L19 15.5L19.8 18.5L16.8 19L15.5 21.8L12.5 20.8L10 22.5L8.5 20L5.5 20.5L5.2 17.5L2.2 16.5L3.2 13.5L1 11.5L3 9L2.2 6L5.2 5.5L6.5 2.8L9.5 3.8Z"
+            fill="#d97706"
+            stroke="#fde047"
+            strokeWidth="1.3"
+          />
+          <circle cx="12" cy="12" r="4.5" fill="#78350f" stroke="#fde047" strokeWidth="1" />
+          <circle cx="12" cy="12" r="2" fill="#fef08a" />
+        </g>
       </svg>
     );
   }
@@ -2476,6 +2558,37 @@ function CodexResourceVectorArt({ resKey }: { resKey: ResourceItemKey }) {
         <line x1="7" y1="17" x2="7" y2="20" stroke="#fde047" strokeWidth="1" />
         <line x1="12" y1="17" x2="12" y2="20" stroke="#fde047" strokeWidth="1" />
         <line x1="17" y1="17" x2="17" y2="20" stroke="#fde047" strokeWidth="1" />
+      </svg>
+    );
+  }
+
+  if (resKey === 'circuit_boards_double') {
+    return (
+      <svg className="w-6 h-6 drop-shadow" viewBox="0 0 28 24" fill="none">
+        {/* Pair of layered printed green-and-gold microcircuits */}
+        {/* Back / Bottom Circuit Board */}
+        <g transform="translate(-2, 2) scale(0.85)">
+          <rect x="3" y="3" width="18" height="18" rx="3" fill="#064e3b" stroke="#059669" strokeWidth="1.2" />
+          <rect x="7" y="7" width="10" height="10" rx="1.5" fill="#022c22" stroke="#facc15" strokeWidth="0.8" />
+          <circle cx="12" cy="12" r="1.8" fill="#0284c7" />
+          <line x1="7" y1="4" x2="7" y2="7" stroke="#facc15" strokeWidth="0.8" />
+          <line x1="12" y1="4" x2="12" y2="7" stroke="#facc15" strokeWidth="0.8" />
+          <line x1="17" y1="4" x2="17" y2="7" stroke="#facc15" strokeWidth="0.8" />
+        </g>
+        {/* Shadow behind front board */}
+        <rect x="7" y="4" width="17" height="17" rx="3" fill="rgba(0,0,0,0.4)" />
+        {/* Front / Top Circuit Board */}
+        <g transform="translate(7, -1) scale(0.88)">
+          <rect x="3" y="3" width="18" height="18" rx="3" fill="#047857" stroke="#34d399" strokeWidth="1.4" />
+          <rect x="7" y="7" width="10" height="10" rx="1.5" fill="#064e3b" stroke="#fde047" strokeWidth="1" />
+          <circle cx="12" cy="12" r="2" fill="#38bdf8" />
+          <line x1="7" y1="4" x2="7" y2="7" stroke="#fde047" strokeWidth="1" />
+          <line x1="12" y1="4" x2="12" y2="7" stroke="#fde047" strokeWidth="1" />
+          <line x1="17" y1="4" x2="17" y2="7" stroke="#fde047" strokeWidth="1" />
+          <line x1="7" y1="17" x2="7" y2="20" stroke="#fde047" strokeWidth="1" />
+          <line x1="12" y1="17" x2="12" y2="20" stroke="#fde047" strokeWidth="1" />
+          <line x1="17" y1="17" x2="17" y2="20" stroke="#fde047" strokeWidth="1" />
+        </g>
       </svg>
     );
   }
@@ -2529,6 +2642,12 @@ function CodexResourceBox({
       glow: 'shadow-[0_0_12px_rgba(245,158,11,0.55)]',
       label: 'Heavy Scrap 2x',
     },
+    scrap_metal_triple: {
+      bg: 'bg-gradient-to-br from-amber-800 via-amber-700 to-amber-950',
+      border: 'border-amber-300',
+      glow: 'shadow-[0_0_14px_rgba(245,158,11,0.65)]',
+      label: 'Scrap Metal Trio 3x',
+    },
     copper_wire: {
       bg: 'bg-gradient-to-br from-orange-950 via-orange-900 to-orange-950',
       border: 'border-orange-400',
@@ -2541,17 +2660,35 @@ function CodexResourceBox({
       glow: 'shadow-[0_0_12px_rgba(234,88,12,0.55)]',
       label: 'Heavy Wire 2x',
     },
+    copper_wire_triple: {
+      bg: 'bg-gradient-to-br from-orange-800 via-orange-700 to-orange-950',
+      border: 'border-orange-300',
+      glow: 'shadow-[0_0_14px_rgba(234,88,12,0.65)]',
+      label: 'Copper Wire Spools 3x',
+    },
     brass_gears: {
       bg: 'bg-gradient-to-br from-yellow-950 via-yellow-900 to-yellow-950',
       border: 'border-yellow-400',
       glow: 'shadow-[0_0_10px_rgba(250,204,21,0.4)]',
       label: 'Mechanical Gears 1x',
     },
+    brass_gears_double: {
+      bg: 'bg-gradient-to-br from-yellow-900 via-yellow-700 to-yellow-950',
+      border: 'border-yellow-300',
+      glow: 'shadow-[0_0_14px_rgba(250,204,21,0.65)]',
+      label: 'Interlocking Gears 2x',
+    },
     circuit_boards: {
       bg: 'bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950',
       border: 'border-emerald-400',
       glow: 'shadow-[0_0_10px_rgba(52,211,153,0.4)]',
       label: 'Circuit Boards',
+    },
+    circuit_boards_double: {
+      bg: 'bg-gradient-to-br from-emerald-900 via-emerald-700 to-emerald-950',
+      border: 'border-emerald-300',
+      glow: 'shadow-[0_0_14px_rgba(52,211,153,0.65)]',
+      label: 'Layered Circuits 2x',
     },
     electronic_chips: {
       bg: 'bg-gradient-to-br from-purple-950 via-purple-900 to-purple-950',
@@ -2627,7 +2764,7 @@ function CodexSeedlingVector({
   );
 }
 
-function CodexSeedlingBox({
+export function CodexSeedlingBox({
   leafType,
   discovered,
 }: {
@@ -2664,7 +2801,7 @@ function CodexSeedlingBox({
   );
 }
 
-function CodexMaturityBox({
+export function CodexMaturityBox({
   matDef,
   discovered,
 }: {
@@ -2735,6 +2872,7 @@ export interface PlantedBonsai {
   y: number;
   col?: number;
   row?: number;
+  field?: 'main' | 'left' | 'right';
   width?: number;
   height?: number;
   radius: number;
@@ -2782,6 +2920,7 @@ export interface StoredPottedBonsai {
   cultivationPotential?: CultivationPotential;
   width?: number;
   height?: number;
+  field?: 'main' | 'left' | 'right';
   basePriceBonus?: number;
   isFavorite?: boolean;
   organicBuff?: ActiveBonsaiBuff | null;
@@ -2812,6 +2951,7 @@ export interface StoredSapling {
 export interface SanctuaryInventory {
   [key: string]: any;
   coins: number;
+  unlockedMaps?: string[];
   license_t1: number;
   license_t2: number;
   license_t3: number;
@@ -3174,7 +3314,11 @@ export type ResourceItemKey =
   | 'circuit_boards'
   | 'electronic_chips'
   | 'scrap_metal_double'
-  | 'copper_wire_double';
+  | 'copper_wire_double'
+  | 'scrap_metal_triple'
+  | 'copper_wire_triple'
+  | 'brass_gears_double'
+  | 'circuit_boards_double';
 
 export interface ExcursionTileNode {
   id: string;
@@ -3182,6 +3326,7 @@ export interface ExcursionTileNode {
   tileY: number;
   type: 'RESOURCE' | 'SAPLING' | 'CRYSTAL';
   resourceType?: ResourceItemKey;
+  resourceYield?: number;
   saplingLeafType?: BonsaiLeafType;
   saplingGroup?: BonsaiGroup;
   saplingMaturity?: MaturityTier;
@@ -4005,6 +4150,10 @@ export const RESOURCE_HARVEST_EXP: Record<ResourceItemKey, number> = {
   electronic_chips: 50,
   scrap_metal_double: 6,
   copper_wire_double: 12,
+  scrap_metal_triple: 9,
+  copper_wire_triple: 18,
+  brass_gears_double: 24,
+  circuit_boards_double: 50,
 };
 
 /**
@@ -4022,6 +4171,11 @@ export const RESOURCE_HARVEST_EXP: Record<ResourceItemKey, number> = {
  *   Mid (21-40 steps): Scrap (1x): 66.5%, Wire (1x): 25%, Scrap (2x): 7.3%, Wire (2x): 1.2%
  *   Far (41-60 steps): Scrap (1x): 56.5%, Wire (1x): 28%, Scrap (2x): 11.5%, Wire (2x): 3.5%, Gears (1x): 0.5%
  */
+export type ResourceDepositYield = {
+  key: ResourceItemKey;
+  amount: number;
+};
+
 export function pickResourceDeposit(
   biomeId: ExpeditionBiomeId,
   distSteps: number,
@@ -4031,7 +4185,8 @@ export function pickResourceDeposit(
     if (distSteps <= 20) {
       return 'scrap_metal';
     } else if (distSteps <= 40) {
-      return resRoll < 0.88 ? 'scrap_metal' : 'copper_wire';
+      if (resRoll < 0.88) return 'scrap_metal';
+      return 'copper_wire';
     } else {
       if (resRoll < 0.78) return 'scrap_metal';
       if (resRoll < 0.98) return 'copper_wire';
@@ -4039,7 +4194,8 @@ export function pickResourceDeposit(
     }
   } else if (biomeId === 'HIGHLANDS') {
     if (distSteps <= 20) {
-      return resRoll < 0.88 ? 'scrap_metal' : 'copper_wire';
+      if (resRoll < 0.88) return 'scrap_metal';
+      return 'copper_wire';
     } else if (distSteps <= 40) {
       if (resRoll < 0.78) return 'scrap_metal';
       if (resRoll < 0.98) return 'copper_wire';
@@ -4051,7 +4207,7 @@ export function pickResourceDeposit(
       return 'copper_wire_double';
     }
   } else {
-    // Area 3 (OVERGROWTH / Ancient Caldera)
+    // Ancient Caldera / OVERGROWTH
     if (distSteps <= 20) {
       if (resRoll < 0.78) return 'scrap_metal';
       if (resRoll < 0.98) return 'copper_wire';
@@ -4064,9 +4220,167 @@ export function pickResourceDeposit(
     } else {
       if (resRoll < 0.565) return 'scrap_metal';
       if (resRoll < 0.845) return 'copper_wire';
-      if (resRoll < 0.960) return 'scrap_metal_double';
+      if (resRoll < 0.96) return 'scrap_metal_double';
       if (resRoll < 0.995) return 'copper_wire_double';
       return 'brass_gears';
+    }
+  }
+}
+
+export function pickResourceDepositEx(
+  biomeId: ExpeditionBiomeId,
+  distSteps: number,
+  resRoll: number,
+): ResourceDepositYield {
+  if (distSteps <= 60) {
+    const key = pickResourceDeposit(biomeId, distSteps, resRoll);
+    if (key === 'scrap_metal_double') return { key: 'scrap_metal', amount: 2 };
+    if (key === 'copper_wire_double') return { key: 'copper_wire', amount: 2 };
+    return { key, amount: 1 };
+  }
+
+  // 61-160 steps
+  if (biomeId === 'FOOTHILLS') {
+    if (distSteps <= 80) {
+      // Scrap (1x) 66.5%, Wire (1x) 25.0%, Scrap (2x) 7.3%, Wire (2x) 1.2%
+      if (resRoll < 0.665) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.915) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.988) return { key: 'scrap_metal', amount: 2 };
+      return { key: 'copper_wire', amount: 2 };
+    } else if (distSteps <= 100) {
+      // Scrap (1x) 56.5%, Wire (1x) 28.0%, Scrap (2x) 11.5%, Wire (2x) 3.5%, Gears (1x) 0.5%
+      if (resRoll < 0.565) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.845) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.960) return { key: 'scrap_metal', amount: 2 };
+      if (resRoll < 0.995) return { key: 'copper_wire', amount: 2 };
+      return { key: 'brass_gears', amount: 1 };
+    } else if (distSteps <= 120) {
+      // Scrap (1x) 48.0%, Wire (1x) 29.4%, Scrap (2x) 15.0%, Wire (2x) 6.0%, Gears (1x) 1.4%, Scrap (3x) 0.2%
+      if (resRoll < 0.480) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.774) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.924) return { key: 'scrap_metal', amount: 2 };
+      if (resRoll < 0.984) return { key: 'copper_wire', amount: 2 };
+      if (resRoll < 0.998) return { key: 'brass_gears', amount: 1 };
+      return { key: 'scrap_metal', amount: 3 };
+    } else if (distSteps <= 140) {
+      // Scrap (1x) 40.5%, Wire (1x) 30.15%, Scrap (2x) 17.75%, Wire (2x) 8.25%, Gears (1x) 2.5%, Scrap (3x) 0.75%, Gears (2x) 0.1%
+      if (resRoll < 0.405) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.7065) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.8840) return { key: 'scrap_metal', amount: 2 };
+      if (resRoll < 0.9665) return { key: 'copper_wire', amount: 2 };
+      if (resRoll < 0.9915) return { key: 'brass_gears', amount: 1 };
+      if (resRoll < 0.9990) return { key: 'scrap_metal', amount: 3 };
+      return { key: 'brass_gears', amount: 2 };
+    } else {
+      // 141-160: Scrap (1x) 33.4%, Wire (1x) 29.7%, Scrap (2x) 20.7%, Wire (2x) 10.5%, Gears (1x) 4.0%, Scrap (3x) 1.25%, Gears (2x) 0.4%, Circuits (1x) 0.05%
+      if (resRoll < 0.334) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.631) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.838) return { key: 'scrap_metal', amount: 2 };
+      if (resRoll < 0.943) return { key: 'copper_wire', amount: 2 };
+      if (resRoll < 0.983) return { key: 'brass_gears', amount: 1 };
+      if (resRoll < 0.9955) return { key: 'scrap_metal', amount: 3 };
+      if (resRoll < 0.9995) return { key: 'brass_gears', amount: 2 };
+      return { key: 'circuit_boards', amount: 1 };
+    }
+  } else if (biomeId === 'HIGHLANDS') {
+    if (distSteps <= 80) {
+      // Scrap (1x) 56.5%, Wire (1x) 28.0%, Scrap (2x) 11.5%, Wire (2x) 3.5%, Gears (1x) 0.5%
+      if (resRoll < 0.565) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.845) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.960) return { key: 'scrap_metal', amount: 2 };
+      if (resRoll < 0.995) return { key: 'copper_wire', amount: 2 };
+      return { key: 'brass_gears', amount: 1 };
+    } else if (distSteps <= 100) {
+      // Scrap (1x) 48.0%, Wire (1x) 29.4%, Scrap (2x) 15.0%, Wire (2x) 6.0%, Gears (1x) 1.4%, Scrap (3x) 0.2%
+      if (resRoll < 0.480) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.774) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.924) return { key: 'scrap_metal', amount: 2 };
+      if (resRoll < 0.984) return { key: 'copper_wire', amount: 2 };
+      if (resRoll < 0.998) return { key: 'brass_gears', amount: 1 };
+      return { key: 'scrap_metal', amount: 3 };
+    } else if (distSteps <= 120) {
+      // Scrap (1x) 40.5%, Wire (1x) 30.15%, Scrap (2x) 17.75%, Wire (2x) 8.25%, Gears (1x) 2.5%, Scrap (3x) 0.75%, Gears (2x) 0.1%
+      if (resRoll < 0.405) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.7065) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.8840) return { key: 'scrap_metal', amount: 2 };
+      if (resRoll < 0.9665) return { key: 'copper_wire', amount: 2 };
+      if (resRoll < 0.9915) return { key: 'brass_gears', amount: 1 };
+      if (resRoll < 0.9990) return { key: 'scrap_metal', amount: 3 };
+      return { key: 'brass_gears', amount: 2 };
+    } else if (distSteps <= 140) {
+      // Scrap (1x) 33.4%, Wire (1x) 29.7%, Scrap (2x) 20.7%, Wire (2x) 10.5%, Gears (1x) 4.0%, Scrap (3x) 1.25%, Gears (2x) 0.4%, Circuits (1x) 0.05%
+      if (resRoll < 0.334) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.631) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.838) return { key: 'scrap_metal', amount: 2 };
+      if (resRoll < 0.943) return { key: 'copper_wire', amount: 2 };
+      if (resRoll < 0.983) return { key: 'brass_gears', amount: 1 };
+      if (resRoll < 0.9955) return { key: 'scrap_metal', amount: 3 };
+      if (resRoll < 0.9995) return { key: 'brass_gears', amount: 2 };
+      return { key: 'circuit_boards', amount: 1 };
+    } else {
+      // 141-160: Scrap (1x) 27.0%, Wire (1x) 28.2%, Scrap (2x) 23.0%, Wire (2x) 12.8%, Gears (1x) 5.5%, Scrap (3x) 2.2%, Gears (2x) 1.0%, Circuits (1x) 0.28%, Wire (3x) 0.02%
+      if (resRoll < 0.270) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.552) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.782) return { key: 'scrap_metal', amount: 2 };
+      if (resRoll < 0.910) return { key: 'copper_wire', amount: 2 };
+      if (resRoll < 0.965) return { key: 'brass_gears', amount: 1 };
+      if (resRoll < 0.987) return { key: 'scrap_metal', amount: 3 };
+      if (resRoll < 0.997) return { key: 'brass_gears', amount: 2 };
+      if (resRoll < 0.9998) return { key: 'circuit_boards', amount: 1 };
+      return { key: 'copper_wire', amount: 3 };
+    }
+  } else {
+    // Area 3: OVERGROWTH
+    if (distSteps <= 80) {
+      // Scrap (1x) 48.0%, Wire (1x) 29.4%, Scrap (2x) 15.0%, Wire (2x) 6.0%, Gears (1x) 1.4%, Scrap (3x) 0.2%
+      if (resRoll < 0.480) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.774) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.924) return { key: 'scrap_metal', amount: 2 };
+      if (resRoll < 0.984) return { key: 'copper_wire', amount: 2 };
+      if (resRoll < 0.998) return { key: 'brass_gears', amount: 1 };
+      return { key: 'scrap_metal', amount: 3 };
+    } else if (distSteps <= 100) {
+      // Scrap (1x) 40.5%, Wire (1x) 30.15%, Scrap (2x) 17.75%, Wire (2x) 8.25%, Gears (1x) 2.5%, Scrap (3x) 0.75%, Gears (2x) 0.1%
+      if (resRoll < 0.405) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.7065) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.8840) return { key: 'scrap_metal', amount: 2 };
+      if (resRoll < 0.9665) return { key: 'copper_wire', amount: 2 };
+      if (resRoll < 0.9915) return { key: 'brass_gears', amount: 1 };
+      if (resRoll < 0.9990) return { key: 'scrap_metal', amount: 3 };
+      return { key: 'brass_gears', amount: 2 };
+    } else if (distSteps <= 120) {
+      // Scrap (1x) 33.4%, Wire (1x) 29.7%, Scrap (2x) 20.7%, Wire (2x) 10.5%, Gears (1x) 4.0%, Scrap (3x) 1.25%, Gears (2x) 0.4%, Circuits (1x) 0.05%
+      if (resRoll < 0.334) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.631) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.838) return { key: 'scrap_metal', amount: 2 };
+      if (resRoll < 0.943) return { key: 'copper_wire', amount: 2 };
+      if (resRoll < 0.983) return { key: 'brass_gears', amount: 1 };
+      if (resRoll < 0.9955) return { key: 'scrap_metal', amount: 3 };
+      if (resRoll < 0.9995) return { key: 'brass_gears', amount: 2 };
+      return { key: 'circuit_boards', amount: 1 };
+    } else if (distSteps <= 140) {
+      // Scrap (1x) 27.0%, Wire (1x) 28.2%, Scrap (2x) 23.0%, Wire (2x) 12.8%, Gears (1x) 5.5%, Scrap (3x) 2.2%, Gears (2x) 1.0%, Circuits (1x) 0.28%, Wire (3x) 0.02%
+      if (resRoll < 0.270) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.552) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.782) return { key: 'scrap_metal', amount: 2 };
+      if (resRoll < 0.910) return { key: 'copper_wire', amount: 2 };
+      if (resRoll < 0.965) return { key: 'brass_gears', amount: 1 };
+      if (resRoll < 0.987) return { key: 'scrap_metal', amount: 3 };
+      if (resRoll < 0.997) return { key: 'brass_gears', amount: 2 };
+      if (resRoll < 0.9998) return { key: 'circuit_boards', amount: 1 };
+      return { key: 'copper_wire', amount: 3 };
+    } else {
+      // 141-160: Scrap (1x) 20.7%, Wire (1x) 25.8%, Scrap (2x) 24.0%, Wire (2x) 15.0%, Gears (1x) 7.5%, Scrap (3x) 4.0%, Gears (2x) 2.0%, Circuits (1x) 0.75%, Wire (3x) 0.24%, Circuits (2x) 0.01%
+      if (resRoll < 0.207) return { key: 'scrap_metal', amount: 1 };
+      if (resRoll < 0.465) return { key: 'copper_wire', amount: 1 };
+      if (resRoll < 0.705) return { key: 'scrap_metal', amount: 2 };
+      if (resRoll < 0.855) return { key: 'copper_wire', amount: 2 };
+      if (resRoll < 0.930) return { key: 'brass_gears', amount: 1 };
+      if (resRoll < 0.970) return { key: 'scrap_metal', amount: 3 };
+      if (resRoll < 0.990) return { key: 'brass_gears', amount: 2 };
+      if (resRoll < 0.9975) return { key: 'circuit_boards', amount: 1 };
+      if (resRoll < 0.9999) return { key: 'copper_wire', amount: 3 };
+      return { key: 'circuit_boards', amount: 2 };
     }
   }
 }
@@ -4080,6 +4394,10 @@ export const ITEM_WEIGHTS: Record<ResourceItemKey | 'sapling' | 'crystal', numbe
   electronic_chips: 1.5,
   scrap_metal_double: 1.6,
   copper_wire_double: 1.0,
+  scrap_metal_triple: 2.4,
+  copper_wire_triple: 1.5,
+  brass_gears_double: 2.4,
+  circuit_boards_double: 2.0,
   sapling: 3.0,
   crystal: 0.5,
 };
@@ -4197,16 +4515,9 @@ export function getStructureConstituentPlots(struct: DeployedStructure): { col: 
   let baseRow = struct.row;
 
   if (baseCol === undefined || baseRow === undefined) {
-    if (is2x2) {
-      baseCol = Math.round((struct.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW - 0.5);
-      baseRow = Math.round((struct.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH - 0.5);
-    } else if (is3x3) {
-      baseCol = Math.round((struct.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW - 1);
-      baseRow = Math.round((struct.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH - 1);
-    } else {
-      baseCol = Math.round((struct.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-      baseRow = Math.round((struct.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
-    }
+    const p = getPlotAtCoords(struct.x, struct.y);
+    baseCol = p ? p.col : 0;
+    baseRow = p ? p.row : 0;
   }
 
   const plots: { col: number; row: number }[] = [];
@@ -4237,6 +4548,7 @@ export function countAdjacentEnergyUnits(
   };
 
   const myPlots = getStructureConstituentPlots(struct);
+  const myField = struct.field || (struct.x < SANCTUARY_LAYOUT.leftPathX ? 'left' : struct.x > SANCTUARY_LAYOUT.rightPathX ? 'right' : 'main');
   const fenceSet = new Set<string>();
   structures.forEach((s) => {
     if (s.type === 'bamboo_fence' && s.edgeKey) {
@@ -4248,6 +4560,8 @@ export function countAdjacentEnergyUnits(
   structures.forEach((other) => {
     if (other.id === struct.id) return;
     if (!isTargetCategory(other.type)) return;
+    const otherField = other.field || (other.x < SANCTUARY_LAYOUT.leftPathX ? 'left' : other.x > SANCTUARY_LAYOUT.rightPathX ? 'right' : 'main');
+    if (myField !== otherField) return;
     const otherPlots = getStructureConstituentPlots(other);
 
     otherPlots.forEach((op) => {
@@ -4444,8 +4758,8 @@ export function isFarmDisruptedPlotBlocked(
  */
 export function getDisruptedZenPlots(
   structures: DeployedStructure[],
-  cols = SANCTUARY_GRID.cols,
-  rows = SANCTUARY_GRID.rows,
+  cols = SANCTUARY_LAYOUT.mainCols,
+  rows = SANCTUARY_LAYOUT.mainRows,
 ): Set<string> {
   const fenceSet = new Set<string>();
   structures.forEach((s) => {
@@ -4470,65 +4784,70 @@ export function getDisruptedZenPlots(
       s.type === 'chemical_station';
     const is3x3Farm = s.type === 'solar_farm_3x3' || s.type === 'wind_farm_3x3';
 
+    const p = getPlotAtCoords(s.x, s.y);
+    const field = p ? p.field : 'main';
+    const fieldCols = field === 'main' ? SANCTUARY_LAYOUT.mainCols : SANCTUARY_LAYOUT.sideCols;
+    const fieldRows = field === 'main' ? SANCTUARY_LAYOUT.mainRows : SANCTUARY_LAYOUT.sideRows;
+
     if (isSingleEmitter) {
-      // 1x1 items ONLY mark their own plot right below them; surrounding plots remain lush green!
-      const sc = s.col ?? Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-      const sr = s.row ?? Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
-      if (sc >= 0 && sc < cols && sr >= 0 && sr < rows) {
+      const sc = p ? p.col : 0;
+      const sr = p ? p.row : 0;
+      if (sc >= 0 && sc < fieldCols && sr >= 0 && sr < fieldRows) {
+        coreDisrupted.add(`${field}_${sr}_${sc}`);
         coreDisrupted.add(`${sc},${sr}`);
       }
     } else if (is2x2Farm) {
-      const sc = s.col ?? Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW - 0.5);
-      const sr = s.row ?? Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH - 0.5);
+      const sc = p ? p.col : 0;
+      const sr = p ? p.row : 0;
       const minX = sc;
       const maxX = sc + 1;
       const minY = sr;
       const maxY = sr + 1;
 
-      // The interior plots of the farm are ALWAYS Disrupted Zen
       for (let dc = 0; dc <= 1; dc++) {
         for (let dr = 0; dr <= 1; dr++) {
           const c = sc + dc;
           const r = sr + dr;
-          if (c >= 0 && c < cols && r >= 0 && r < rows) {
+          if (c >= 0 && c < fieldCols && r >= 0 && r < fieldRows) {
+            coreDisrupted.add(`${field}_${r}_${c}`);
             coreDisrupted.add(`${c},${r}`);
           }
         }
       }
 
-      // Outer 1-tile perimeter (affects unlocked AND locked tiles unless fenced)
       for (let c = minX - 1; c <= maxX + 1; c++) {
         for (let r = minY - 1; r <= maxY + 1; r++) {
-          if (c >= 0 && c < cols && r >= 0 && r < rows) {
+          if (c >= 0 && c < fieldCols && r >= 0 && r < fieldRows) {
             if (c >= minX && c <= maxX && r >= minY && r <= maxY) continue;
+            candidatePerimeterPlots.add(`${field}_${r}_${c}`);
             candidatePerimeterPlots.add(`${c},${r}`);
           }
         }
       }
     } else if (is3x3Farm) {
-      const sc = s.col ?? Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW - 1);
-      const sr = s.row ?? Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH - 1);
+      const sc = p ? p.col : 0;
+      const sr = p ? p.row : 0;
       const minX = sc;
       const maxX = sc + 2;
       const minY = sr;
       const maxY = sr + 2;
 
-      // The interior plots of the farm are ALWAYS Disrupted Zen
       for (let dc = 0; dc <= 2; dc++) {
         for (let dr = 0; dr <= 2; dr++) {
           const c = sc + dc;
           const r = sr + dr;
-          if (c >= 0 && c < cols && r >= 0 && r < rows) {
+          if (c >= 0 && c < fieldCols && r >= 0 && r < fieldRows) {
+            coreDisrupted.add(`${field}_${r}_${c}`);
             coreDisrupted.add(`${c},${r}`);
           }
         }
       }
 
-      // Outer 1-tile perimeter (affects unlocked AND locked tiles unless fenced)
       for (let c = minX - 1; c <= maxX + 1; c++) {
         for (let r = minY - 1; r <= maxY + 1; r++) {
-          if (c >= 0 && c < cols && r >= 0 && r < rows) {
+          if (c >= 0 && c < fieldCols && r >= 0 && r < fieldRows) {
             if (c >= minX && c <= maxX && r >= minY && r <= maxY) continue;
+            candidatePerimeterPlots.add(`${field}_${r}_${c}`);
             candidatePerimeterPlots.add(`${c},${r}`);
           }
         }
@@ -4536,45 +4855,7 @@ export function getDisruptedZenPlots(
     }
   });
 
-  // Candidate plots that are already in coreDisrupted are permanently disrupted
-  coreDisrupted.forEach((key) => {
-    candidatePerimeterPlots.delete(key);
-  });
-
   const disrupted = new Set<string>(coreDisrupted);
-  const queue: { c: number; r: number }[] = [];
-
-  coreDisrupted.forEach((key) => {
-    const [cStr, rStr] = key.split(',');
-    queue.push({ c: Number(cStr), r: Number(rStr) });
-  });
-
-  // BFS propagation: any candidate perimeter plot C with an unsealed edge to ANY Disrupted Zen plot gets contaminated
-  while (queue.length > 0) {
-    const cur = queue.shift()!;
-    const neighbors = [
-      { c: cur.c, r: cur.r - 1 }, // Up
-      { c: cur.c, r: cur.r + 1 }, // Down
-      { c: cur.c - 1, r: cur.r }, // Left
-      { c: cur.c + 1, r: cur.r }, // Right
-    ];
-
-    for (const nb of neighbors) {
-      if (nb.c < 0 || nb.c >= cols || nb.r < 0 || nb.r >= rows) continue;
-      const key = `${nb.c},${nb.r}`;
-
-      // Contamination only attempts to spread into candidate perimeter plots
-      if (!candidatePerimeterPlots.has(key)) continue;
-      if (disrupted.has(key)) continue;
-
-      // If no fence between cur and nb, contamination bleeds across
-      if (!hasEdgeFence(cur.c, cur.r, nb.c, nb.r, fenceSet)) {
-        disrupted.add(key);
-        queue.push(nb);
-      }
-    }
-  }
-
   return disrupted;
 }
 
@@ -4675,6 +4956,7 @@ export function getFenceEdgeGeometry(
   col: number,
   row: number,
   side: 'top' | 'right' | 'bottom' | 'left' = 'top',
+  field: 'main' | 'left' | 'right' = 'main',
 ): {
   edgeKey: string;
   side: 'top' | 'right' | 'bottom' | 'left';
@@ -4682,40 +4964,42 @@ export function getFenceEdgeGeometry(
   x: number;
   y: number;
 } {
-  const centerX = SANCTUARY_GRID.startX + col * SANCTUARY_GRID.cellW;
-  const centerY = SANCTUARY_GRID.startY + row * SANCTUARY_GRID.cellH;
+  const startX = field === 'left' ? SANCTUARY_LAYOUT.leftStartX : field === 'right' ? SANCTUARY_LAYOUT.rightStartX : SANCTUARY_LAYOUT.mainStartX;
+  const startY = field === 'left' ? SANCTUARY_LAYOUT.leftStartY : field === 'right' ? SANCTUARY_LAYOUT.rightStartY : SANCTUARY_LAYOUT.mainStartY;
+  const centerX = startX + col * SANCTUARY_LAYOUT.cellW;
+  const centerY = startY + row * SANCTUARY_LAYOUT.cellH;
 
   switch (side) {
     case 'top':
       return {
-        edgeKey: `H_${col}_${row}`,
+        edgeKey: `${field}_H_${col}_${row}`,
         side: 'top',
         orientation: 'horizontal',
         x: centerX,
-        y: centerY - SANCTUARY_GRID.cellH / 2,
+        y: centerY - SANCTUARY_LAYOUT.cellH / 2,
       };
     case 'bottom':
       return {
-        edgeKey: `H_${col}_${row + 1}`,
+        edgeKey: `${field}_H_${col}_${row + 1}`,
         side: 'bottom',
         orientation: 'horizontal',
         x: centerX,
-        y: centerY + SANCTUARY_GRID.cellH / 2,
+        y: centerY + SANCTUARY_LAYOUT.cellH / 2,
       };
     case 'left':
       return {
-        edgeKey: `V_${col}_${row}`,
+        edgeKey: `${field}_V_${col}_${row}`,
         side: 'left',
         orientation: 'vertical',
-        x: centerX - SANCTUARY_GRID.cellW / 2,
+        x: centerX - SANCTUARY_LAYOUT.cellW / 2,
         y: centerY,
       };
     case 'right':
       return {
-        edgeKey: `V_${col + 1}_${row}`,
+        edgeKey: `${field}_V_${col + 1}_${row}`,
         side: 'right',
         orientation: 'vertical',
-        x: centerX + SANCTUARY_GRID.cellW / 2,
+        x: centerX + SANCTUARY_LAYOUT.cellW / 2,
         y: centerY,
       };
   }
@@ -4740,11 +5024,15 @@ export function getBonsaiSynergies(
   structures: DeployedStructure[],
 ): BonsaiSynergies {
   const rating = getBonsaiMaturityRating(bonsai);
-  const bCol = bonsai.col !== undefined ? bonsai.col : Math.round((bonsai.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-  const bRow = bonsai.row !== undefined ? bonsai.row : Math.round((bonsai.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
-  const haloPlots = getBonsaiHaloPlots(bCol, bRow, rating, SANCTUARY_GRID.cols, SANCTUARY_GRID.rows);
+  const p = getPlotAtCoords(bonsai.x, bonsai.y) || { field: (bonsai as any).field || 'main', col: bonsai.col || 0, row: bonsai.row || 0 };
+  const bField = p.field;
+  const bCol = bonsai.col !== undefined ? bonsai.col : p.col;
+  const bRow = bonsai.row !== undefined ? bonsai.row : p.row;
+  const maxCols = bField === 'main' ? SANCTUARY_LAYOUT.mainCols : SANCTUARY_LAYOUT.sideCols;
+  const maxRows = bField === 'main' ? SANCTUARY_LAYOUT.mainRows : SANCTUARY_LAYOUT.sideRows;
+  const haloPlots = getBonsaiHaloPlots(bCol, bRow, rating, maxCols, maxRows);
 
-  const isPlotInHalo = (c: number, r: number) => haloPlots.some((p) => p.col === c && p.row === r);
+  const isPlotInHalo = (c: number, r: number) => haloPlots.some((hp) => hp.col === c && hp.row === r);
 
   const fenceSet = new Set<string>();
   structures.forEach((s) => {
@@ -4755,7 +5043,6 @@ export function getBonsaiSynergies(
 
   const isBlocked = (c: number, r: number) => {
     if (bonsai.width === 2 && bonsai.height === 2) {
-      // 2x2 bonsai: blocked if blocked to all 4 constituent plots
       let allBlocked = true;
       for (let dc = 0; dc <= 1; dc++) {
         for (let dr = 0; dr <= 1; dr++) {
@@ -4774,8 +5061,10 @@ export function getBonsaiSynergies(
   let bonsaiCount = 0;
   plantedBonsais.forEach((other) => {
     if (other.id === bonsai.id) return;
-    const oc = other.col !== undefined ? other.col : Math.round((other.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-    const or = other.row !== undefined ? other.row : Math.round((other.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+    const op = getPlotAtCoords(other.x, other.y);
+    if (!op || op.field !== bField) return;
+    const oc = other.col !== undefined ? other.col : op.col;
+    const or = other.row !== undefined ? other.row : op.row;
     const oW = other.width || 1;
     const oH = other.height || 1;
     let inHalo = false;
@@ -4812,16 +5101,17 @@ export function getBonsaiSynergies(
   const countsByType: Record<string, number> = {};
   countsByType['bonsai'] = bonsaiCount;
 
-  const disruptedPlots = getDisruptedZenPlots(structures, SANCTUARY_GRID.cols, SANCTUARY_GRID.rows);
+  const disruptedPlots = getDisruptedZenPlots(structures);
 
   structures.forEach((s) => {
     if (s.type === 'bamboo_fence') {
-      // Fences are border barriers, not halo entities
       return;
     }
 
-    const sc = Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-    const sr = Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+    const sp = getPlotAtCoords(s.x, s.y);
+    if (!sp || sp.field !== bField) return;
+    const sc = s.col !== undefined ? s.col : sp.col;
+    const sr = s.row !== undefined ? s.row : sp.row;
 
     let inHalo = false;
     if (s.type === 'torii_gate') {
@@ -4842,7 +5132,6 @@ export function getBonsaiSynergies(
 
     if (inHalo) {
       if (s.type === 'decor_pebble_path') {
-        // Zen Pebble Path is purely a pathway/flooring
         return;
       } else if (s.type === 'torii_gate') {
         toriiCount++;
@@ -4901,46 +5190,6 @@ export function getBonsaiSynergies(
           energyCount++;
         }
       }
-    } else if (s.type === 'solar_farm_2x2' || s.type === 'wind_farm_2x2' || s.type === 'fertilizer_station' || s.type === 'chemical_station') {
-      const fsc = s.col ?? Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW - 0.5);
-      const fsr = s.row ?? Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH - 0.5);
-      let farmAffectsBonsai = false;
-      for (let bc = bCol; bc < bCol + (bonsai.width || 1); bc++) {
-        for (let br = bRow; br < bRow + (bonsai.height || 1); br++) {
-          if (bc >= fsc - 1 && bc <= fsc + 2 && br >= fsr - 1 && br <= fsr + 2) {
-            if (disruptedPlots.has(`${bc},${br}`)) {
-              farmAffectsBonsai = true;
-              break;
-            }
-          }
-        }
-        if (farmAffectsBonsai) break;
-      }
-      if (farmAffectsBonsai) {
-        if (s.type.startsWith('solar') || s.type.startsWith('wind')) {
-          energyCount += 2;
-        }
-        countsByType[s.type] = (countsByType[s.type] || 0) + 1;
-      }
-    } else if (s.type === 'solar_farm_3x3' || s.type === 'wind_farm_3x3') {
-      const fsc = s.col ?? Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW - 1);
-      const fsr = s.row ?? Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH - 1);
-      let farmAffectsBonsai = false;
-      for (let bc = bCol; bc < bCol + (bonsai.width || 1); bc++) {
-        for (let br = bRow; br < bRow + (bonsai.height || 1); br++) {
-          if (bc >= fsc - 1 && bc <= fsc + 3 && br >= fsr - 1 && br <= fsr + 3) {
-            if (disruptedPlots.has(`${bc},${br}`)) {
-              farmAffectsBonsai = true;
-              break;
-            }
-          }
-        }
-        if (farmAffectsBonsai) break;
-      }
-      if (farmAffectsBonsai) {
-        energyCount += 3;
-        countsByType['solar_farm_3x3'] = (countsByType['solar_farm_3x3'] || 0) + 1;
-      }
     }
   });
 
@@ -4948,7 +5197,7 @@ export function getBonsaiSynergies(
   let isOnDisruptedZenGround = false;
   for (let bc = bCol; bc < bCol + (bonsai.width || 1); bc++) {
     for (let br = bRow; br < bRow + (bonsai.height || 1); br++) {
-      if (disruptedPlots.has(`${bc},${br}`)) {
+      if (disruptedPlots.has(`${bField}_${br}_${bc}`) || disruptedPlots.has(`${bc},${br}`)) {
         isOnDisruptedZenGround = true;
         break;
       }
@@ -4956,12 +5205,9 @@ export function getBonsaiSynergies(
     if (isOnDisruptedZenGround) break;
   }
 
-  // Cumulative "Disrupted Zen" Calculation:
-  // - If placed on degraded soil: -10% Growth Speed
-  // - For EACH degraded soil tile within the 3x3 halo not cut off by fences: -10% Growth Speed per tile!
   let degradedHaloTilesCount = 0;
-  haloPlots.forEach((p) => {
-    if (disruptedPlots.has(`${p.col},${p.row}`) && !isBlocked(p.col, p.row)) {
+  haloPlots.forEach((hp) => {
+    if ((disruptedPlots.has(`${bField}_${hp.row}_${hp.col}`) || disruptedPlots.has(`${hp.col},${hp.row}`)) && !isBlocked(hp.col, hp.row)) {
       degradedHaloTilesCount++;
     }
   });
@@ -4979,7 +5225,6 @@ export function getBonsaiSynergies(
     }
   }
 
-  // 5 or more triggers Stalling Surroundings
   const isStalled = maxIdenticalCount >= 5;
 
   let stalledEntityLabel = '';
@@ -5035,29 +5280,21 @@ export function getBonsaiSynergies(
     sevenLuckyGodsCount > 0 ||
     stoneLanternCount > 0;
 
-  // Hydration Growth Speed calculation (doubled if in halo of Torii Gate)
   const growingTogetherBonus = bonsaiCount * 0.10 * haloMultiplier;
   const privateGrowingBonus = wallCount * 0.10 * haloMultiplier;
   const baseGrowthRate = 1.0 + growingTogetherBonus + privateGrowingBonus;
 
-  // Cumulative Disrupted Zen Multiplier applies Math.max(0.05, 1 - (totalPenalty / 100))
   const disruptedPenaltyMultiplier = isDisruptedZen
     ? Math.max(0.05, 1 - totalDisruptedZenPenalty / 100)
     : 1.0;
   let rawGrowthMultiplier = Math.max(0.05, baseGrowthRate * disruptedPenaltyMultiplier);
   const growthMultiplier = isStalled ? 0 : rawGrowthMultiplier;
-  // Zen Rock Formation: +15% Level Up Experience (XP Boosted, doubled by Torii Gate)
   const expMultiplier = 1.0 + (rockCount * 0.15) * haloMultiplier;
-  // Growing Bamboo Formation: +0.25s Pruning Effect (Quick Prune, doubled by Torii Gate)
   const quickPruneBonus = (bambooCount * 0.25) * haloMultiplier;
-  // Asparagus Fern Ball: +15% Chance for Extra Organic Waste on Level Up (Efficient Pruning, doubled by Torii Gate)
   const extraWasteChance = (fernBallCount * 0.15) * haloMultiplier;
-  // Seven Lucky Gods: +0.01 Bonsai Baseprice per Bonsai Level Up (Fortunate Blessings, doubled by Torii Gate)
   const basePriceBonusRate = (sevenLuckyGodsCount * 0.01) * haloMultiplier;
-  // Stone Lantern: +0.5% Chance for Zen Point on Bonsai Level Up (Skilled Knowledge, doubled by Torii Gate)
   const zenPointChance = (stoneLanternCount * 0.005) * haloMultiplier;
 
-  // Double crystal pedestal CP bonuses if Torii Gate is present
   if (hasToriiGate) {
     crystalPedestals.foliage *= 2;
     crystalPedestals.branches *= 2;
@@ -5139,30 +5376,72 @@ export function getMaturitySpawnChance(
 ): number {
   let weights = {sprout: 100, sapling: 0, notable: 0, refined: 0, premium: 0};
 
-  if (biomeId === 'FOOTHILLS') {
-    if (distSteps <= 20) {
-      weights = {sprout: 100, sapling: 0, notable: 0, refined: 0, premium: 0};
-    } else if (distSteps <= 40) {
-      weights = {sprout: 88, sapling: 12, notable: 0, refined: 0, premium: 0};
+  if (distSteps <= 60) {
+    if (biomeId === 'FOOTHILLS') {
+      if (distSteps <= 20) {
+        weights = {sprout: 100, sapling: 0, notable: 0, refined: 0, premium: 0};
+      } else if (distSteps <= 40) {
+        weights = {sprout: 88, sapling: 12, notable: 0, refined: 0, premium: 0};
+      } else {
+        weights = {sprout: 78, sapling: 20, notable: 2, refined: 0, premium: 0};
+      }
+    } else if (biomeId === 'HIGHLANDS') {
+      if (distSteps <= 20) {
+        weights = {sprout: 88, sapling: 12, notable: 0, refined: 0, premium: 0};
+      } else if (distSteps <= 40) {
+        weights = {sprout: 78, sapling: 20, notable: 2, refined: 0, premium: 0};
+      } else {
+        weights = {sprout: 66.5, sapling: 25, notable: 7.3, refined: 1.2, premium: 0};
+      }
     } else {
-      weights = {sprout: 78, sapling: 20, notable: 2, refined: 0, premium: 0};
-    }
-  } else if (biomeId === 'HIGHLANDS') {
-    if (distSteps <= 20) {
-      weights = {sprout: 88, sapling: 12, notable: 0, refined: 0, premium: 0};
-    } else if (distSteps <= 40) {
-      weights = {sprout: 78, sapling: 20, notable: 2, refined: 0, premium: 0};
-    } else {
-      weights = {sprout: 66.5, sapling: 25, notable: 7.3, refined: 1.2, premium: 0};
+      // Ancient Overgrowth
+      if (distSteps <= 20) {
+        weights = {sprout: 78, sapling: 20, notable: 2, refined: 0, premium: 0};
+      } else if (distSteps <= 40) {
+        weights = {sprout: 66.5, sapling: 25, notable: 7.3, refined: 1.2, premium: 0};
+      } else {
+        weights = {sprout: 56.5, sapling: 28, notable: 11.5, refined: 3.5, premium: 0.5};
+      }
     }
   } else {
-    // Ancient Overgrowth
-    if (distSteps <= 20) {
-      weights = {sprout: 78, sapling: 20, notable: 2, refined: 0, premium: 0};
-    } else if (distSteps <= 40) {
-      weights = {sprout: 66.5, sapling: 25, notable: 7.3, refined: 1.2, premium: 0};
+    // 61 - 160 steps
+    if (biomeId === 'FOOTHILLS') {
+      if (distSteps <= 80) {
+        weights = {sprout: 66.5, sapling: 25.0, notable: 7.3, refined: 1.2, premium: 0};
+      } else if (distSteps <= 100) {
+        weights = {sprout: 56.5, sapling: 28.0, notable: 11.5, refined: 3.5, premium: 0.5};
+      } else if (distSteps <= 120) {
+        weights = {sprout: 48.0, sapling: 29.4, notable: 15.0, refined: 6.0, premium: 1.6};
+      } else if (distSteps <= 140) {
+        weights = {sprout: 40.5, sapling: 30.15, notable: 17.75, refined: 8.25, premium: 3.35};
+      } else {
+        weights = {sprout: 33.4, sapling: 29.7, notable: 20.7, refined: 10.5, premium: 5.7};
+      }
+    } else if (biomeId === 'HIGHLANDS') {
+      if (distSteps <= 80) {
+        weights = {sprout: 56.5, sapling: 28.0, notable: 11.5, refined: 3.5, premium: 0.5};
+      } else if (distSteps <= 100) {
+        weights = {sprout: 48.0, sapling: 29.4, notable: 15.0, refined: 6.0, premium: 1.6};
+      } else if (distSteps <= 120) {
+        weights = {sprout: 40.5, sapling: 30.15, notable: 17.75, refined: 8.25, premium: 3.35};
+      } else if (distSteps <= 140) {
+        weights = {sprout: 33.4, sapling: 29.7, notable: 20.7, refined: 10.5, premium: 5.7};
+      } else {
+        weights = {sprout: 27.0, sapling: 28.2, notable: 23.0, refined: 12.8, premium: 9.0};
+      }
     } else {
-      weights = {sprout: 56.5, sapling: 28, notable: 11.5, refined: 3.5, premium: 0.5};
+      // Area 3: OVERGROWTH
+      if (distSteps <= 80) {
+        weights = {sprout: 48.0, sapling: 29.4, notable: 15.0, refined: 6.0, premium: 1.6};
+      } else if (distSteps <= 100) {
+        weights = {sprout: 40.5, sapling: 30.15, notable: 17.75, refined: 8.25, premium: 3.35};
+      } else if (distSteps <= 120) {
+        weights = {sprout: 33.4, sapling: 29.7, notable: 20.7, refined: 10.5, premium: 5.7};
+      } else if (distSteps <= 140) {
+        weights = {sprout: 27.0, sapling: 28.2, notable: 23.0, refined: 12.8, premium: 9.0};
+      } else {
+        weights = {sprout: 20.7, sapling: 25.8, notable: 24.0, refined: 15.0, premium: 14.5};
+      }
     }
   }
 
@@ -5281,37 +5560,7 @@ export const SKILL_CONFIGS: Record<string, SkillConfigItem> = {
   },
 };
 
-// SANCTUARY EXPANSION TIERS (4 Staged Expansions in Botanical Market)
-export const SANCTUARY_EXPANSIONS = [
-  {
-    tier: 1,
-    name: 'Expansion I - Inner Wings Expansion',
-    plots: 32,
-    cost: 150,
-    description: 'Unlocks 2×4 columns to left (cols 4,5) and right (cols 10,11) of starter zone (+16 plots, 32 total).',
-  },
-  {
-    tier: 2,
-    name: 'Expansion II - Northern Terraces Completion',
-    plots: 64,
-    cost: 400,
-    description: 'Unlocks remaining outer wings on left (cols 0..3) & right (cols 12..15), completing top 4 rows (+32 plots, 64 total).',
-  },
-  {
-    tier: 3,
-    name: 'Expansion III - Central Basin Expansion',
-    plots: 96,
-    cost: 850,
-    description: 'Unlocks the next two rows to the south: Rows 4 & 5 across all 16 columns (+32 plots, 96 total).',
-  },
-  {
-    tier: 4,
-    name: 'Expansion IV - Southern Pavilions Final Expansion',
-    plots: 128,
-    cost: 1600,
-    description: 'Unlocks the final two southern rows (Rows 6 & 7), completing the full 16×8 = 128 plot sanctuary!',
-  },
-];
+// 8 Sequential Sanctuary Expansions (Exported from SanctuaryCanvas)
 
 /**
  * Complete standalone vector rendering for Auto (Un-)Loader (1x1 grid size):
@@ -7240,10 +7489,12 @@ export function getTendedPlotsForDispenser(
   facing: LoaderFacing = 'UP',
   orientation: 'horizontal' | 'vertical' = 'horizontal',
   fenceSet?: Set<string>,
+  maxCols = SANCTUARY_LAYOUT.mainCols,
+  maxRows = SANCTUARY_LAYOUT.mainRows,
 ): { col: number; row: number }[] {
   const result: { col: number; row: number }[] = [];
   const addIfValid = (c: number, r: number) => {
-    if (c >= 0 && c < SANCTUARY_GRID.cols && r >= 0 && r < SANCTUARY_GRID.rows) {
+    if (c >= 0 && c < maxCols && r >= 0 && r < maxRows) {
       if (!fenceSet || !isHaloBlockedByFence(col, row, c, r, fenceSet)) {
         result.push({ col: c, row: r });
       }
@@ -7284,8 +7535,8 @@ export function getStructureCoveredPlots(
   structType: DeployedStructureType,
   col: number,
   row: number,
-  cols = SANCTUARY_GRID.cols,
-  rows = SANCTUARY_GRID.rows,
+  cols = SANCTUARY_LAYOUT.mainCols,
+  rows = SANCTUARY_LAYOUT.mainRows,
   orientation: 'horizontal' | 'vertical' = 'horizontal',
 ): { col: number; row: number }[] {
   let offsets: { dc: number; dr: number }[] = [];
@@ -11478,6 +11729,117 @@ export function ItemVectorPreview({
 }
 
 
+export function getCrystalArtifactBaseRate(biomeId: ExpeditionBiomeId, dist: number): number {
+  if (biomeId === 'FOOTHILLS') {
+    if (dist <= 20) return 0.0005;
+    if (dist <= 40) return 0.0010;
+    if (dist <= 60) return 0.0015;
+    if (dist <= 80) return 0.0020;
+    if (dist <= 100) return 0.0025;
+    if (dist <= 120) return 0.0030;
+    if (dist <= 140) return 0.0035;
+    return 0.0040;
+  }
+  if (biomeId === 'HIGHLANDS') {
+    if (dist <= 20) return 0.0010;
+    if (dist <= 40) return 0.0020;
+    if (dist <= 60) return 0.0030;
+    if (dist <= 80) return 0.0040;
+    if (dist <= 100) return 0.0050;
+    if (dist <= 120) return 0.0060;
+    if (dist <= 140) return 0.0070;
+    return 0.0080;
+  }
+  // OVERGROWTH
+  if (dist <= 20) return 0.0015;
+  if (dist <= 40) return 0.0030;
+  if (dist <= 60) return 0.0045;
+  if (dist <= 80) return 0.0060;
+  if (dist <= 100) return 0.0075;
+  if (dist <= 120) return 0.0090;
+  if (dist <= 140) return 0.0105;
+  return 0.0120;
+}
+
+export function getMaturityWeights(
+  biomeId: ExpeditionBiomeId,
+  dist: number,
+): { sprout: number; sapling: number; notable: number; refined: number; premium: number } {
+  if (dist <= 60) {
+    if (biomeId === 'FOOTHILLS') {
+      if (dist <= 20) return { sprout: 100, sapling: 0, notable: 0, refined: 0, premium: 0 };
+      if (dist <= 40) return { sprout: 88, sapling: 12, notable: 0, refined: 0, premium: 0 };
+      return { sprout: 78, sapling: 20, notable: 2, refined: 0, premium: 0 };
+    }
+    if (biomeId === 'HIGHLANDS') {
+      if (dist <= 20) return { sprout: 88, sapling: 12, notable: 0, refined: 0, premium: 0 };
+      if (dist <= 40) return { sprout: 78, sapling: 20, notable: 2, refined: 0, premium: 0 };
+      return { sprout: 66.5, sapling: 25, notable: 7.3, refined: 1.2, premium: 0 };
+    }
+    // OVERGROWTH
+    if (dist <= 20) return { sprout: 78, sapling: 20, notable: 2, refined: 0, premium: 0 };
+    if (dist <= 40) return { sprout: 66.5, sapling: 25, notable: 7.3, refined: 1.2, premium: 0 };
+    return { sprout: 56.5, sapling: 28, notable: 11.5, refined: 3.5, premium: 0.5 };
+  }
+
+  // 61 - 160 steps
+  if (biomeId === 'FOOTHILLS') {
+    if (dist <= 80) return { sprout: 66.5, sapling: 25.0, notable: 7.3, refined: 1.2, premium: 0 };
+    if (dist <= 100) return { sprout: 56.5, sapling: 28.0, notable: 11.5, refined: 3.5, premium: 0.5 };
+    if (dist <= 120) return { sprout: 48.0, sapling: 29.4, notable: 15.0, refined: 6.0, premium: 1.6 };
+    if (dist <= 140) return { sprout: 40.5, sapling: 30.15, notable: 17.75, refined: 8.25, premium: 3.35 };
+    return { sprout: 33.4, sapling: 29.7, notable: 20.7, refined: 10.5, premium: 5.7 };
+  }
+
+  if (biomeId === 'HIGHLANDS') {
+    if (dist <= 80) return { sprout: 56.5, sapling: 28.0, notable: 11.5, refined: 3.5, premium: 0.5 };
+    if (dist <= 100) return { sprout: 48.0, sapling: 29.4, notable: 15.0, refined: 6.0, premium: 1.6 };
+    if (dist <= 120) return { sprout: 40.5, sapling: 30.15, notable: 17.75, refined: 8.25, premium: 3.35 };
+    if (dist <= 140) return { sprout: 33.4, sapling: 29.7, notable: 20.7, refined: 10.5, premium: 5.7 };
+    return { sprout: 27.0, sapling: 28.2, notable: 23.0, refined: 12.8, premium: 9.0 };
+  }
+
+  // Area 3: OVERGROWTH
+  if (dist <= 80) return { sprout: 48.0, sapling: 29.4, notable: 15.0, refined: 6.0, premium: 1.6 };
+  if (dist <= 100) return { sprout: 40.5, sapling: 30.15, notable: 17.75, refined: 8.25, premium: 3.35 };
+  if (dist <= 120) return { sprout: 33.4, sapling: 29.7, notable: 20.7, refined: 10.5, premium: 5.7 };
+  if (dist <= 140) return { sprout: 27.0, sapling: 28.2, notable: 23.0, refined: 12.8, premium: 9.0 };
+  return { sprout: 20.7, sapling: 25.8, notable: 24.0, refined: 15.0, premium: 14.5 };
+}
+
+export function getMaxAllowedStepsForArea(
+  areaId: ExpeditionBiomeId,
+  inv: SanctuaryInventory,
+): number {
+  const isOwned = (key: string) => Boolean(inv[key] || inv.unlockedMaps?.includes(key));
+
+  if (areaId === 'FOOTHILLS') {
+    if (isOwned('area1_exp5')) return 160;
+    if (isOwned('area1_exp4')) return 140;
+    if (isOwned('area1_exp3')) return 120;
+    if (isOwned('area1_exp2')) return 100;
+    if (isOwned('area1_exp1')) return 80;
+    return 60;
+  }
+
+  if (areaId === 'HIGHLANDS') {
+    if (isOwned('area2_exp5')) return 160;
+    if (isOwned('area2_exp4')) return 140;
+    if (isOwned('area2_exp3')) return 120;
+    if (isOwned('area2_exp2')) return 100;
+    if (isOwned('area2_exp1')) return 80;
+    return 60;
+  }
+
+  // Area 3: OVERGROWTH
+  if (isOwned('area3_exp5')) return 160;
+  if (isOwned('area3_exp4')) return 140;
+  if (isOwned('area3_exp3')) return 120;
+  if (isOwned('area3_exp2')) return 100;
+  if (isOwned('area3_exp1')) return 80;
+  return 60;
+}
+
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stepperRef = useRef<ReturnType<typeof createFixedStepper>>();
@@ -11935,8 +12297,8 @@ export default function App() {
 
   // Permanent Sanctuary Storage (with Coins Currency, Purchased Maps, Expansions, Organic Waste & Composting)
   const sanctuaryInventoryRef = useRef<SanctuaryInventory>({
-    coins: 250,
-    verdure: 250,
+    coins: 12000,
+    verdure: 12000,
     license_t1: 0,
     license_t2: 0,
     license_t3: 0,
@@ -12139,6 +12501,7 @@ export default function App() {
     rover_battery_level: 0,
     rover_cargo_level: 0,
     sanctuary_expansion_tier: 0, // Starter: 12 plots unlocked
+    unlockedMaps: ['area1_base'],
     has_map_highlands: false,
     has_map_overgrowth: false,
     unlockedBlueprints: [],
@@ -12366,8 +12729,8 @@ export default function App() {
 
   // Walkable Botanist Avatar in Sanctuary
   const avatarRef = useRef({
-    x: 640,
-    y: 220,
+    x: 1400,
+    y: 256,
     vx: 0,
     vy: 0,
     radius: 18,
@@ -12379,8 +12742,8 @@ export default function App() {
 
   // Stored Sanctuary Avatar Position across Expeditions
   const sanctuaryPlayerPosRef = useRef({
-    x: 640,
-    y: 220,
+    x: 1400,
+    y: 256,
   });
 
   // --- EXCURSION ROVER & CAMERA STATE ---
@@ -12396,8 +12759,8 @@ export default function App() {
     facing: 'up' as 'up' | 'down' | 'left' | 'right',
     facingDirection: 1 as 1 | -1, // 1 = right, -1 = left
     rotation: 0,
-    batteryKwh: 50,
-    maxBatteryKwh: 50,
+    batteryKwh: 500,
+    maxBatteryKwh: 500,
     isMovingAnim: false,
     moveCooldown: 0,
     maxDistanceReached: 0,
@@ -12411,15 +12774,17 @@ export default function App() {
   });
 
   const sanctuaryCameraRef = useRef({
+    x: 0,
     y: 0,
   });
 
-  // --- 5 HORIZONTALLY SPACED PROMENADE SANCTUARY STATIONS (BALANCED & SYMMETRICAL) ---
+  // --- 5 HORIZONTALLY SPACED PROMENADE SANCTUARY STATIONS (BALANCED & SYMMETRICAL ATOP MAIN GRID) ---
+  // Center X = 1400. Width = 150. Spacing = 230. Adjusted to clear wisteria canopy comfortably.
   // Station 1 (Far Left): Zen Library
   const sanctuaryZenLibrary = useMemo(
     () => ({
-      x: 105,
-      y: 88,
+      x: 865,
+      y: 118,
       width: 150,
       height: 105,
     }),
@@ -12429,8 +12794,8 @@ export default function App() {
   // Station 2 (Mid Left): Artisan Workbench
   const sanctuaryWorkbench = useMemo(
     () => ({
-      x: 335,
-      y: 88,
+      x: 1095,
+      y: 118,
       width: 150,
       height: 105,
     }),
@@ -12440,8 +12805,8 @@ export default function App() {
   // Station 3 (Dead Center): Bonsai Society
   const sanctuaryBonsaiSociety = useMemo(
     () => ({
-      x: 565,
-      y: 88,
+      x: 1325,
+      y: 118,
       width: 150,
       height: 105,
     }),
@@ -12451,8 +12816,8 @@ export default function App() {
   // Station 4 (Mid Right): Rover Garage Bay
   const sanctuaryRoverGarage = useMemo(
     () => ({
-      x: 795,
-      y: 88,
+      x: 1555,
+      y: 118,
       width: 150,
       height: 105,
     }),
@@ -12462,8 +12827,8 @@ export default function App() {
   // Station 5 (Far Right): Botanical Market
   const sanctuaryShopStand = useMemo(
     () => ({
-      x: 1025,
-      y: 88,
+      x: 1785,
+      y: 118,
       width: 150,
       height: 105,
     }),
@@ -12800,7 +13165,7 @@ export default function App() {
 
   // Compute Maximum Battery Points (kWh) with Modules & Chassis Outfitting
   const getMaxRoverBattery = useCallback(() => {
-    const base = (getConfig('roverBaseBattery') as number) || 50;
+    const base = (getConfig('roverBaseBattery') as number) || 500;
     const attached = sanctuaryInventoryRef.current.attached_rover_modules || [];
     const moduleBonus = attached.reduce((acc, modType) => {
       const cfg = ROVER_MODULE_CONFIGS[modType];
@@ -12825,46 +13190,22 @@ export default function App() {
     return 2 + zenSkillsRef.current.carefulTrowel;
   }, []);
 
-  // Check if a Sanctuary Grid coordinate (gx, gy) is unlocked based on expansion tier (0..4)
+  // Check if a Sanctuary Grid coordinate (gx, gy) is unlocked based on expansion tier
   const isGridPlotUnlocked = useCallback((gx: number, gy: number) => {
-    const colIdx = Math.round((gx - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-    const rowIdx = Math.round((gy - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
-
-    if (colIdx < 0 || colIdx >= SANCTUARY_GRID.cols || rowIdx < 0 || rowIdx >= SANCTUARY_GRID.rows) {
-      return false;
-    }
-
     const tier = sanctuaryInventoryRef.current.sanctuary_expansion_tier || 0;
-
-    // Expansion IV: Full 16x8 matrix unlocked (128 plots)
-    if (tier >= 4) return true;
-
-    // Expansion III: Central Basin - Rows 0..5 across all 16 columns (96 plots)
-    if (tier === 3) {
-      return rowIdx >= 0 && rowIdx <= 5;
-    }
-
-    // Expansion II: Northern Terraces - Rows 0..3 across all 16 columns (64 plots)
-    if (tier === 2) {
-      return rowIdx >= 0 && rowIdx <= 3;
-    }
-
-    // Expansion I: Inner Wings - Cols 4..11 for top 4 rows (32 plots)
-    if (tier === 1) {
-      return colIdx >= 4 && colIdx <= 11 && rowIdx >= 0 && rowIdx <= 3;
-    }
-
-    // Starter Tier 0: 4x4 Top-Middle (Cols 6..9, Rows 0..3 = 16 starter plots)
-    return colIdx >= 6 && colIdx <= 9 && rowIdx >= 0 && rowIdx <= 3;
+    const plot = getPlotAtCoords(gx, gy, tier);
+    return plot ? plot.isUnlocked : false;
   }, []);
 
   // Helpers to check plot occupation accounting for 1x1, 2x2 bonsai footprints, and 3x1 torii gates
   const isPlotOccupiedByPlantedBonsai = useCallback(
-    (c: number, r: number, excludeBonsaiId?: string): boolean => {
+    (c: number, r: number, field: 'main' | 'left' | 'right' = 'main', excludeBonsaiId?: string): boolean => {
       return plantedBonsaisRef.current.some((b) => {
         if (excludeBonsaiId && b.id === excludeBonsaiId) return false;
-        const bCol = b.col !== undefined ? b.col : Math.round((b.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-        const bRow = b.row !== undefined ? b.row : Math.round((b.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+        const bField = (b as any).field || (b.x < SANCTUARY_LAYOUT.leftPathX ? 'left' : b.x > SANCTUARY_LAYOUT.rightPathX ? 'right' : 'main');
+        if (bField !== field) return false;
+        const bCol = b.col !== undefined ? b.col : 0;
+        const bRow = b.row !== undefined ? b.row : 0;
         const bW = b.width || 1;
         const bH = b.height || 1;
         return c >= bCol && c < bCol + bW && r >= bRow && r < bRow + bH;
@@ -12874,18 +13215,23 @@ export default function App() {
   );
 
   const isPlotOccupiedByStructure = useCallback(
-    (c: number, r: number, excludeStructId?: string): boolean => {
+    (c: number, r: number, field: 'main' | 'left' | 'right' = 'main', excludeStructId?: string): boolean => {
       return deployedStructuresRef.current.some((s) => {
         if (excludeStructId && s.id === excludeStructId) return false;
         if (s.type === 'bamboo_fence') return false; // Fences are boundary edge entities and do not occupy plot interiors
-        const plots = getStructureConstituentPlots(s);
-        return plots.some((p) => p.col === c && p.row === r);
+        const sField = (s as any).field || (s.x < SANCTUARY_LAYOUT.leftPathX ? 'left' : s.x > SANCTUARY_LAYOUT.rightPathX ? 'right' : 'main');
+        if (sField !== field) return false;
+        const sCol = s.col !== undefined ? s.col : 0;
+        const sRow = s.row !== undefined ? s.row : 0;
+        const sW = s.width || 1;
+        const sH = s.height || 1;
+        return c >= sCol && c < sCol + sW && r >= sRow && r < sRow + sH;
       });
     },
     [],
   );
 
-  // Pre-render static terrain, promenade pebbles, and soil grid to an offscreen canvas
+  // Pre-render static terrain, promenade pebbles, lateral paths, and organic forest perimeter border to an offscreen canvas
   const renderOffscreenTerrain = useCallback(
     (targetWidth: number, targetHeight: number) => {
       let offCanvas = offscreenTerrainCanvasRef.current;
@@ -12904,47 +13250,74 @@ export default function App() {
 
       // Warm greenhouse base ambiance
       const greenhouseGrad = offCtx.createLinearGradient(0, 0, 0, targetHeight);
-      greenhouseGrad.addColorStop(0, 'rgba(15, 23, 42, 0.55)');
+      greenhouseGrad.addColorStop(0, 'rgba(15, 23, 42, 0.65)');
       greenhouseGrad.addColorStop(0.3, 'rgba(6, 78, 59, 0.45)');
-      greenhouseGrad.addColorStop(1, 'rgba(15, 23, 42, 0.7)');
+      greenhouseGrad.addColorStop(0.8, 'rgba(6, 78, 59, 0.55)');
+      greenhouseGrad.addColorStop(1, 'rgba(15, 23, 42, 0.75)');
       offCtx.fillStyle = greenhouseGrad;
       offCtx.fillRect(0, 50, targetWidth, targetHeight - 50);
 
-      // Continuous Station Promenade Zen Pebble Walkway
+      // Top Station Promenade Zen Pebble Walkway: extending cleanly from leftPathX to rightPathX
       offCtx.save();
-      for (let c = 0; c < SANCTUARY_GRID.cols; c++) {
-        const px = SANCTUARY_GRID.startX + c * SANCTUARY_GRID.cellW;
-        renderPebbleCluster(offCtx, px, 218, c % 5);
+      for (let px = SANCTUARY_LAYOUT.leftPathX; px <= SANCTUARY_LAYOUT.rightPathX; px += SANCTUARY_LAYOUT.cellW) {
+        const variant = Math.floor((px - SANCTUARY_LAYOUT.leftPathX) / SANCTUARY_LAYOUT.cellW) % 5;
+        renderPebbleCluster(offCtx, px, SANCTUARY_LAYOUT.topPathY, variant);
+      }
+
+      // Left Flanking Lateral Vertical Pebble Path: 8 discrete stepping stone clusters with grass gaps, exactly matching the top path stones
+      for (let r = 0; r < SANCTUARY_LAYOUT.sideRows; r++) {
+        const py = SANCTUARY_LAYOUT.leftStartY + r * SANCTUARY_LAYOUT.cellH;
+        renderPebbleCluster(offCtx, SANCTUARY_LAYOUT.leftPathX, py, (r + 1) % 5);
+      }
+
+      // Right Flanking Lateral Vertical Pebble Path: 8 discrete stepping stone clusters with grass gaps, exactly matching the top path stones
+      for (let r = 0; r < SANCTUARY_LAYOUT.sideRows; r++) {
+        const py = SANCTUARY_LAYOUT.rightStartY + r * SANCTUARY_LAYOUT.cellH;
+        renderPebbleCluster(offCtx, SANCTUARY_LAYOUT.rightPathX, py, (r + 3) % 5);
       }
       offCtx.restore();
 
-      // 16x8 Polished parquet & warm stone flooring beneath the nursery plots
-      const gridW = SANCTUARY_GRID.cols * SANCTUARY_GRID.cellW;
-      const gridH = SANCTUARY_GRID.rows * SANCTUARY_GRID.cellH;
-      const floorX = SANCTUARY_GRID.startX - SANCTUARY_GRID.cellW / 2 - 14;
-      const floorY = SANCTUARY_GRID.startY - SANCTUARY_GRID.cellH / 2 - 14;
-      const floorW = gridW + 28;
-      const floorH = gridH + 28;
+      // Half-Circle Forest Perimeter Border:
+      // Pushed significantly further outward so tree crowns and trunks do NOT overlap or clip into 8x8 fields or main field
+      // Ensures left trees strictly stay to the left of (leftFieldX - 60px) and right trees to the right of (rightFieldX + 60px)
+      offCtx.save();
+      const { centerX, forestCenterY, forestRx, forestRy } = SANCTUARY_LAYOUT;
+      const arcSteps = 64;
 
-      offCtx.fillStyle = 'rgba(20, 83, 45, 0.45)';
-      offCtx.beginPath();
-      offCtx.roundRect(floorX, floorY, floorW, floorH, 14);
-      offCtx.fill();
+      const leftSafeBoundary = SANCTUARY_LAYOUT.leftStartX - (SANCTUARY_LAYOUT.cellW - 8) / 2 - 75; // well left of left field
+      const rightSafeBoundary = SANCTUARY_LAYOUT.rightStartX + 7 * SANCTUARY_LAYOUT.cellW + (SANCTUARY_LAYOUT.cellW - 8) / 2 + 75; // well right of right field
 
-      // Stone boundary border trim with wooden joinery
-      offCtx.strokeStyle = 'rgba(180, 83, 9, 0.45)';
-      offCtx.lineWidth = 3.5;
-      offCtx.stroke();
+      for (let i = 0; i <= arcSteps; i++) {
+        const theta = Math.PI - (i / arcSteps) * Math.PI; // from PI (left) down to 0 (right)
+        let edgeX = centerX + Math.cos(theta) * forestRx;
+        const edgeY = forestCenterY + Math.sin(theta) * forestRy;
 
-      // Subdued parquet planks detail inside the courtyard floor
-      offCtx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-      offCtx.lineWidth = 1;
-      for (let py = floorY + 14; py < floorY + floorH - 10; py += 36) {
-        offCtx.beginPath();
-        offCtx.moveTo(floorX + 10, py);
-        offCtx.lineTo(floorX + floorW - 10, py);
-        offCtx.stroke();
+        // Ensure clearance alongside the 8x8 side fields
+        if (edgeY <= SANCTUARY_LAYOUT.pathBottomY + 80) {
+          if (theta >= Math.PI / 2) {
+            edgeX = Math.min(edgeX, leftSafeBoundary);
+          } else {
+            edgeX = Math.max(edgeX, rightSafeBoundary);
+          }
+        }
+
+        // Outer dense tree ring
+        const outerX = theta >= Math.PI / 2 ? edgeX - 60 : edgeX + 60;
+        const outerY = edgeY + 20;
+        drawWildBarrierTree(offCtx, outerX - 32, outerY - 36, 64, i * 7, i * 11, i % 3 === 0);
+
+        // Core tree perimeter line
+        drawWildBarrierTree(offCtx, edgeX - 32, edgeY - 36, 64, i * 5, i * 13, i % 4 === 0);
       }
+
+      // Flanking vertical forest borders above pathBottomY (from Y = 10 down alongside side fields)
+      for (let py = 10; py <= SANCTUARY_LAYOUT.pathBottomY + 60; py += 48) {
+        drawWildBarrierTree(offCtx, 40, py - 32, 64, 1, Math.floor(py), false);
+        drawWildBarrierTree(offCtx, -15, py - 20, 64, 2, Math.floor(py), true);
+        drawWildBarrierTree(offCtx, 2760, py - 32, 64, 3, Math.floor(py), false);
+        drawWildBarrierTree(offCtx, 2815, py - 20, 64, 4, Math.floor(py), true);
+      }
+      offCtx.restore();
 
       offscreenTerrainDirtyRef.current = false;
     },
@@ -13108,15 +13481,15 @@ export default function App() {
     };
   }, []);
 
-  // Helper to snap coordinates to sanctuary 16x8 grid
+  // Helper to snap coordinates to sanctuary grid (Main, Left, or Right)
   const snapToSanctuaryGrid = useCallback((x: number, y: number) => {
-    const col = Math.max(0, Math.min(SANCTUARY_GRID.cols - 1, Math.round((x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW)));
-    const row = Math.max(0, Math.min(SANCTUARY_GRID.rows - 1, Math.round((y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH)));
+    const p = getPlotAtCoords(x, y, 99) || getPreviewPlot(x, y, 99);
     return {
-      col,
-      row,
-      x: SANCTUARY_GRID.startX + col * SANCTUARY_GRID.cellW,
-      y: SANCTUARY_GRID.startY + row * SANCTUARY_GRID.cellH,
+      col: p.col,
+      row: p.row,
+      x: p.centerX,
+      y: p.centerY,
+      field: p.field,
     };
   }, []);
 
@@ -13137,12 +13510,47 @@ export default function App() {
         color: '#f59e0b',
         description: `Middle range perimeter (21-40 steps). Drain: ${biome.batteryCostPerStep} kWh/step.`,
       };
-    } else {
+    } else if (distSteps <= 60) {
       return {
         name: `✨ ${biome.name} - Far Range`,
         tier: 3,
+        color: '#38bdf8',
+        description: `Far range perimeter (41-60 steps). Drain: ${biome.batteryCostPerStep} kWh/step.`,
+      };
+    } else if (distSteps <= 80) {
+      return {
+        name: `🏔️ ${biome.name} - Expansion I`,
+        tier: 4,
+        color: '#818cf8',
+        description: `Expansion I sector (61-80 steps). Drain: ${biome.batteryCostPerStep} kWh/step.`,
+      };
+    } else if (distSteps <= 100) {
+      return {
+        name: `🌌 ${biome.name} - Expansion II`,
+        tier: 5,
+        color: '#a855f7',
+        description: `Expansion II sector (81-100 steps). Drain: ${biome.batteryCostPerStep} kWh/step.`,
+      };
+    } else if (distSteps <= 120) {
+      return {
+        name: `🔮 ${biome.name} - Expansion III`,
+        tier: 6,
         color: '#c084fc',
-        description: `Far range frontier (41-60 steps). Drain: ${biome.batteryCostPerStep} kWh/step.`,
+        description: `Expansion III sector (101-120 steps). Drain: ${biome.batteryCostPerStep} kWh/step.`,
+      };
+    } else if (distSteps <= 140) {
+      return {
+        name: `⚡ ${biome.name} - Expansion IV`,
+        tier: 7,
+        color: '#e879f9',
+        description: `Expansion IV sector (121-140 steps). Drain: ${biome.batteryCostPerStep} kWh/step.`,
+      };
+    } else {
+      return {
+        name: `👑 ${biome.name} - Deep Frontier V`,
+        tier: 8,
+        color: '#f43f5e',
+        description: `Deep Frontier sector (141-160 steps). Drain: ${biome.batteryCostPerStep} kWh/step.`,
       };
     }
   }, []);
@@ -13150,7 +13558,7 @@ export default function App() {
   // Generate Wilderness Excursion Grid Map with unified combined probability calculation per tile
   const generateExcursionGridWorld = useCallback((biomeId: ExpeditionBiomeId) => {
     const nodes = new Map<string, ExcursionTileNode>();
-    const radius = 60;
+    const radius = 160;
     const seed = worldSeedRef.current;
 
     // Pseudo-random hash generator based on world seed
@@ -13186,30 +13594,15 @@ export default function App() {
         if (Math.abs(gx) <= 1 && Math.abs(gy) <= 1) continue;
 
         const dist = Math.hypot(gx, gy);
-        if (dist >= 60) continue; // Boundary at 60 steps is impassable wild perimeter
+        if (dist > 160) continue; // Boundary expands up to 160 steps
 
         const isClose = dist <= 20;
         const isMid = dist > 20 && dist <= 40;
 
-        // Unified Probability Calculation Per Tile:
-        // Area 1 (Foothills): Close: 8% bonsai, 4% resource, 0.05% crystal, 87.95% nothing
-        //                    Mid:   8% bonsai, 6% resource, 0.10% crystal, 85.90% nothing
-        //                    Far:   8% bonsai, 8% resource, 0.15% crystal, 83.85% nothing
-        // Area 2 (Highlands): Close: 8% bonsai, 4% resource, 0.10% crystal, 87.90% nothing
-        //                    Mid:   8% bonsai, 6% resource, 0.20% crystal, 85.80% nothing
-        //                    Far:   8% bonsai, 8% resource, 0.30% crystal, 83.70% nothing
-        // Area 3 (Overgrowth): Close: 8% bonsai, 4% resource, 0.15% crystal, 87.85% nothing
-        //                     Mid:   8% bonsai, 6% resource, 0.30% crystal, 85.70% nothing
-        //                     Far:   8% bonsai, 8% resource, 0.45% crystal, 83.55% nothing
         const bonsaiRate = 0.08 + dowsingBonus;
         const baseResRate = isClose ? 0.04 : isMid ? 0.06 : 0.08;
         const resourceRate = baseResRate + prospectingBonus;
-        const baseCrystalRate =
-          biomeId === 'FOOTHILLS'
-            ? (isClose ? 0.0005 : isMid ? 0.0010 : 0.0015)
-            : biomeId === 'HIGHLANDS'
-            ? (isClose ? 0.0010 : isMid ? 0.0020 : 0.0030)
-            : (isClose ? 0.0015 : isMid ? 0.0030 : 0.0045);
+        const baseCrystalRate = getCrystalArtifactBaseRate(biomeId, dist);
         const crystalRate = baseCrystalRate + artifactHunterBonus;
 
         const tileRoll = pseudoNoise(gx, gy, 111.1);
@@ -13229,22 +13622,7 @@ export default function App() {
           }
 
           const chosenLeaf = LEAF_TYPE_CONFIGS[chosenLeafType];
-
-          let weights = {sprout: 100, sapling: 0, notable: 0, refined: 0, premium: 0};
-          if (biomeId === 'FOOTHILLS') {
-            if (dist <= 20) weights = {sprout: 100, sapling: 0, notable: 0, refined: 0, premium: 0};
-            else if (dist <= 40) weights = {sprout: 88, sapling: 12, notable: 0, refined: 0, premium: 0};
-            else weights = {sprout: 78, sapling: 20, notable: 2, refined: 0, premium: 0};
-          } else if (biomeId === 'HIGHLANDS') {
-            if (dist <= 20) weights = {sprout: 88, sapling: 12, notable: 0, refined: 0, premium: 0};
-            else if (dist <= 40) weights = {sprout: 78, sapling: 20, notable: 2, refined: 0, premium: 0};
-            else weights = {sprout: 66.5, sapling: 25, notable: 7.3, refined: 1.2, premium: 0};
-          } else {
-            if (dist <= 20) weights = {sprout: 78, sapling: 20, notable: 2, refined: 0, premium: 0};
-            else if (dist <= 40) weights = {sprout: 66.5, sapling: 25, notable: 7.3, refined: 1.2, premium: 0};
-            else weights = {sprout: 56.5, sapling: 28, notable: 11.5, refined: 3.5, premium: 0.5};
-          }
-
+          const weights = getMaturityWeights(biomeId, dist);
           const wArray = [weights.sprout, weights.sapling, weights.notable, weights.refined, weights.premium];
           const totalW = wArray.reduce((a, b) => a + b, 0);
           const matRoll = pseudoNoise(gx, gy, 555.5) * totalW;
@@ -13263,7 +13641,6 @@ export default function App() {
           }
 
           const spawnChance = totalW > 0 ? (wArray[chosenMaturityIdx] / totalW) : 1.0;
-          const matDef = getMaturityDef(chosenMaturity);
 
           nodes.set(`${gx},${gy}`, {
             id: `sap_${gx}_${gy}`,
@@ -13282,14 +13659,29 @@ export default function App() {
         } else if (tileRoll < bonsaiRate + resourceRate) {
           // 2. RESOURCE DEPOSIT TILE
           const resRoll = pseudoNoise(gx, gy, 888.8);
-          const resourceType = pickResourceDeposit(biomeId, dist, resRoll);
+          const resYield = pickResourceDepositEx(biomeId, dist, resRoll);
+          let resType = resYield.key;
+          if (resYield.amount === 2 && resType === 'scrap_metal') {
+            resType = 'scrap_metal_double';
+          } else if (resYield.amount === 3 && resType === 'scrap_metal') {
+            resType = 'scrap_metal_triple';
+          } else if (resYield.amount === 2 && resType === 'copper_wire') {
+            resType = 'copper_wire_double';
+          } else if (resYield.amount === 3 && resType === 'copper_wire') {
+            resType = 'copper_wire_triple';
+          } else if (resYield.amount === 2 && resType === 'brass_gears') {
+            resType = 'brass_gears_double';
+          } else if (resYield.amount === 2 && resType === 'circuit_boards') {
+            resType = 'circuit_boards_double';
+          }
 
           nodes.set(`${gx},${gy}`, {
             id: `res_${gx}_${gy}`,
             tileX: gx,
             tileY: gy,
             type: 'RESOURCE',
-            resourceType,
+            resourceType: resType,
+            resourceYield: resYield.amount,
             collected: false,
           });
         } else if (tileRoll < bonsaiRate + resourceRate + crystalRate) {
@@ -13301,7 +13693,6 @@ export default function App() {
           else if (cTypeRoll < 0.75) crystalType = 'trunk';
           else crystalType = 'roots';
 
-          // Strength Level: Area 1: 100% 0.5; Area 2: 100% 0.5; Area 3: 90% 0.5, 10% 1.0
           let strength: 0.5 | 1.0 = 0.5;
           if (biomeId === 'OVERGROWTH') {
             const strRoll = pseudoNoise(gx, gy, 444.4);
@@ -13338,7 +13729,6 @@ export default function App() {
             collected: false,
           });
         }
-        // else: 87.8% / 85.8% / 83.8% nothing
       }
     }
 
@@ -13352,7 +13742,13 @@ export default function App() {
       const inv = sanctuaryInventoryRef.current;
       const reqKey = biome.requiredMapKey;
 
-      if (!biome.unlockedByDefault && reqKey && !inv[reqKey]) {
+      const isAreaUnlocked =
+        biome.unlockedByDefault ||
+        (reqKey && inv[reqKey]) ||
+        (biomeId === 'HIGHLANDS' && (inv.has_map_highlands || inv['area2_base'] || inv.unlockedMaps?.includes('area2_base'))) ||
+        (biomeId === 'OVERGROWTH' && (inv.has_map_overgrowth || inv['area3_base'] || inv.unlockedMaps?.includes('area3_base')));
+
+      if (!isAreaUnlocked) {
         gameAudio.playErrorBuzz();
         triggerNotification(`Locked: Purchase map at Botanical Market (${biome.mapCost} Verdure)`, '#ef4444');
         return;
@@ -13452,6 +13848,10 @@ export default function App() {
           electronic_chips: '💎 Electronic Chips',
           scrap_metal_double: '🔩 Heavy Scrap Metal (2x)',
           copper_wire_double: '⚡ Heavy Copper Wire (2x)',
+          scrap_metal_triple: '🔩 Scrap Metal Trio (3x)',
+          copper_wire_triple: '⚡ Copper Wire Spools (3x)',
+          brass_gears_double: '⚙️ Interlocking Brass Gears (2x)',
+          circuit_boards_double: '🟩 Layered Microcircuits (2x)',
         };
 
         return {
@@ -13932,10 +14332,11 @@ export default function App() {
       const nextTileY = rover.tileY + dy;
       const targetDist = Math.hypot(nextTileX, nextTileY);
 
-      // Impassable 60-Step Wilderness Barrier
-      if (targetDist >= 60) {
+      // Maximum Unlocked Distance Barrier for Area
+      const maxAllowedSteps = getMaxAllowedStepsForArea(activeBiomeIdRef.current, sanctuaryInventoryRef.current);
+      if (targetDist > maxAllowedSteps) {
         gameAudio.playErrorBuzz();
-        triggerNotification('🚫 Impassable Wilderness Boundary', '#f43f5e');
+        triggerNotification(`Requires Expansion Map to travel beyond ${maxAllowedSteps} steps`, '#f43f5e');
         return;
       }
 
@@ -13995,35 +14396,48 @@ export default function App() {
       if (node && !node.collected) {
         if (node.type === 'RESOURCE' && node.resourceType) {
           const rt = node.resourceType;
-          // Track discovered resource in codex
           const curArea = activeBiomeIdRef.current;
           const disc = areaDiscoveryRef.current;
           if (!disc.resources[curArea].includes(rt)) {
             disc.resources[curArea].push(rt);
           }
-          const isDoubleScrap = rt === 'scrap_metal_double';
-          const isDoubleWire = rt === 'copper_wire_double';
-          const nameMap: Record<ResourceItemKey, string> = {
-            scrap_metal: '🔩 Scrap Metal (0.8kg)',
-            copper_wire: '⚡ Copper Wire (0.5kg)',
-            brass_gears: '⚙️ Brass Gear (1.2kg)',
-            circuit_boards: '🟩 Circuit Board (1.0kg)',
-            electronic_chips: '💎 Electronic Chip (1.5kg)',
-            scrap_metal_double: '🔩 Heavy Scrap Metal Cache (2x, 1.6kg)',
-            copper_wire_double: '⚡ Heavy Copper Wire Bundle (2x, 1.0kg)',
-          };
+          const yieldCount = node.resourceYield || (
+            rt === 'scrap_metal_triple' || rt === 'copper_wire_triple' ? 3 :
+            rt === 'scrap_metal_double' || rt === 'copper_wire_double' || rt === 'brass_gears_double' || rt === 'circuit_boards_double' ? 2 : 1
+          );
+          const baseKey = (
+            rt === 'scrap_metal_double' || rt === 'scrap_metal_triple' ? 'scrap_metal' :
+            rt === 'copper_wire_double' || rt === 'copper_wire_triple' ? 'copper_wire' :
+            rt === 'brass_gears_double' ? 'brass_gears' :
+            rt === 'circuit_boards_double' ? 'circuit_boards' : rt
+          ) as ResourceItemKey;
+          const singleWeight = ITEM_WEIGHTS[baseKey] || 0.8;
+          const totalWeight = singleWeight * yieldCount;
           const curWeight = getCargoWeight();
           const maxWeight = getMaxRoverCargo();
-          const itemWeight = ITEM_WEIGHTS[rt];
-          const remainingCapacity = maxWeight - curWeight;
-          const singleWeight = isDoubleScrap ? 0.8 : isDoubleWire ? 0.5 : itemWeight;
 
-          if (curWeight + itemWeight <= maxWeight) {
-            triggerNotification(`Found ${nameMap[rt]}! Press [E] to collect.`, '#38bdf8');
-          } else if ((isDoubleScrap || isDoubleWire) && remainingCapacity >= singleWeight) {
-            triggerNotification(`Found ${nameMap[rt]}! [Requires 2 cargo slots - only 1 available]`, '#ef4444');
+          const nameMap: Record<string, string> = {
+            scrap_metal: '🔩 Scrap Metal',
+            copper_wire: '⚡ Copper Wire',
+            brass_gears: '⚙️ Brass Gear',
+            circuit_boards: '🟩 Circuit Board',
+            electronic_chips: '💎 Electronic Chip',
+            scrap_metal_double: '🔩 Heavy Scrap Metal Cache (2x)',
+            copper_wire_double: '⚡ Heavy Copper Wire Bundle (2x)',
+            scrap_metal_triple: '🔩 Scrap Metal Trio (3x)',
+            copper_wire_triple: '⚡ Copper Wire Spools (3x)',
+            brass_gears_double: '⚙️ Interlocking Brass Gears (2x)',
+            circuit_boards_double: '🟩 Layered Microcircuits (2x)',
+          };
+
+          const label = yieldCount > 1 && !rt.includes('double')
+            ? `${nameMap[baseKey]} (${yieldCount}x, ${totalWeight.toFixed(1)}kg)`
+            : `${nameMap[rt] || rt} (${totalWeight.toFixed(1)}kg)`;
+
+          if (curWeight + totalWeight <= maxWeight) {
+            triggerNotification(`Found ${label}! Press [E] to collect.`, '#38bdf8');
           } else {
-            triggerNotification(`Found ${nameMap[rt]}! [Backpack Full - Return to Base]`, '#ef4444');
+            triggerNotification(`Found ${label}! [Backpack Full - Return to Base]`, '#ef4444');
           }
         } else if (node.type === 'SAPLING') {
           const curWeight = getCargoWeight();
@@ -14334,8 +14748,8 @@ export default function App() {
     storedSaplingsRef.current = [];
 
     sanctuaryInventoryRef.current = {
-      coins: 250,
-      verdure: 250,
+      coins: 12000,
+      verdure: 12000,
       license_t1: 0,
       license_t2: 0,
       license_t3: 0,
@@ -14538,6 +14952,7 @@ export default function App() {
       rover_battery_level: 0,
       rover_cargo_level: 0,
       sanctuary_expansion_tier: 0,
+      unlockedMaps: ['area1_base'],
       has_map_highlands: false,
       has_map_overgrowth: false,
       unlockedBlueprints: [],
@@ -14635,8 +15050,8 @@ export default function App() {
     };
 
     avatarRef.current = {
-      x: 640,
-      y: 220,
+      x: 1400,
+      y: 256,
       vx: 0,
       vy: 0,
       radius: 18,
@@ -14647,8 +15062,8 @@ export default function App() {
     };
 
     sanctuaryPlayerPosRef.current = {
-      x: 640,
-      y: 220,
+      x: 1400,
+      y: 256,
     };
 
     hasMovedOffSpawnRef.current = false;
@@ -14662,8 +15077,8 @@ export default function App() {
       facing: 'up',
       facingDirection: 1,
       rotation: 0,
-      batteryKwh: 50,
-      maxBatteryKwh: 50,
+      batteryKwh: 500,
+      maxBatteryKwh: 500,
       isMovingAnim: false,
       moveCooldown: 0,
       maxDistanceReached: 0,
@@ -14675,7 +15090,10 @@ export default function App() {
       x: EXCURSION_TILE_SIZE / 2 - canvasWidth / 2,
       y: EXCURSION_TILE_SIZE / 2 - canvasHeight / 2,
     };
-    sanctuaryCameraRef.current = {y: 0};
+    sanctuaryCameraRef.current = {
+      x: 1400 - canvasWidth / 2,
+      y: 0,
+    };
     digStateRef.current = {
       active: false,
       nodeId: '',
@@ -14844,23 +15262,24 @@ export default function App() {
 
     if (node && !node.collected && node.type === 'RESOURCE' && node.resourceType) {
       const rt = node.resourceType;
-      const isDoubleScrap = rt === 'scrap_metal_double';
-      const isDoubleWire = rt === 'copper_wire_double';
+      const yieldCount = node.resourceYield || (
+        rt === 'scrap_metal_triple' || rt === 'copper_wire_triple' ? 3 :
+        rt === 'scrap_metal_double' || rt === 'copper_wire_double' || rt === 'brass_gears_double' || rt === 'circuit_boards_double' ? 2 : 1
+      );
+      const baseKey = (
+        rt === 'scrap_metal_double' || rt === 'scrap_metal_triple' ? 'scrap_metal' :
+        rt === 'copper_wire_double' || rt === 'copper_wire_triple' ? 'copper_wire' :
+        rt === 'brass_gears_double' ? 'brass_gears' :
+        rt === 'circuit_boards_double' ? 'circuit_boards' : rt
+      ) as ResourceItemKey;
+      const singleWeight = ITEM_WEIGHTS[baseKey] || 0.8;
+      const totalWeight = singleWeight * yieldCount;
       const curWeight = getCargoWeight();
       const maxWeight = getMaxRoverCargo();
-      const itemWeight = ITEM_WEIGHTS[rt];
-      const remainingSpace = maxWeight - curWeight;
-      const singleWeight = isDoubleScrap ? 0.8 : isDoubleWire ? 0.5 : itemWeight;
 
-      if (curWeight + itemWeight <= maxWeight) {
+      if (curWeight + totalWeight <= maxWeight) {
         node.collected = true;
-        if (isDoubleScrap) {
-          backpackInventoryRef.current.scrap_metal += 2;
-        } else if (isDoubleWire) {
-          backpackInventoryRef.current.copper_wire += 2;
-        } else {
-          backpackInventoryRef.current[rt] += 1;
-        }
+        backpackInventoryRef.current[baseKey] += yieldCount;
         gameAudio.playCoinPickup();
 
         // Track discovered resource in current area codex
@@ -14870,24 +15289,28 @@ export default function App() {
           disc.resources[curArea].push(rt);
         }
 
-        const nameMap: Record<ResourceItemKey, string> = {
-          scrap_metal: '🔩 Scrap Metal (0.8kg)',
-          copper_wire: '⚡ Copper Wire (0.5kg)',
-          brass_gears: '⚙️ Brass Gear (1.2kg)',
-          circuit_boards: '🟩 Circuit Board (1.0kg)',
-          electronic_chips: '💎 Electronic Chip (1.5kg)',
-          scrap_metal_double: '🔩 Heavy Scrap Metal Cache (2x, 1.6kg)',
-          copper_wire_double: '⚡ Heavy Copper Wire Bundle (2x, 1.0kg)',
+        const nameMap: Record<string, string> = {
+          scrap_metal: '🔩 Scrap Metal',
+          copper_wire: '⚡ Copper Wire',
+          brass_gears: '⚙️ Brass Gear',
+          circuit_boards: '🟩 Circuit Board',
+          electronic_chips: '💎 Electronic Chip',
+          scrap_metal_double: '🔩 Heavy Scrap Metal Cache (2x)',
+          copper_wire_double: '⚡ Heavy Copper Wire Bundle (2x)',
+          scrap_metal_triple: '🔩 Scrap Metal Trio (3x)',
+          copper_wire_triple: '⚡ Copper Wire Spools (3x)',
+          brass_gears_double: '⚙️ Interlocking Brass Gears (2x)',
+          circuit_boards_double: '🟩 Layered Microcircuits (2x)',
         };
-        triggerNotification(`Harvested ${nameMap[rt]}! Secured in cargo bed.`, '#f59e0b');
+        const label = yieldCount > 1 && !rt.includes('double')
+          ? `${nameMap[baseKey]} (${yieldCount}x, ${totalWeight.toFixed(1)}kg)`
+          : `${nameMap[rt] || rt} (${totalWeight.toFixed(1)}kg)`;
+
+        triggerNotification(`Harvested ${label}! Secured in cargo bed.`, '#f59e0b');
         refreshHud();
       } else {
         gameAudio.playErrorBuzz();
-        if ((isDoubleScrap || isDoubleWire) && remainingSpace >= singleWeight) {
-          triggerNotification('🎒 2 cargo slots required for 2x Heavy Deposit! (Only 1 slot available)', '#ef4444');
-        } else {
-          triggerNotification('🎒 Rover Cargo Bed full! Return to Campsite to unload.', '#ef4444');
-        }
+        triggerNotification(`🎒 Rover Cargo Bed full! (${totalWeight.toFixed(1)}kg needed) Return to Campsite to unload.`, '#ef4444');
       }
     }
   }, [excursionReport, gainPlayerExp, getCargoWeight, getMaxRoverCargo, refreshHud, triggerNotification]);
@@ -14920,16 +15343,26 @@ export default function App() {
 
   // --- ECONOMY: PURCHASE CARTOGRAPHY MAPS ---
   const buyExpeditionMap = useCallback(
-    (mapKey: 'has_map_highlands' | 'has_map_overgrowth', cost: number, mapName: string) => {
+    (mapKey: string, cost: number, mapName: string) => {
       const inv = sanctuaryInventoryRef.current;
-      if (inv[mapKey]) return;
+      if (!inv.unlockedMaps) inv.unlockedMaps = ['area1_base'];
+      if (inv.unlockedMaps.includes(mapKey) || inv[mapKey]) return;
 
       const effectiveCost = getDiscountedCost(cost);
       if (inv.coins >= effectiveCost) {
         inv.coins = Number((inv.coins - effectiveCost).toFixed(2));
         inv[mapKey] = true;
+        if (!inv.unlockedMaps.includes(mapKey)) {
+          inv.unlockedMaps.push(mapKey);
+        }
+        if (mapKey === 'area2_base') {
+          inv.has_map_highlands = true;
+        }
+        if (mapKey === 'area3_base') {
+          inv.has_map_overgrowth = true;
+        }
         gameAudio.playLevelUpStinger();
-        triggerNotification(`🗺️ Charted ${mapName}! Area unlocked for wilderness excursions!`, '#38bdf8');
+        triggerNotification(`🗺️ Charted ${mapName}! Expanded wilderness territory!`, '#38bdf8');
         refreshHud();
       } else {
         gameAudio.playErrorBuzz();
@@ -14939,11 +15372,16 @@ export default function App() {
     [getDiscountedCost, refreshHud, triggerNotification],
   );
 
-  // --- ECONOMY: PURCHASE SANCTUARY GREENHOUSE EXPANSIONS ---
+  // --- ECONOMY: PURCHASE SANCTUARY GREENHOUSE EXPANSIONS (STRICTLY SEQUENTIAL) ---
   const buySanctuaryExpansion = useCallback(
     (targetTier: number, cost: number, name: string) => {
       const inv = sanctuaryInventoryRef.current;
       if (inv.sanctuary_expansion_tier >= targetTier) return;
+      if (targetTier > (inv.sanctuary_expansion_tier || 0) + 1) {
+        gameAudio.playErrorBuzz();
+        triggerNotification('Must purchase previous expansion tier first!', '#ef4444');
+        return;
+      }
 
       const effectiveCost = getDiscountedCost(cost);
       if (inv.coins >= effectiveCost) {
@@ -15147,10 +15585,8 @@ export default function App() {
     masterQuestsRef.current.discovery.tier1Completed = true;
     (masterQuestsRef.current.discovery as any).rank = 2;
     (masterQuestsRef.current.discovery as any).completedRank = 1;
-    sanctuaryInventoryRef.current.coins = Number((sanctuaryInventoryRef.current.coins + 250).toFixed(2));
-    sanctuaryInventoryRef.current.zen_essence += 5;
     gameAudio.playVictoryFanfare();
-    triggerNotification('🎉 Discovery Quest Rank 1 Completed! (+250 Verdure, 🌸 +5 Zen Points)', '#10b981', 4500);
+    triggerNotification('🎉 Discovery Quest Rank 1 Completed! Unlocked new blueprints and skills.', '#10b981', 4500);
     setGameState((prev) => ({
       ...prev,
       masterQuest: masterQuestsRef.current,
@@ -15170,10 +15606,8 @@ export default function App() {
     masterQuestsRef.current.eco.tier1Completed = true;
     (masterQuestsRef.current.eco as any).rank = 2;
     (masterQuestsRef.current.eco as any).completedRank = 1;
-    sanctuaryInventoryRef.current.coins = Number((sanctuaryInventoryRef.current.coins + 500).toFixed(2));
-    sanctuaryInventoryRef.current.zen_essence += 5;
     gameAudio.playVictoryFanfare();
-    triggerNotification('🎉 Eco Quest Rank 1 Completed! (+500 Verdure, 🌸 +5 Zen Points)', '#10b981', 4500);
+    triggerNotification('🎉 Eco Quest Rank 1 Completed! Unlocked new blueprints and skills.', '#10b981', 4500);
     setGameState((prev) => ({
       ...prev,
       masterQuest: masterQuestsRef.current,
@@ -15355,8 +15789,14 @@ export default function App() {
       // Expand to 2x2 footprint if reaching Rating 5 (Lv. 21+ / Ancient)
       const currentRating = getBonsaiMaturityRating(bonsai);
       if (currentRating === 5 && (bonsai.width !== 2 || bonsai.height !== 2)) {
-        const curC = bonsai.col !== undefined ? bonsai.col : Math.round((bonsai.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-        const curR = bonsai.row !== undefined ? bonsai.row : Math.round((bonsai.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+        const bField = (bonsai as any).field || (bonsai.x < SANCTUARY_LAYOUT.leftPathX ? 'left' : bonsai.x > SANCTUARY_LAYOUT.rightPathX ? 'right' : 'main');
+        const bStartX = bField === 'left' ? SANCTUARY_LAYOUT.leftStartX : bField === 'right' ? SANCTUARY_LAYOUT.rightStartX : SANCTUARY_LAYOUT.mainStartX;
+        const bStartY = bField === 'left' ? SANCTUARY_LAYOUT.leftStartY : bField === 'right' ? SANCTUARY_LAYOUT.rightStartY : SANCTUARY_LAYOUT.mainStartY;
+        const bMaxCols = bField === 'main' ? SANCTUARY_LAYOUT.mainCols : SANCTUARY_LAYOUT.sideCols;
+        const bMaxRows = bField === 'main' ? SANCTUARY_LAYOUT.mainRows : SANCTUARY_LAYOUT.sideRows;
+
+        const curC = bonsai.col !== undefined ? bonsai.col : Math.round((bonsai.x - bStartX) / SANCTUARY_LAYOUT.cellW);
+        const curR = bonsai.row !== undefined ? bonsai.row : Math.round((bonsai.y - bStartY) / SANCTUARY_LAYOUT.cellH);
         
         // Find adjacent available 2x2 plot footprint
         const candidateOffsets = [
@@ -15369,16 +15809,16 @@ export default function App() {
         for (const { dc, dr } of candidateOffsets) {
           const testC = curC + dc;
           const testR = curR + dr;
-          if (testC >= 0 && testC + 1 < SANCTUARY_GRID.cols && testR >= 0 && testR + 1 < SANCTUARY_GRID.rows) {
+          if (testC >= 0 && testC + 1 < bMaxCols && testR >= 0 && testR + 1 < bMaxRows) {
             let valid = true;
             for (let c = testC; c <= testC + 1; c++) {
               for (let r = testR; r <= testR + 1; r++) {
-                const px = SANCTUARY_GRID.startX + c * SANCTUARY_GRID.cellW;
-                const py = SANCTUARY_GRID.startY + r * SANCTUARY_GRID.cellH;
+                const px = bStartX + c * SANCTUARY_LAYOUT.cellW;
+                const py = bStartY + r * SANCTUARY_LAYOUT.cellH;
                 if (
                   !isGridPlotUnlocked(px, py) ||
-                  isPlotOccupiedByPlantedBonsai(c, r, bonsai.id) ||
-                  isPlotOccupiedByStructure(c, r)
+                  isPlotOccupiedByPlantedBonsai(c, r, bField, bonsai.id) ||
+                  isPlotOccupiedByStructure(c, r, bField)
                 ) {
                   valid = false;
                   break;
@@ -15397,11 +15837,12 @@ export default function App() {
         const finalR = chosenCandidate ? chosenCandidate.r : curR;
         bonsai.col = finalC;
         bonsai.row = finalR;
+        bonsai.field = bField;
         bonsai.width = 2;
         bonsai.height = 2;
         bonsai.maturityRating = 5;
-        bonsai.x = SANCTUARY_GRID.startX + (finalC + 0.5) * SANCTUARY_GRID.cellW;
-        bonsai.y = SANCTUARY_GRID.startY + (finalR + 0.5) * SANCTUARY_GRID.cellH;
+        bonsai.x = bStartX + (finalC + 0.5) * SANCTUARY_LAYOUT.cellW;
+        bonsai.y = bStartY + (finalR + 0.5) * SANCTUARY_LAYOUT.cellH;
         bonsai.gridX = bonsai.x;
         bonsai.gridY = bonsai.y;
         bonsai.radius = 60;
@@ -16495,11 +16936,17 @@ export default function App() {
     const farmWidth = is3x3Farm ? 3 : is2x2Installation ? 2 : 1;
     const farmHeight = is3x3Farm ? 3 : is2x2Installation ? 2 : 1;
 
+    const fField = currentPlot.field || 'main';
+    const fStartX = fField === 'left' ? SANCTUARY_LAYOUT.leftStartX : fField === 'right' ? SANCTUARY_LAYOUT.rightStartX : SANCTUARY_LAYOUT.mainStartX;
+    const fStartY = fField === 'left' ? SANCTUARY_LAYOUT.leftStartY : fField === 'right' ? SANCTUARY_LAYOUT.rightStartY : SANCTUARY_LAYOUT.mainStartY;
+    const fMaxCols = fField === 'main' ? SANCTUARY_LAYOUT.mainCols : SANCTUARY_LAYOUT.sideCols;
+    const fMaxRows = fField === 'main' ? SANCTUARY_LAYOUT.mainRows : SANCTUARY_LAYOUT.sideRows;
+
     // Multi-tile validation for farms and 2x2 Chemical Station
     if (is2x2Installation || is3x3Farm) {
       const c = currentPlot.col;
       const r = currentPlot.row;
-      if (c + farmWidth > SANCTUARY_GRID.cols || r + farmHeight > SANCTUARY_GRID.rows) {
+      if (c + farmWidth > fMaxCols || r + farmHeight > fMaxRows) {
         gameAudio.playErrorBuzz();
         triggerNotification(`Installation (${farmWidth}x${farmHeight}) does not fit here! Move away from grid edges.`, '#ef4444');
         return;
@@ -16508,12 +16955,12 @@ export default function App() {
         for (let dr = 0; dr < farmHeight; dr++) {
           const pc = c + dc;
           const pr = r + dr;
-          const px = SANCTUARY_GRID.startX + pc * SANCTUARY_GRID.cellW;
-          const py = SANCTUARY_GRID.startY + pr * SANCTUARY_GRID.cellH;
+          const px = fStartX + pc * SANCTUARY_LAYOUT.cellW;
+          const py = fStartY + pr * SANCTUARY_LAYOUT.cellH;
           if (
             !isGridPlotUnlocked(px, py) ||
-            isPlotOccupiedByPlantedBonsai(pc, pr) ||
-            isPlotOccupiedByStructure(pc, pr)
+            isPlotOccupiedByPlantedBonsai(pc, pr, fField) ||
+            isPlotOccupiedByStructure(pc, pr, fField)
           ) {
             gameAudio.playErrorBuzz();
             triggerNotification(`Installation (${farmWidth}x${farmHeight}) needs all ${farmWidth * farmHeight} plots empty and unlocked!`, '#ef4444');
@@ -16531,8 +16978,8 @@ export default function App() {
       const snapX = currentPlot.centerX;
       const snapY = currentPlot.centerY;
 
-      const isTreeOccupied = isPlotOccupiedByPlantedBonsai(currentPlot.col, currentPlot.row);
-      const isStructureOccupied = isPlotOccupiedByStructure(currentPlot.col, currentPlot.row);
+      const isTreeOccupied = isPlotOccupiedByPlantedBonsai(currentPlot.col, currentPlot.row, fField);
+      const isStructureOccupied = isPlotOccupiedByStructure(currentPlot.col, currentPlot.row, fField);
 
       const nearWb =
         snapX >= sanctuaryWorkbench.x - 30 &&
@@ -16572,14 +17019,14 @@ export default function App() {
     }
 
     const snapX = is3x3Farm
-      ? SANCTUARY_GRID.startX + (currentPlot.col + 1) * SANCTUARY_GRID.cellW
+      ? fStartX + (currentPlot.col + 1) * SANCTUARY_LAYOUT.cellW
       : is2x2Installation
-      ? SANCTUARY_GRID.startX + (currentPlot.col + 0.5) * SANCTUARY_GRID.cellW
+      ? fStartX + (currentPlot.col + 0.5) * SANCTUARY_LAYOUT.cellW
       : currentPlot.centerX;
     const snapY = is3x3Farm
-      ? SANCTUARY_GRID.startY + (currentPlot.row + 1) * SANCTUARY_GRID.cellH
+      ? fStartY + (currentPlot.row + 1) * SANCTUARY_LAYOUT.cellH
       : is2x2Installation
-      ? SANCTUARY_GRID.startY + (currentPlot.row + 0.5) * SANCTUARY_GRID.cellH
+      ? fStartY + (currentPlot.row + 0.5) * SANCTUARY_LAYOUT.cellH
       : currentPlot.centerY;
 
       inv[key] = Math.max(0, (inv[key] ?? stock) - 1);
@@ -16765,6 +17212,7 @@ export default function App() {
         gridY: snapY,
         col: currentPlot.col,
         row: currentPlot.row,
+        field: currentPlot.field,
         width: farmWidth,
         height: farmHeight,
         dispenserFacing: (type === 't1_compost_feeder' || type === 't1_fertilizer_dripper')
@@ -18295,6 +18743,7 @@ export default function App() {
         y: snapY,
         col: currentPlot.col,
         row: currentPlot.row,
+        field: currentPlot.field,
         width: isRating5 ? 2 : 1,
         height: isRating5 ? 2 : 1,
         radius: isRating5 ? 60 : 36,
@@ -18431,6 +18880,7 @@ export default function App() {
         y: snapY,
         col: currentPlot.col,
         row: currentPlot.row,
+        field: currentPlot.field,
         width: isRating5 ? 2 : 1,
         height: isRating5 ? 2 : 1,
         radius: isRating5 ? 60 : 36,
@@ -18599,6 +19049,7 @@ export default function App() {
         y: snapY,
         col: currentPlot.col,
         row: currentPlot.row,
+        field: currentPlot.field,
         width: isRating5 ? 2 : 1,
         height: isRating5 ? 2 : 1,
         radius: isRating5 ? 60 : 36,
@@ -18679,7 +19130,7 @@ export default function App() {
       };
 
       const checkOccupied = (c: number, r: number) => {
-        return isPlotOccupiedByPlantedBonsai(c, r) || isPlotOccupiedByStructure(c, r);
+        return isPlotOccupiedByPlantedBonsai(c, r, plot.field) || isPlotOccupiedByStructure(c, r, plot.field);
       };
 
       // 2x2 FOOTPRINT CHECK FOR MATURITY RATING 5 BONSAIS
@@ -18697,10 +19148,16 @@ export default function App() {
         preview.item === 'fertilizer_station';
       const is3x3Farm = preview.payload === 'solar_farm_3x3' || preview.payload === 'wind_farm_3x3';
 
+      const field = plot.field || 'main';
+      const maxCols = field === 'main' ? SANCTUARY_LAYOUT.mainCols : SANCTUARY_LAYOUT.sideCols;
+      const maxRows = field === 'main' ? SANCTUARY_LAYOUT.mainRows : SANCTUARY_LAYOUT.sideRows;
+      const startX = field === 'left' ? SANCTUARY_LAYOUT.leftStartX : field === 'right' ? SANCTUARY_LAYOUT.rightStartX : SANCTUARY_LAYOUT.mainStartX;
+      const startY = field === 'left' ? SANCTUARY_LAYOUT.leftStartY : field === 'right' ? SANCTUARY_LAYOUT.rightStartY : SANCTUARY_LAYOUT.mainStartY;
+
       if (is2x2Industrial) {
         const c = plot.col;
         const r = plot.row;
-        if (c + 1 >= SANCTUARY_GRID.cols || r + 1 >= SANCTUARY_GRID.rows) return false;
+        if (c + 1 >= maxCols || r + 1 >= maxRows) return false;
         const fenceSet = new Set(
           deployedStructuresRef.current
             .filter((s) => s.type === 'bamboo_fence' && s.edgeKey)
@@ -18718,8 +19175,8 @@ export default function App() {
           for (let dr = 0; dr <= 1; dr++) {
             const plotC = c + dc;
             const plotR = r + dr;
-            const pX = SANCTUARY_GRID.startX + plotC * SANCTUARY_GRID.cellW;
-            const py = SANCTUARY_GRID.startY + plotR * SANCTUARY_GRID.cellH;
+            const pX = startX + plotC * SANCTUARY_LAYOUT.cellW;
+            const py = startY + plotR * SANCTUARY_LAYOUT.cellH;
             if (!isGridPlotUnlocked(pX, py)) return false;
             if (isNearStationCoords(pX, py)) return false;
             if (checkOccupied(plotC, plotR)) return false;
@@ -18731,7 +19188,7 @@ export default function App() {
       if (is3x3Farm) {
         const c = plot.col;
         const r = plot.row;
-        if (c + 2 >= SANCTUARY_GRID.cols || r + 2 >= SANCTUARY_GRID.rows) return false;
+        if (c + 2 >= maxCols || r + 2 >= maxRows) return false;
         const fenceSet = new Set(
           deployedStructuresRef.current
             .filter((s) => s.type === 'bamboo_fence' && s.edgeKey)
@@ -18747,8 +19204,8 @@ export default function App() {
           for (let dr = 0; dr <= 2; dr++) {
             const plotC = c + dc;
             const plotR = r + dr;
-            const pX = SANCTUARY_GRID.startX + plotC * SANCTUARY_GRID.cellW;
-            const py = SANCTUARY_GRID.startY + plotR * SANCTUARY_GRID.cellH;
+            const pX = startX + plotC * SANCTUARY_LAYOUT.cellW;
+            const py = startY + plotR * SANCTUARY_LAYOUT.cellH;
             if (!isGridPlotUnlocked(pX, py)) return false;
             if (isNearStationCoords(pX, py)) return false;
             if (checkOccupied(plotC, plotR)) return false;
@@ -18761,7 +19218,7 @@ export default function App() {
         const c = plot.col;
         const r = plot.row;
         // Validate all 4 plots [c .. c+1] x [r .. r+1]
-        if (c + 1 >= SANCTUARY_GRID.cols || r + 1 >= SANCTUARY_GRID.rows) return false;
+        if (c + 1 >= maxCols || r + 1 >= maxRows) return false;
 
         const fenceSet = new Set(
           deployedStructuresRef.current
@@ -18782,10 +19239,10 @@ export default function App() {
           for (let dr = 0; dr <= 1; dr++) {
             const plotC = c + dc;
             const plotR = r + dr;
-            const pX = SANCTUARY_GRID.startX + plotC * SANCTUARY_GRID.cellW;
-            const pY = SANCTUARY_GRID.startY + plotR * SANCTUARY_GRID.cellH;
-            if (!isGridPlotUnlocked(pX, pY)) return false;
-            if (isNearStationCoords(pX, pY)) return false;
+            const pX = startX + plotC * SANCTUARY_LAYOUT.cellW;
+            const py = startY + plotR * SANCTUARY_LAYOUT.cellH;
+            if (!isGridPlotUnlocked(pX, py)) return false;
+            if (isNearStationCoords(pX, py)) return false;
             if (checkOccupied(plotC, plotR)) return false;
           }
         }
@@ -18797,7 +19254,7 @@ export default function App() {
       if (preview.payload === 'bamboo_fence') {
         if (!plot.isUnlocked) return false;
         const side = preview.fenceEdge || preview.edgeSide || 'top';
-        const edgeGeom = getFenceEdgeGeometry(plot.col, plot.row, side);
+        const edgeGeom = getFenceEdgeGeometry(plot.col, plot.row, side, plot.field);
         const alreadyHasFence = deployedStructuresRef.current.some(
           (s) => s.type === 'bamboo_fence' && s.edgeKey === edgeGeom.edgeKey,
         );
@@ -18812,23 +19269,21 @@ export default function App() {
             .map((s) => s.edgeKey!),
         );
         if (isVert) {
-          if (plot.row - 1 < 0 || plot.row + 1 >= SANCTUARY_GRID.rows) return false;
-          const topUnlocked = isGridPlotUnlocked(snapX, snapY - SANCTUARY_GRID.cellH);
-          const botUnlocked = isGridPlotUnlocked(snapX, snapY + SANCTUARY_GRID.cellH);
+          if (plot.row - 1 < 0 || plot.row + 1 >= maxRows) return false;
+          const topUnlocked = isGridPlotUnlocked(snapX, snapY - SANCTUARY_LAYOUT.cellH);
+          const botUnlocked = isGridPlotUnlocked(snapX, snapY + SANCTUARY_LAYOUT.cellH);
           if (!topUnlocked || !botUnlocked) return false;
-          // Internal fence collision: cannot place if an internal fence runs between composite plots
-          if (fenceSet.has(`H_${plot.col}_${plot.row}`) || fenceSet.has(`H_${plot.col}_${plot.row + 1}`)) return false;
+          if (fenceSet.has(`${field}_H_${plot.col}_${plot.row}`) || fenceSet.has(`${field}_H_${plot.col}_${plot.row + 1}`)) return false;
           if (checkOccupied(plot.col, plot.row)) return false;
           if (checkOccupied(plot.col, plot.row - 1)) return false;
           if (checkOccupied(plot.col, plot.row + 1)) return false;
           return true;
         } else {
-          if (plot.col - 1 < 0 || plot.col + 1 >= SANCTUARY_GRID.cols) return false;
-          const leftUnlocked = isGridPlotUnlocked(snapX - SANCTUARY_GRID.cellW, snapY);
-          const rightUnlocked = isGridPlotUnlocked(snapX + SANCTUARY_GRID.cellW, snapY);
+          if (plot.col - 1 < 0 || plot.col + 1 >= maxCols) return false;
+          const leftUnlocked = isGridPlotUnlocked(snapX - SANCTUARY_LAYOUT.cellW, snapY);
+          const rightUnlocked = isGridPlotUnlocked(snapX + SANCTUARY_LAYOUT.cellW, snapY);
           if (!leftUnlocked || !rightUnlocked) return false;
-          // Internal fence collision: cannot place if an internal fence runs between composite plots
-          if (fenceSet.has(`V_${plot.col}_${plot.row}`) || fenceSet.has(`V_${plot.col + 1}_${plot.row}`)) return false;
+          if (fenceSet.has(`${field}_V_${plot.col}_${plot.row}`) || fenceSet.has(`${field}_V_${plot.col + 1}_${plot.row}`)) return false;
           if (checkOccupied(plot.col, plot.row)) return false;
           if (checkOccupied(plot.col - 1, plot.row)) return false;
           if (checkOccupied(plot.col + 1, plot.row)) return false;
@@ -18884,7 +19339,7 @@ export default function App() {
           return;
         }
         const side = preview.fenceEdge || preview.edgeSide || 'top';
-        const edgeGeom = getFenceEdgeGeometry(currentPlot.col, currentPlot.row, side);
+        const edgeGeom = getFenceEdgeGeometry(currentPlot.col, currentPlot.row, side, currentPlot.field);
         const remaining = Math.max(0, stock - 1);
         inv.bamboo_fence_inv = remaining;
         if (!inv.decorations) inv.decorations = { pebblePath: 0, rockFormation: 0, shrubbery: 0, wovenWall: 0 };
@@ -18959,6 +19414,9 @@ export default function App() {
           y: snapY,
           gridX: snapX,
           gridY: snapY,
+          col: currentPlot.col,
+          row: currentPlot.row,
+          field: currentPlot.field,
           orientation: preview.orientation || 'horizontal',
           variant: 0,
         };
@@ -20340,8 +20798,9 @@ export default function App() {
       }
 
       if (locationRef.current === 'SANCTUARY') {
-        const camY = sanctuaryCameraRef.current.y;
-        const worldX = clickX;
+        const camX = sanctuaryCameraRef.current.x || 0;
+        const camY = sanctuaryCameraRef.current.y || 0;
+        const worldX = clickX + camX;
         const worldY = clickY + camY;
 
         const shop = sanctuaryShopStand;
@@ -21063,19 +21522,27 @@ export default function App() {
       if (locationRef.current === 'SANCTUARY' && !isAnyModalBlockingInput && !quickRadialBonsai && !quickRadialBonsaiRef.current && !isBonsaiSocietyOpenRef.current && !isRecipeModalOpenRef.current) {
         const baseSpeed = (getConfig('playerWalkSpeed') as number) || 220;
 
-        // Check if player is standing on a Zen Pebble Stepping Path or Station Promenade Walkway
-        const {x: snapAvX, y: snapAvY} = snapToSanctuaryGrid(av.x, av.y);
-        const promenadeLeft = SANCTUARY_GRID.startX - SANCTUARY_GRID.cellW / 2;
-        const promenadeRight = SANCTUARY_GRID.startX + (SANCTUARY_GRID.cols - 0.5) * SANCTUARY_GRID.cellW;
-        const inPromenadeCorridor =
-          av.y >= 180 && av.y <= 250 && av.x >= promenadeLeft && av.x <= promenadeRight;
+        // Check if player is standing on any pebble path (Top promenade, Left lateral, Right lateral, or deployed)
+        const inTopPath =
+          av.y >= SANCTUARY_LAYOUT.topPathY - 35 &&
+          av.y <= SANCTUARY_LAYOUT.topPathY + 35 &&
+          av.x >= SANCTUARY_LAYOUT.leftPathX - 20 &&
+          av.x <= SANCTUARY_LAYOUT.rightPathX + 20;
+        const inLeftPath =
+          Math.abs(av.x - SANCTUARY_LAYOUT.leftPathX) <= 38 &&
+          av.y >= SANCTUARY_LAYOUT.pathTopY - 20 &&
+          av.y <= SANCTUARY_LAYOUT.pathBottomY + 20;
+        const inRightPath =
+          Math.abs(av.x - SANCTUARY_LAYOUT.rightPathX) <= 38 &&
+          av.y >= SANCTUARY_LAYOUT.pathTopY - 20 &&
+          av.y <= SANCTUARY_LAYOUT.pathBottomY + 20;
         const onGridPebblePath = deployedStructuresRef.current.some(
-          (s) => s.type === 'decor_pebble_path' && Math.hypot(s.x - snapAvX, s.y - snapAvY) < 32
+          (s) => s.type === 'decor_pebble_path' && Math.hypot(s.x - av.x, s.y - av.y) < 36,
         );
         const onToriiGateCenter = deployedStructuresRef.current.some(
-          (s) => s.type === 'torii_gate' && Math.hypot(s.x - snapAvX, s.y - snapAvY) < 32
+          (s) => s.type === 'torii_gate' && Math.hypot(s.x - av.x, s.y - av.y) < 36,
         );
-        const onPebblePath = inPromenadeCorridor || onGridPebblePath || onToriiGateCenter;
+        const onPebblePath = inTopPath || inLeftPath || inRightPath || onGridPebblePath || onToriiGateCenter;
         const speedMultiplier = onPebblePath ? 1.35 : 1.0;
         const moveSpeed = baseSpeed * speedMultiplier;
 
@@ -21114,8 +21581,25 @@ export default function App() {
         av.x += av.vx * dt;
         av.y += av.vy * dt;
 
-        av.x = Math.max(av.radius + 30, Math.min(canvasWidth - av.radius - 30, av.x));
-        av.y = Math.max(av.radius + 60, Math.min(SANCTUARY_WORLD_HEIGHT - av.radius - 40, av.y));
+        // Half-Circle Forest Perimeter Constraint (bounds movement within organic curved border)
+        const centerX = SANCTUARY_LAYOUT.centerX;
+        const archCenterY = SANCTUARY_LAYOUT.forestCenterY;
+        const Rx = SANCTUARY_LAYOUT.forestRx - 45;
+        const Ry = SANCTUARY_LAYOUT.forestRy - 45;
+
+        if (av.y >= archCenterY) {
+          const dx = (av.x - centerX) / Rx;
+          const dy = (av.y - archCenterY) / Ry;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 1.0) {
+            const ang = Math.atan2(dy, dx);
+            av.x = centerX + Math.cos(ang) * Rx;
+            av.y = archCenterY + Math.sin(ang) * Ry;
+          }
+        } else {
+          av.y = Math.max(40, av.y);
+          av.x = Math.max(centerX - Rx + 20, Math.min(centerX + Rx - 20, av.x));
+        }
 
         av.isMoving = moveX !== 0 || moveY !== 0;
         if (av.isMoving) {
@@ -21151,13 +21635,20 @@ export default function App() {
         }
       }
 
-      // Vertical Sanctuary Camera Tracking
+      // 2D Smooth Sanctuary Camera Tracking
       if (locationRef.current === 'SANCTUARY') {
+        const targetSanctuaryCamX = Math.max(
+          0,
+          Math.min(SANCTUARY_LAYOUT.worldWidth - canvasWidth, av.x - canvasWidth / 2),
+        );
         const targetSanctuaryCamY = Math.max(
           0,
-          Math.min(SANCTUARY_WORLD_HEIGHT - canvasHeight, av.y - canvasHeight / 2)
+          Math.min(SANCTUARY_LAYOUT.worldHeight - canvasHeight, av.y - canvasHeight / 2),
         );
-        sanctuaryCameraRef.current.y += (targetSanctuaryCamY - sanctuaryCameraRef.current.y) * Math.min(1.0, dt * 8);
+        sanctuaryCameraRef.current.x +=
+          (targetSanctuaryCamX - (sanctuaryCameraRef.current.x || 0)) * Math.min(1.0, dt * 8);
+        sanctuaryCameraRef.current.y +=
+          (targetSanctuaryCamY - sanctuaryCameraRef.current.y) * Math.min(1.0, dt * 8);
       }
 
       // 3. Power Grid Calculation (Runs globally)
@@ -21176,13 +21667,17 @@ export default function App() {
       });
 
       // Build Set/Map of plots covered by active Sprinklers and running Irrigation Systems
-      const activeSprinklerMap = new Map<string, number>(); // 'col,row' -> speedMultiplier
-      const activeWateringMap = new Map<string, number>();  // 'col,row' -> watering growth velocity (1 + skillLevel)
-      const activeIrrigatedPlotSet = new Set<string>();     // 'col,row'
+      const activeSprinklerMap = new Map<string, number>(); // 'field_col_row' -> speedMultiplier
+      const activeWateringMap = new Map<string, number>();  // 'field_col_row' -> watering growth velocity (1 + skillLevel)
+      const activeIrrigatedPlotSet = new Set<string>();     // 'field_col_row'
 
       deployedStructuresRef.current.forEach((s) => {
-        const sc = Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-        const sr = Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+        const sp = getPlotAtCoords(s.x, s.y);
+        const sField = sp ? sp.field : (s as any).field || 'main';
+        const sc = s.col !== undefined ? s.col : (sp ? sp.col : 0);
+        const sr = s.row !== undefined ? s.row : (sp ? sp.row : 0);
+        const maxCols = sField === 'main' ? SANCTUARY_LAYOUT.mainCols : SANCTUARY_LAYOUT.sideCols;
+        const maxRows = sField === 'main' ? SANCTUARY_LAYOUT.mainRows : SANCTUARY_LAYOUT.sideRows;
 
         if (s.type === 'automaton_t1' || s.type === 'automaton_t2' || s.type === 'automaton_t3') {
           if (power.isPowerSufficient) {
@@ -21191,12 +21686,12 @@ export default function App() {
               s.type,
               sc,
               sr,
-              SANCTUARY_GRID.cols,
-              SANCTUARY_GRID.rows,
+              maxCols,
+              maxRows,
               s.orientation || 'horizontal',
             );
             plots.forEach(({ col, row }) => {
-              const key = `${col},${row}`;
+              const key = `${sField}_${col}_${row}`;
               const prev = activeWateringMap.get(key) || 0;
               if (speed > prev) activeWateringMap.set(key, speed);
               const prevSprinkler = activeSprinklerMap.get(key) || 0;
@@ -21210,12 +21705,12 @@ export default function App() {
               s.type,
               sc,
               sr,
-              SANCTUARY_GRID.cols,
-              SANCTUARY_GRID.rows,
+              maxCols,
+              maxRows,
               s.orientation || 'horizontal',
             );
             plots.forEach(({ col, row }) => {
-              const key = `${col},${row}`;
+              const key = `${sField}_${col}_${row}`;
               const prev = activeWateringMap.get(key) || 0;
               if (speed > prev) activeWateringMap.set(key, speed);
               activeIrrigatedPlotSet.add(key);
@@ -21245,8 +21740,10 @@ export default function App() {
           pruneMult = 2.5;
         }
 
-        const bCol = bonsai.col !== undefined ? bonsai.col : Math.round((bonsai.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-        const bRow = bonsai.row !== undefined ? bonsai.row : Math.round((bonsai.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+        const bp = getPlotAtCoords(bonsai.x, bonsai.y);
+        const bField = bp ? bp.field : (bonsai as any).field || 'main';
+        const bCol = bonsai.col !== undefined ? bonsai.col : (bp ? bp.col : 0);
+        const bRow = bonsai.row !== undefined ? bonsai.row : (bp ? bp.row : 0);
         const bW = bonsai.width || 1;
         const bH = bonsai.height || 1;
 
@@ -21255,7 +21752,7 @@ export default function App() {
 
         for (let c = bCol; c < bCol + bW; c++) {
           for (let r = bRow; r < bRow + bH; r++) {
-            const plotKey = `${c},${r}`;
+            const plotKey = `${bField}_${c}_${r}`;
             const wSpeed = activeWateringMap.get(plotKey) || 0;
             if (wSpeed > wateringSpeed) wateringSpeed = wSpeed;
             if (activeIrrigatedPlotSet.has(plotKey)) isCoveredByIrrigation = true;
@@ -21389,8 +21886,12 @@ export default function App() {
 
             // Determine target plot
             const f = s.loaderFacing;
-            const sc = s.col ?? Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-            const sr = s.row ?? Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+            const sp = getPlotAtCoords(s.x, s.y);
+            const sField = sp ? sp.field : (s as any).field || 'main';
+            const sc = s.col ?? (sp ? sp.col : 0);
+            const sr = s.row ?? (sp ? sp.row : 0);
+            const maxCols = sField === 'main' ? SANCTUARY_LAYOUT.mainCols : SANCTUARY_LAYOUT.sideCols;
+            const maxRows = sField === 'main' ? SANCTUARY_LAYOUT.mainRows : SANCTUARY_LAYOUT.sideRows;
             let tc = sc;
             let tr = sr;
             if (f === 'UP') tr -= 1;
@@ -21398,7 +21899,7 @@ export default function App() {
             else if (f === 'DOWN') tr += 1;
             else if (f === 'LEFT') tc -= 1;
 
-            if (tc >= 0 && tc < SANCTUARY_GRID.cols && tr >= 0 && tr < SANCTUARY_GRID.rows) {
+            if (tc >= 0 && tc < maxCols && tr >= 0 && tr < maxRows) {
               // Find target station
               const targetStation = deployedStructuresRef.current.find((other) => {
                 if (other.id === s.id) return false;
@@ -21543,8 +22044,12 @@ export default function App() {
           if (power.isPowerSufficient && s.dispenserTickTimer >= 1.0) {
             s.dispenserTickTimer = 0;
             const isCompostDispenser = s.type.includes('compost');
-            const sc = s.col ?? Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-            const sr = s.row ?? Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+            const sp = getPlotAtCoords(s.x, s.y);
+            const sField = sp ? sp.field : (s as any).field || 'main';
+            const sc = s.col ?? (sp ? sp.col : 0);
+            const sr = s.row ?? (sp ? sp.row : 0);
+            const maxCols = sField === 'main' ? SANCTUARY_LAYOUT.mainCols : SANCTUARY_LAYOUT.sideCols;
+            const maxRows = sField === 'main' ? SANCTUARY_LAYOUT.mainRows : SANCTUARY_LAYOUT.sideRows;
             const facing: LoaderFacing = s.dispenserFacing || s.loaderFacing || 'UP';
             const orient: 'horizontal' | 'vertical' = s.dispenserOrientation || s.orientation || 'horizontal';
 
@@ -21553,7 +22058,7 @@ export default function App() {
               if (st.type === 'bamboo_fence' && st.edgeKey) fenceSet.add(st.edgeKey);
             });
 
-            const tendedPlots = getTendedPlotsForDispenser(s.type, sc, sr, facing, orient, fenceSet);
+            const tendedPlots = getTendedPlotsForDispenser(s.type, sc, sr, facing, orient, fenceSet, maxCols, maxRows);
 
             const candidateBonsais: PlantedBonsai[] = [];
             tendedPlots.forEach(({ col: tc, row: tr }) => {
@@ -22349,22 +22854,23 @@ export default function App() {
         }
 
         const isAnyStationNear = isZenNear || isWbNear || isSocietyNear || isGarageNear || isShopNear;
-        const structInPlotCenter = deployedStructuresRef.current.find(
-          (s) =>
-            s.type !== 'bamboo_fence' &&
-            Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW) === currentPlot?.col &&
-            Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH) === currentPlot?.row,
-        );
+        const structInPlotCenter = currentPlot
+          ? deployedStructuresRef.current.find((s) => {
+              if (s.type === 'bamboo_fence') return false;
+              const sp = getPlotAtCoords(s.x, s.y);
+              return sp && sp.field === currentPlot.field && sp.col === currentPlot.col && sp.row === currentPlot.row;
+            })
+          : null;
         const isPlotEmpty =
           currentPlot !== null &&
           currentPlot.isUnlocked &&
           !closestBonsai &&
           !structInPlotCenter &&
           !isAnyStationNear &&
-          !isPlotOccupiedByPlantedBonsai(currentPlot.col, currentPlot.row) &&
-          !isPlotOccupiedByStructure(currentPlot.col, currentPlot.row);
+          !isPlotOccupiedByPlantedBonsai(currentPlot.col, currentPlot.row, currentPlot.field) &&
+          !isPlotOccupiedByStructure(currentPlot.col, currentPlot.row, currentPlot.field);
 
-        const currentPlotKey = isPlotEmpty && currentPlot ? `empty_${currentPlot.col}_${currentPlot.row}` : '';
+        const currentPlotKey = isPlotEmpty && currentPlot ? `empty_${currentPlot.field}_${currentPlot.col}_${currentPlot.row}` : '';
         if (standingPlotKeyRef.current !== currentPlotKey) {
           standingPlotKeyRef.current = currentPlotKey;
           setStandingPlot(isPlotEmpty && currentPlot ? {
@@ -22550,31 +23056,34 @@ export default function App() {
 
       if (loc === 'SANCTUARY') {
         const av = avatarRef.current;
-        const sCamY = sanctuaryCameraRef.current.y;
-        const halfTileW = (SANCTUARY_GRID.cellW - 8) / 2;
-        const halfTileH = (SANCTUARY_GRID.cellH - 8) / 2;
+        const sCamX = sanctuaryCameraRef.current.x || 0;
+        const sCamY = sanctuaryCameraRef.current.y || 0;
+        const halfTileW = (SANCTUARY_LAYOUT.cellW - 8) / 2;
+        const halfTileH = (SANCTUARY_LAYOUT.cellH - 8) / 2;
+        const tileW = halfTileW * 2;
+        const tileH = halfTileH * 2;
 
-        // Background covering full sanctuary vertical scroll space
+        // Background covering full sanctuary space
         ctx.fillStyle = '#064e3b';
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
         ctx.save();
-        ctx.translate(0, -sCamY);
+        ctx.translate(-sCamX, -sCamY);
 
-        // Draw parallax greenhouse background across entire world height
+        // Draw parallax greenhouse background across entire world bounds
         drawBackground(
           ctx,
           assets['nursery_bg'],
-          canvasWidth,
-          SANCTUARY_WORLD_HEIGHT,
+          SANCTUARY_LAYOUT.worldWidth,
+          SANCTUARY_LAYOUT.worldHeight,
           '#064e3b',
-          0,
+          sCamX * 0.25,
           sCamY * 0.4,
         );
 
-        // Render / Blit cached offscreen terrain (ambiance, promenade pebbles, flooring)
+        // Render / Blit cached offscreen terrain (ambiance, promenade pebbles, lateral paths, organic forest border)
         if (!offscreenTerrainCanvasRef.current || offscreenTerrainDirtyRef.current) {
-          renderOffscreenTerrain(canvasWidth, SANCTUARY_WORLD_HEIGHT);
+          renderOffscreenTerrain(SANCTUARY_LAYOUT.worldWidth, SANCTUARY_LAYOUT.worldHeight);
         }
         if (offscreenTerrainCanvasRef.current) {
           ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
@@ -22583,106 +23092,136 @@ export default function App() {
         // Live calculation of Disrupted Zen plots executed dynamically on EVERY render frame directly from live gridPlots and fences!
         const liveDisruptedPlots = getDisruptedZenPlots(deployedStructuresRef.current);
 
-        // 16x8 GRID TILE OVERLAY WITH UNLOCKED & LOCKED SANCTUARY PLOTS (Rendered live every frame)
-        for (let c = 0; c < SANCTUARY_GRID.cols; c++) {
-          for (let r = 0; r < SANCTUARY_GRID.rows; r++) {
-            const gx = SANCTUARY_GRID.startX + c * SANCTUARY_GRID.cellW;
-            const gy = SANCTUARY_GRID.startY + r * SANCTUARY_GRID.cellH;
-            const isUnlocked = isGridPlotUnlocked(gx, gy);
-            const tileX = gx - halfTileW;
-            const tileY = gy - halfTileH;
-            const tileW = halfTileW * 2;
-            const tileH = halfTileH * 2;
-            const isDisrupted = liveDisruptedPlots.has(`${c},${r}`);
+        // Helper to render individual plot tile (Left 8x8, Right 8x8, or Main 16x16)
+        const renderPlotTile = (
+          gx: number,
+          gy: number,
+          isUnlocked: boolean,
+          isDisrupted: boolean,
+          key: string,
+        ) => {
+          const tileX = gx - halfTileW;
+          const tileY = gy - halfTileH;
 
-            if (isUnlocked) {
-              if (isDisrupted) {
-                // Rich earthy brown barren soil base (#543d2b / #422f21) with desolate scorched texture
-                const brownGrad = ctx.createLinearGradient(tileX, tileY, tileX + tileW, tileY + tileH);
-                brownGrad.addColorStop(0, '#543d2b');
-                brownGrad.addColorStop(0.5, '#483324');
-                brownGrad.addColorStop(1, '#422f21');
-                ctx.fillStyle = brownGrad;
-                ctx.fillRect(tileX, tileY, tileW, tileH);
-
-                // Scorched desolate border
-                ctx.strokeStyle = 'rgba(120, 83, 40, 0.55)';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(tileX, tileY, tileW, tileH);
-
-                // Dry cracked earth lines across the tile
-                ctx.strokeStyle = 'rgba(35, 22, 14, 0.75)';
-                ctx.lineWidth = 1.2;
-                ctx.beginPath();
-                ctx.moveTo(tileX + 10, tileY + 8);
-                ctx.lineTo(tileX + 24, tileY + 22);
-                ctx.lineTo(tileX + 20, tileY + 38);
-                ctx.lineTo(tileX + 34, tileY + 54);
-                ctx.moveTo(tileX + 24, tileY + 22);
-                ctx.lineTo(tileX + 42, tileY + 18);
-                ctx.lineTo(tileX + 52, tileY + 30);
-                ctx.moveTo(tileX + 20, tileY + 38);
-                ctx.lineTo(tileX + 8, tileY + 46);
-                ctx.stroke();
-
-                // Scorched earth parched dust flecks
-                ctx.fillStyle = 'rgba(84, 61, 43, 0.7)';
-                ctx.fillRect(tileX + 15, tileY + 14, 2, 2);
-                ctx.fillRect(tileX + 40, tileY + 40, 2, 2);
-                ctx.fillRect(tileX + 28, tileY + 48, 2, 2);
-              } else {
-                // Unlocked Active Soil Tile with subtle lush grass / parquet grain
-                ctx.fillStyle = 'rgba(34, 197, 94, 0.07)';
-                ctx.fillRect(tileX, tileY, tileW, tileH);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(tileX, tileY, tileW, tileH);
-
-                // Brass corner soil markers
-                ctx.fillStyle = 'rgba(250, 204, 21, 0.4)';
-                ctx.fillRect(tileX + 2, tileY + 2, 4, 4);
-                ctx.fillRect(tileX + tileW - 6, tileY + 2, 4, 4);
-                ctx.fillRect(tileX + 2, tileY + tileH - 6, 4, 4);
-                ctx.fillRect(tileX + tileW - 6, tileY + tileH - 6, 4, 4);
-
-                // Center planting alignment dot
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-                ctx.fillRect(gx - 1.5, gy - 1.5, 3, 3);
-              }
-            } else {
-              // Locked plot: If affected by Disrupted Zen, render the earthy brown soil texture (#452f1e / #362315) underneath its locked shroud!
-              if (isDisrupted) {
-                const brownGrad = ctx.createLinearGradient(tileX, tileY, tileX + tileW, tileY + tileH);
-                brownGrad.addColorStop(0, '#452f1e');
-                brownGrad.addColorStop(0.5, '#3c2919');
-                brownGrad.addColorStop(1, '#362315');
-                ctx.fillStyle = brownGrad;
-                ctx.fillRect(tileX, tileY, tileW, tileH);
-
-                // Dry cracked earth lines underneath the shroud
-                ctx.strokeStyle = 'rgba(35, 22, 14, 0.65)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(tileX + 12, tileY + 10);
-                ctx.lineTo(tileX + 26, tileY + 24);
-                ctx.lineTo(tileX + 36, tileY + 52);
-                ctx.stroke();
-              }
-
-              // Locked plot boundary with subtle decorative soil ribbon & lock marker
-              ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+          if (isUnlocked) {
+            if (isDisrupted) {
+              // Rich earthy brown barren soil base (#543d2b / #422f21) with desolate scorched texture
+              const brownGrad = ctx.createLinearGradient(tileX, tileY, tileX + tileW, tileY + tileH);
+              brownGrad.addColorStop(0, '#543d2b');
+              brownGrad.addColorStop(0.5, '#483324');
+              brownGrad.addColorStop(1, '#422f21');
+              ctx.fillStyle = brownGrad;
               ctx.fillRect(tileX, tileY, tileW, tileH);
-              ctx.strokeStyle = 'rgba(245, 158, 11, 0.25)';
-              ctx.lineWidth = 1;
-              ctx.setLineDash([3, 3]);
-              ctx.strokeRect(tileX, tileY, tileW, tileH);
-              ctx.setLineDash([]);
 
-              ctx.fillStyle = 'rgba(245, 158, 11, 0.45)';
-              ctx.font = '10px system-ui';
-              ctx.textAlign = 'center';
-              ctx.fillText('🔒', gx, gy + 3.5);
+              // Scorched desolate border
+              ctx.strokeStyle = 'rgba(120, 83, 40, 0.55)';
+              ctx.lineWidth = 1;
+              ctx.strokeRect(tileX, tileY, tileW, tileH);
+
+              // Dry cracked earth lines across the tile
+              ctx.strokeStyle = 'rgba(35, 22, 14, 0.75)';
+              ctx.lineWidth = 1.2;
+              ctx.beginPath();
+              ctx.moveTo(tileX + 10, tileY + 8);
+              ctx.lineTo(tileX + 24, tileY + 22);
+              ctx.lineTo(tileX + 20, tileY + 38);
+              ctx.lineTo(tileX + 34, tileY + 54);
+              ctx.moveTo(tileX + 24, tileY + 22);
+              ctx.lineTo(tileX + 42, tileY + 18);
+              ctx.lineTo(tileX + 52, tileY + 30);
+              ctx.moveTo(tileX + 20, tileY + 38);
+              ctx.lineTo(tileX + 8, tileY + 46);
+              ctx.stroke();
+
+              // Scorched earth parched dust flecks
+              ctx.fillStyle = 'rgba(84, 61, 43, 0.7)';
+              ctx.fillRect(tileX + 15, tileY + 14, 2, 2);
+              ctx.fillRect(tileX + 40, tileY + 40, 2, 2);
+              ctx.fillRect(tileX + 28, tileY + 48, 2, 2);
+            } else {
+              // Unlocked Active Soil Tile with subtle lush grass tint
+              ctx.fillStyle = 'rgba(34, 197, 94, 0.08)';
+              ctx.fillRect(tileX, tileY, tileW, tileH);
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+              ctx.lineWidth = 1;
+              ctx.strokeRect(tileX, tileY, tileW, tileH);
+
+              // Brass corner soil markers
+              ctx.fillStyle = 'rgba(250, 204, 21, 0.4)';
+              ctx.fillRect(tileX + 2, tileY + 2, 4, 4);
+              ctx.fillRect(tileX + tileW - 6, tileY + 2, 4, 4);
+              ctx.fillRect(tileX + 2, tileY + tileH - 6, 4, 4);
+              ctx.fillRect(tileX + tileW - 6, tileY + tileH - 6, 4, 4);
+
+              // Center planting alignment dot
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+              ctx.fillRect(gx - 1.5, gy - 1.5, 3, 3);
             }
+          } else {
+            // Locked plot: tranquil untouched grassy earth with soft dashed boundary
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.65)';
+            ctx.fillRect(tileX, tileY, tileW, tileH);
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.28)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.strokeRect(tileX, tileY, tileW, tileH);
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.45)';
+            ctx.font = '10px system-ui';
+            ctx.textAlign = 'center';
+            ctx.fillText('🔒', gx, gy + 3.5);
+          }
+        };
+
+        // 1. LEFT FIELD: 8 rows × 8 columns = 64 placeable plots (Unlocked at Expansion V)
+        for (let c = 0; c < SANCTUARY_LAYOUT.sideCols; c++) {
+          for (let r = 0; r < SANCTUARY_LAYOUT.sideRows; r++) {
+            const gx = SANCTUARY_LAYOUT.leftStartX + c * SANCTUARY_LAYOUT.cellW;
+            const gy = SANCTUARY_LAYOUT.leftStartY + r * SANCTUARY_LAYOUT.cellH;
+            const isUnlocked = inv.sanctuary_expansion_tier >= 5;
+            const key = `left_${r}_${c}`;
+            const isDisrupted = liveDisruptedPlots.has(key) || liveDisruptedPlots.has(`${c},${r}`);
+            renderPlotTile(gx, gy, isUnlocked, isDisrupted, key);
+          }
+        }
+
+        // 2. MAIN GRID: 16 rows × 16 columns = 256 placeable plots (Unlocked in Tiers 0..4, 7, 8)
+        for (let c = 0; c < SANCTUARY_LAYOUT.mainCols; c++) {
+          for (let r = 0; r < SANCTUARY_LAYOUT.mainRows; r++) {
+            const gx = SANCTUARY_LAYOUT.mainStartX + c * SANCTUARY_LAYOUT.cellW;
+            const gy = SANCTUARY_LAYOUT.mainStartY + r * SANCTUARY_LAYOUT.cellH;
+
+            let isUnlocked = false;
+            if (r <= 3) {
+              if (inv.sanctuary_expansion_tier >= 2) isUnlocked = true;
+              else if (inv.sanctuary_expansion_tier === 1) isUnlocked = c >= 4 && c <= 11;
+              else isUnlocked = c >= 6 && c <= 9;
+            } else if (r <= 5) {
+              isUnlocked = inv.sanctuary_expansion_tier >= 3;
+            } else if (r <= 7) {
+              isUnlocked = inv.sanctuary_expansion_tier >= 4;
+            } else if (r <= 11) {
+              isUnlocked = inv.sanctuary_expansion_tier >= 7;
+            } else {
+              isUnlocked = inv.sanctuary_expansion_tier >= 8;
+            }
+
+            const key = `main_${r}_${c}`;
+            const isDisrupted = liveDisruptedPlots.has(key) || liveDisruptedPlots.has(`${c},${r}`);
+            renderPlotTile(gx, gy, isUnlocked, isDisrupted, key);
+          }
+        }
+
+        // 3. RIGHT FIELD: 8 rows × 8 columns = 64 placeable plots (Unlocked at Expansion VI)
+        for (let c = 0; c < SANCTUARY_LAYOUT.sideCols; c++) {
+          for (let r = 0; r < SANCTUARY_LAYOUT.sideRows; r++) {
+            const gx = SANCTUARY_LAYOUT.rightStartX + c * SANCTUARY_LAYOUT.cellW;
+            const gy = SANCTUARY_LAYOUT.rightStartY + r * SANCTUARY_LAYOUT.cellH;
+            const isUnlocked = inv.sanctuary_expansion_tier >= 6;
+            const key = `right_${r}_${c}`;
+            const isDisrupted = liveDisruptedPlots.has(key) || liveDisruptedPlots.has(`${c},${r}`);
+            renderPlotTile(gx, gy, isUnlocked, isDisrupted, key);
           }
         }
 
@@ -22712,25 +23251,25 @@ export default function App() {
         ctx.closePath();
         ctx.fill();
 
-        // Top architectural honey-timber rafter beam at ceiling edge (Y=6)
+        // Top architectural honey-timber rafter beam at ceiling edge (spanning full sanctuary width)
         ctx.strokeStyle = '#451a03';
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(0, 6);
-        ctx.lineTo(canvasWidth, 6);
+        ctx.lineTo(SANCTUARY_LAYOUT.worldWidth, 6);
         ctx.stroke();
 
         ctx.strokeStyle = '#78350f';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(0, 8);
-        ctx.lineTo(canvasWidth, 8);
+        ctx.lineTo(SANCTUARY_LAYOUT.worldWidth, 8);
         ctx.stroke();
 
-        // Delicate hanging ceiling wisteria floral vines along the very top edge (Y <= 20)
-        for (let wx = 30; wx < canvasWidth - 20; wx += 38) {
+        // Wisteria Lanterns and floral vines extending continuously across the entire width of the sanctuary canvas
+        for (let wx = 15; wx < SANCTUARY_LAYOUT.worldWidth - 15; wx += 40) {
           const vSeed = Math.sin(wx * 12.9898);
-          const vLen = 8 + Math.abs(vSeed) * 12; // 8 to 20 px hanging length
+          const vLen = 10 + Math.abs(vSeed) * 14; // 10 to 24 px hanging length
           const vCurve = vSeed * 4;
 
           // Green wisteria vine tendril
@@ -22766,6 +23305,52 @@ export default function App() {
           ctx.ellipse(wx - 2, 8, 2.5, 1.2, -0.4, 0, Math.PI * 2);
           ctx.ellipse(wx + 2, 8, 2.5, 1.2, 0.4, 0, Math.PI * 2);
           ctx.fill();
+
+          // Delicate glowing Wisteria Lantern hanging from the vine
+          const lantX = wx + vCurve * 0.7;
+          const lantY = 8 + vLen + 4;
+          const pulse = 0.6 + Math.sin(Date.now() * 0.004 + wx) * 0.35;
+
+          // Soft ambient lantern glow
+          const lGlow = ctx.createRadialGradient(lantX, lantY + 4, 1, lantX, lantY + 4, 18);
+          lGlow.addColorStop(0, `rgba(233, 213, 255, ${0.45 * pulse})`);
+          lGlow.addColorStop(0.5, `rgba(168, 85, 247, ${0.2 * pulse})`);
+          lGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = lGlow;
+          ctx.beginPath();
+          ctx.arc(lantX, lantY + 4, 18, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Lantern hanging cord
+          ctx.strokeStyle = '#b45309';
+          ctx.lineWidth = 0.8;
+          ctx.beginPath();
+          ctx.moveTo(lantX, 8 + vLen);
+          ctx.lineTo(lantX, lantY);
+          ctx.stroke();
+
+          // Brass/timber top cap
+          ctx.fillStyle = '#78350f';
+          ctx.fillRect(lantX - 4, lantY, 8, 2);
+
+          // Wisteria lantern body (warm soft violet / cream glow)
+          ctx.fillStyle = wx % 80 === 0 ? '#fef08a' : '#f3e8ff';
+          ctx.beginPath();
+          ctx.roundRect(lantX - 3.5, lantY + 2, 7, 8, 1.5);
+          ctx.fill();
+          ctx.strokeStyle = '#c084fc';
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+
+          // Miniature bottom cap & violet tassel
+          ctx.fillStyle = '#78350f';
+          ctx.fillRect(lantX - 3, lantY + 10, 6, 1.5);
+          ctx.strokeStyle = '#9333ea';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(lantX, lantY + 11.5);
+          ctx.lineTo(lantX, lantY + 15);
+          ctx.stroke();
         }
 
         // Floating ambient light dust motes
@@ -24162,8 +24747,15 @@ export default function App() {
         // A. 3x3 CLEAN ENERGY RESONANCE HALO (Floor Tiles & Beams)
         if (activeHaloGenerator) {
           const isSolar = activeHaloGenerator.type === 'solar_panel';
-          const centerCol = Math.round((activeHaloGenerator.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-          const centerRow = Math.round((activeHaloGenerator.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+          const gp = getPlotAtCoords(activeHaloGenerator.x, activeHaloGenerator.y);
+          const genField = gp ? gp.field : (activeHaloGenerator as any).field || 'main';
+          const centerCol = activeHaloGenerator.col !== undefined ? activeHaloGenerator.col : (gp ? gp.col : 0);
+          const centerRow = activeHaloGenerator.row !== undefined ? activeHaloGenerator.row : (gp ? gp.row : 0);
+          const maxCols = genField === 'main' ? SANCTUARY_LAYOUT.mainCols : SANCTUARY_LAYOUT.sideCols;
+          const maxRows = genField === 'main' ? SANCTUARY_LAYOUT.mainRows : SANCTUARY_LAYOUT.sideRows;
+          const startX = genField === 'left' ? SANCTUARY_LAYOUT.leftStartX : genField === 'right' ? SANCTUARY_LAYOUT.rightStartX : SANCTUARY_LAYOUT.mainStartX;
+          const startY = genField === 'left' ? SANCTUARY_LAYOUT.leftStartY : genField === 'right' ? SANCTUARY_LAYOUT.rightStartY : SANCTUARY_LAYOUT.mainStartY;
+
           const haloTime = Date.now() * 0.005;
           const haloPulse = 0.55 + Math.sin(haloTime) * 0.35;
 
@@ -24178,32 +24770,28 @@ export default function App() {
             for (let dc = -1; dc <= 1; dc++) {
               const gc = centerCol + dc;
               const gr = centerRow + dr;
-              if (gc >= 0 && gc < SANCTUARY_GRID.cols && gr >= 0 && gr < SANCTUARY_GRID.rows) {
+              if (gc >= 0 && gc < maxCols && gr >= 0 && gr < maxRows) {
                 const isBlocked = isHaloBlockedByFence(centerCol, centerRow, gc, gr, fenceSet);
-                if (isBlocked) continue; // Physically cut off by bamboo fence
+                if (isBlocked) continue;
 
-                const tx = SANCTUARY_GRID.startX + gc * SANCTUARY_GRID.cellW;
-                const ty = SANCTUARY_GRID.startY + gr * SANCTUARY_GRID.cellH;
-                const tW = SANCTUARY_GRID.cellW - 8;
-                const tH = SANCTUARY_GRID.cellH - 8;
+                const tx = startX + gc * SANCTUARY_LAYOUT.cellW;
+                const ty = startY + gr * SANCTUARY_LAYOUT.cellH;
+                const tW = SANCTUARY_LAYOUT.cellW - 8;
+                const tH = SANCTUARY_LAYOUT.cellH - 8;
 
                 ctx.save();
-                // Glowing resonance tile backdrop
                 ctx.fillStyle = haloFill;
                 ctx.beginPath();
                 ctx.roundRect(tx - tW / 2, ty - tH / 2, tW, tH, 6);
                 ctx.fill();
 
-                // Luminous boundary
                 ctx.strokeStyle = haloBorder;
                 ctx.lineWidth = dr === 0 && dc === 0 ? 2.5 : 1.8;
                 ctx.setLineDash([4, 4]);
                 ctx.stroke();
                 ctx.setLineDash([]);
 
-                // Visual Ambience within neighboring halo tiles
                 if (isSolar) {
-                  // Floating solar dust motes
                   for (let sm = 0; sm < 2; sm++) {
                     const smAng = haloTime * 2 + gc * 1.5 + gr * 2 + sm * Math.PI;
                     const smDist = 12 + Math.sin(haloTime * 3 + sm) * 6;
@@ -24215,7 +24803,6 @@ export default function App() {
                     ctx.fill();
                   }
                 } else {
-                  // Gentle swirling breeze arcs
                   const breezeAng = haloTime * 2.5 + gc * 0.8 + gr * 1.2;
                   ctx.strokeStyle = `rgba(186, 230, 253, ${0.35 + Math.sin(haloTime * 3) * 0.2})`;
                   ctx.lineWidth = 1.2;
@@ -24224,18 +24811,18 @@ export default function App() {
                   ctx.stroke();
                 }
 
-                // Check if this neighboring tile has an adjacent matching generator
                 if (!(dr === 0 && dc === 0)) {
                   const hasMatching = deployedStructuresRef.current.some((s) => {
                     if (s.id === activeHaloGenerator.id) return false;
                     if (s.type !== activeHaloGenerator.type) return false;
-                    const sc = Math.round((s.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-                    const sr = Math.round((s.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
+                    const sp = getPlotAtCoords(s.x, s.y);
+                    if (!sp || sp.field !== genField) return false;
+                    const sc = s.col !== undefined ? s.col : sp.col;
+                    const sr = s.row !== undefined ? s.row : sp.row;
                     return sc === gc && sr === gr;
                   });
 
                   if (hasMatching) {
-                    // Resonance energy conduit beam linking the two generators
                     ctx.strokeStyle = isSolar ? '#facc15' : '#38bdf8';
                     ctx.lineWidth = 2.5;
                     ctx.beginPath();
@@ -24243,7 +24830,6 @@ export default function App() {
                     ctx.lineTo(tx, ty);
                     ctx.stroke();
 
-                    // Sparkle on active link
                     const sparkPulse = 0.6 + Math.sin(haloTime * 2 + gc + gr) * 0.4;
                     ctx.fillStyle = isSolar ? `rgba(254, 240, 138, ${sparkPulse})` : `rgba(186, 230, 253, ${sparkPulse})`;
                     ctx.beginPath();
@@ -24257,14 +24843,20 @@ export default function App() {
           }
         }
 
-        // B. DYNAMIC LUMINOUS EMERALD / WARNING STALLED BONSAI PROXIMITY RESONANCE HALO (4, 6, 8, 10, or 12 Spots)
+        // B. DYNAMIC LUMINOUS EMERALD / WARNING STALLED BONSAI PROXIMITY RESONANCE HALO
         if (activeHaloBonsai && !activeHaloGenerator) {
           const haloSynergies = getCachedBonsaiSynergies(activeHaloBonsai);
           const isStalled = haloSynergies.isStalled;
           const bRating = getBonsaiMaturityRating(activeHaloBonsai);
-          const bCol = activeHaloBonsai.col !== undefined ? activeHaloBonsai.col : Math.round((activeHaloBonsai.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-          const bRow = activeHaloBonsai.row !== undefined ? activeHaloBonsai.row : Math.round((activeHaloBonsai.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
-          const haloPlots = getBonsaiHaloPlots(bCol, bRow, bRating, SANCTUARY_GRID.cols, SANCTUARY_GRID.rows);
+          const bp = getPlotAtCoords(activeHaloBonsai.x, activeHaloBonsai.y);
+          const bField = bp ? bp.field : (activeHaloBonsai as any).field || 'main';
+          const bCol = activeHaloBonsai.col !== undefined ? activeHaloBonsai.col : (bp ? bp.col : 0);
+          const bRow = activeHaloBonsai.row !== undefined ? activeHaloBonsai.row : (bp ? bp.row : 0);
+          const maxCols = bField === 'main' ? SANCTUARY_LAYOUT.mainCols : SANCTUARY_LAYOUT.sideCols;
+          const maxRows = bField === 'main' ? SANCTUARY_LAYOUT.mainRows : SANCTUARY_LAYOUT.sideRows;
+          const startX = bField === 'left' ? SANCTUARY_LAYOUT.leftStartX : bField === 'right' ? SANCTUARY_LAYOUT.rightStartX : SANCTUARY_LAYOUT.mainStartX;
+          const startY = bField === 'left' ? SANCTUARY_LAYOUT.leftStartY : bField === 'right' ? SANCTUARY_LAYOUT.rightStartY : SANCTUARY_LAYOUT.mainStartY;
+          const haloPlots = getBonsaiHaloPlots(bCol, bRow, bRating, maxCols, maxRows);
 
           const haloTime = Date.now() * 0.005;
           const haloPulse = 0.55 + Math.sin(haloTime) * 0.35;
@@ -24278,10 +24870,10 @@ export default function App() {
 
           // Draw 2x2 core outline if Rating 5
           if (bRating === 5) {
-            const coreLeft = SANCTUARY_GRID.startX + bCol * SANCTUARY_GRID.cellW - halfTileW;
-            const coreTop = SANCTUARY_GRID.startY + bRow * SANCTUARY_GRID.cellH - halfTileH;
-            const coreW = 2 * SANCTUARY_GRID.cellW - 8;
-            const coreH = 2 * SANCTUARY_GRID.cellH - 8;
+            const coreLeft = startX + bCol * SANCTUARY_LAYOUT.cellW - halfTileW;
+            const coreTop = startY + bRow * SANCTUARY_LAYOUT.cellH - halfTileH;
+            const coreW = 2 * SANCTUARY_LAYOUT.cellW - 8;
+            const coreH = 2 * SANCTUARY_LAYOUT.cellH - 8;
             ctx.save();
             ctx.strokeStyle = '#f59e0b';
             ctx.lineWidth = 2.5;
@@ -24295,14 +24887,13 @@ export default function App() {
           haloPlots.forEach(({ col: gc, row: gr }) => {
             const isBlockedByFence = isHaloBlockedByFence(bCol, bRow, gc, gr, fenceSet);
 
-            const tx = SANCTUARY_GRID.startX + gc * SANCTUARY_GRID.cellW;
-            const ty = SANCTUARY_GRID.startY + gr * SANCTUARY_GRID.cellH;
-            const tW = SANCTUARY_GRID.cellW - 8;
-            const tH = SANCTUARY_GRID.cellH - 8;
+            const tx = startX + gc * SANCTUARY_LAYOUT.cellW;
+            const ty = startY + gr * SANCTUARY_LAYOUT.cellH;
+            const tW = SANCTUARY_LAYOUT.cellW - 8;
+            const tH = SANCTUARY_LAYOUT.cellH - 8;
 
             ctx.save();
             if (isBlockedByFence) {
-              // Dimmed / severed halo boundary indicating fence occlusion
               ctx.fillStyle = 'rgba(15, 23, 42, 0.4)';
               ctx.beginPath();
               ctx.roundRect(tx - tW / 2, ty - tH / 2, tW, tH, 6);
@@ -24313,16 +24904,14 @@ export default function App() {
               ctx.stroke();
               ctx.setLineDash([]);
               ctx.restore();
-              return; // Completely severed by fence! Do not draw active halo aura or beams
+              return;
             }
 
-            // Glowing resonance tile backdrop
             ctx.fillStyle = haloFill;
             ctx.beginPath();
             ctx.roundRect(tx - tW / 2, ty - tH / 2, tW, tH, 6);
             ctx.fill();
 
-            // Luminous boundary
             ctx.strokeStyle = haloBorder;
             ctx.lineWidth = 1.8;
             ctx.setLineDash(isStalled ? [5, 3] : [4, 4]);
@@ -25132,28 +25721,31 @@ export default function App() {
               prev.item === 'fertilizer_station';
             const is3x3Farm = prev.payload === 'solar_farm_3x3' || prev.payload === 'wind_farm_3x3';
 
+            const startX = currentPlot.field === 'left' ? SANCTUARY_LAYOUT.leftStartX : currentPlot.field === 'right' ? SANCTUARY_LAYOUT.rightStartX : SANCTUARY_LAYOUT.mainStartX;
+            const startY = currentPlot.field === 'left' ? SANCTUARY_LAYOUT.leftStartY : currentPlot.field === 'right' ? SANCTUARY_LAYOUT.rightStartY : SANCTUARY_LAYOUT.mainStartY;
+
             const previewCenterX = is3x3Farm
-              ? SANCTUARY_GRID.startX + (currentPlot.col + 1) * SANCTUARY_GRID.cellW
+              ? startX + (currentPlot.col + 1) * SANCTUARY_LAYOUT.cellW
               : (is2x2Preview || is2x2Farm)
-              ? SANCTUARY_GRID.startX + (currentPlot.col + 0.5) * SANCTUARY_GRID.cellW
+              ? startX + (currentPlot.col + 0.5) * SANCTUARY_LAYOUT.cellW
               : px;
             const previewCenterY = is3x3Farm
-              ? SANCTUARY_GRID.startY + (currentPlot.row + 1) * SANCTUARY_GRID.cellH
+              ? startY + (currentPlot.row + 1) * SANCTUARY_LAYOUT.cellH
               : (is2x2Preview || is2x2Farm)
-              ? SANCTUARY_GRID.startY + (currentPlot.row + 0.5) * SANCTUARY_GRID.cellH
+              ? startY + (currentPlot.row + 0.5) * SANCTUARY_LAYOUT.cellH
               : py;
 
             // Bounding Box (Handles 1x1, 2x2, 3x3, 3x1 torii gate, and edge bamboo fences)
             if (prev.payload === 'bamboo_fence') {
               const side = prev.edgeSide || 'top';
-              const edgeGeom = getFenceEdgeGeometry(currentPlot.col, currentPlot.row, side);
+              const edgeGeom = getFenceEdgeGeometry(currentPlot.col, currentPlot.row, side, currentPlot.field);
               ctx.strokeStyle = isValid ? '#34d399' : '#f43f5e';
               ctx.lineWidth = 3;
               ctx.setLineDash([4, 4]);
               if (edgeGeom.orientation === 'horizontal') {
-                ctx.strokeRect(edgeGeom.x - (SANCTUARY_GRID.cellW - 2) / 2, edgeGeom.y - 7, SANCTUARY_GRID.cellW - 2, 14);
+                ctx.strokeRect(edgeGeom.x - (SANCTUARY_LAYOUT.cellW - 2) / 2, edgeGeom.y - 7, SANCTUARY_LAYOUT.cellW - 2, 14);
               } else {
-                ctx.strokeRect(edgeGeom.x - 7, edgeGeom.y - (SANCTUARY_GRID.cellH - 2) / 2, 14, SANCTUARY_GRID.cellH - 2);
+                ctx.strokeRect(edgeGeom.x - 7, edgeGeom.y - (SANCTUARY_LAYOUT.cellH - 2) / 2, 14, SANCTUARY_LAYOUT.cellH - 2);
               }
               ctx.setLineDash([]);
               renderBambooFence(ctx, edgeGeom.x, edgeGeom.y, edgeGeom.orientation, true);
@@ -25163,29 +25755,29 @@ export default function App() {
               ctx.setLineDash([5, 5]);
               if (isVert) {
                 ctx.beginPath();
-                ctx.roundRect(px - halfTileW, py - SANCTUARY_GRID.cellH - halfTileH, halfTileW * 2, SANCTUARY_GRID.cellH * 2 + halfTileH * 2, 8);
+                ctx.roundRect(px - halfTileW, py - SANCTUARY_LAYOUT.cellH - halfTileH, halfTileW * 2, SANCTUARY_LAYOUT.cellH * 2 + halfTileH * 2, 8);
                 ctx.stroke();
               } else {
                 ctx.beginPath();
-                ctx.roundRect(px - SANCTUARY_GRID.cellW - halfTileW, py - halfTileH, SANCTUARY_GRID.cellW * 2 + halfTileW * 2, halfTileH * 2, 8);
+                ctx.roundRect(px - SANCTUARY_LAYOUT.cellW - halfTileW, py - halfTileH, SANCTUARY_LAYOUT.cellW * 2 + halfTileW * 2, halfTileH * 2, 8);
                 ctx.stroke();
               }
               ctx.setLineDash([]);
             } else if (is3x3Farm) {
-              const boxX = SANCTUARY_GRID.startX + currentPlot.col * SANCTUARY_GRID.cellW - halfTileW;
-              const boxY = SANCTUARY_GRID.startY + currentPlot.row * SANCTUARY_GRID.cellH - halfTileH;
-              const boxW = 3 * SANCTUARY_GRID.cellW - 8;
-              const boxH = 3 * SANCTUARY_GRID.cellH - 8;
+              const boxX = startX + currentPlot.col * SANCTUARY_LAYOUT.cellW - halfTileW;
+              const boxY = startY + currentPlot.row * SANCTUARY_LAYOUT.cellH - halfTileH;
+              const boxW = 3 * SANCTUARY_LAYOUT.cellW - 8;
+              const boxH = 3 * SANCTUARY_LAYOUT.cellH - 8;
               ctx.strokeStyle = isValid ? '#38bdf8' : '#f43f5e';
               ctx.lineWidth = 3;
               ctx.beginPath();
               ctx.roundRect(boxX, boxY, boxW, boxH, 8);
               ctx.stroke();
             } else if (is2x2Preview || is2x2Farm) {
-              const boxX = SANCTUARY_GRID.startX + currentPlot.col * SANCTUARY_GRID.cellW - halfTileW;
-              const boxY = SANCTUARY_GRID.startY + currentPlot.row * SANCTUARY_GRID.cellH - halfTileH;
-              const boxW = 2 * SANCTUARY_GRID.cellW - 8;
-              const boxH = 2 * SANCTUARY_GRID.cellH - 8;
+              const boxX = startX + currentPlot.col * SANCTUARY_LAYOUT.cellW - halfTileW;
+              const boxY = startY + currentPlot.row * SANCTUARY_LAYOUT.cellH - halfTileH;
+              const boxW = 2 * SANCTUARY_LAYOUT.cellW - 8;
+              const boxH = 2 * SANCTUARY_LAYOUT.cellH - 8;
               ctx.strokeStyle = isValid ? (is2x2Farm ? '#38bdf8' : '#f59e0b') : '#f43f5e';
               ctx.lineWidth = 3;
               ctx.beginPath();
@@ -25397,11 +25989,14 @@ export default function App() {
               ctx.setLineDash([4, 4]);
               ctx.beginPath();
               if (is2x2) {
-                const bCol = bonsai.col !== undefined ? bonsai.col : Math.round((bonsai.x - SANCTUARY_GRID.startX) / SANCTUARY_GRID.cellW);
-                const bRow = bonsai.row !== undefined ? bonsai.row : Math.round((bonsai.y - SANCTUARY_GRID.startY) / SANCTUARY_GRID.cellH);
-                const bLeft = SANCTUARY_GRID.startX + bCol * SANCTUARY_GRID.cellW - halfTileW;
-                const bTop = SANCTUARY_GRID.startY + bRow * SANCTUARY_GRID.cellH - halfTileH;
-                ctx.roundRect(bLeft, bTop, 2 * SANCTUARY_GRID.cellW - 8, 2 * SANCTUARY_GRID.cellH - 8, 8);
+                const bField = (bonsai as any).field || (bonsai.x < SANCTUARY_LAYOUT.leftPathX ? 'left' : bonsai.x > SANCTUARY_LAYOUT.rightPathX ? 'right' : 'main');
+                const bStartX = bField === 'left' ? SANCTUARY_LAYOUT.leftStartX : bField === 'right' ? SANCTUARY_LAYOUT.rightStartX : SANCTUARY_LAYOUT.mainStartX;
+                const bStartY = bField === 'left' ? SANCTUARY_LAYOUT.leftStartY : bField === 'right' ? SANCTUARY_LAYOUT.rightStartY : SANCTUARY_LAYOUT.mainStartY;
+                const bCol = bonsai.col !== undefined ? bonsai.col : Math.round((bonsai.x - bStartX) / SANCTUARY_LAYOUT.cellW);
+                const bRow = bonsai.row !== undefined ? bonsai.row : Math.round((bonsai.y - bStartY) / SANCTUARY_LAYOUT.cellH);
+                const bLeft = bStartX + bCol * SANCTUARY_LAYOUT.cellW - halfTileW;
+                const bTop = bStartY + bRow * SANCTUARY_LAYOUT.cellH - halfTileH;
+                ctx.roundRect(bLeft, bTop, 2 * SANCTUARY_LAYOUT.cellW - 8, 2 * SANCTUARY_LAYOUT.cellH - 8, 8);
               } else {
                 ctx.roundRect(
                   bonsai.x - halfTileW,
@@ -25959,6 +26554,8 @@ export default function App() {
         const startTileY = Math.floor(cam.y / ts) - 1;
         const endTileY = Math.ceil((cam.y + canvasHeight) / ts) + 1;
 
+        const maxAllowedSteps = getMaxAllowedStepsForArea(activeBiomeIdRef.current, sanctuaryInventoryRef.current);
+
         for (let tx = startTileX; tx <= endTileX; tx++) {
           for (let ty = startTileY; ty <= endTileY; ty++) {
             const worldX = tx * ts;
@@ -25966,8 +26563,8 @@ export default function App() {
             const dist = Math.hypot(tx, ty);
             const isExplored = exploredTilesRef.current.has(`${tx},${ty}`);
 
-            // Darker Background Past 60 Steps (Deep dark shaded moss/forest soil)
-            if (dist >= 60) {
+            // Darker Background Past currently unlocked step boundary
+            if (dist > maxAllowedSteps) {
               ctx.fillStyle = '#0a1017';
               ctx.fillRect(worldX, worldY, ts, ts);
               ctx.fillStyle = 'rgba(10, 18, 25, 0.92)';
@@ -26094,17 +26691,17 @@ export default function App() {
           }
         }
 
-        // Graphical Wilderness Barrier along and past the 60-step boundary ring
+        // Graphical Wilderness Barrier along and past the current boundary ring
         for (let tx = startTileX; tx <= endTileX; tx++) {
           for (let ty = startTileY; ty <= endTileY; ty++) {
             const dist = Math.hypot(tx, ty);
-            if (dist >= 60 && dist <= 66) {
+            if (dist >= maxAllowedSteps && dist <= maxAllowedSteps + 6) {
               const worldX = tx * ts;
               const worldY = ty * ts;
               const isEven2x2 = Math.abs(tx) % 2 === 0 && Math.abs(ty) % 2 === 0;
               const seed = Math.sin(tx * 31.7 + ty * 67.3) * 43758.5453;
               const hash = seed - Math.floor(seed);
-              if (isEven2x2 && hash > 0.4 && dist <= 64) {
+              if (isEven2x2 && hash > 0.4 && dist <= maxAllowedSteps + 4) {
                 drawWildBarrierTree(ctx, worldX, worldY, ts, tx, ty, true);
               } else if (!isEven2x2 || hash <= 0.4) {
                 drawWildBarrierTree(ctx, worldX, worldY, ts, tx, ty, false);
@@ -26113,50 +26710,54 @@ export default function App() {
           }
         }
 
-        // Distinct Circular Range Boundary Rings (Centered at ts / 2, ts / 2)
-        // 1. Close Range Boundary (20 Steps)
-        ctx.lineWidth = 2.5;
-        ctx.setLineDash([6, 6]);
-        ctx.strokeStyle = 'rgba(52, 211, 153, 0.65)';
-        ctx.beginPath();
-        ctx.arc(ts / 2, ts / 2, 20 * ts, 0, Math.PI * 2);
-        ctx.stroke();
+        // Concentric Range Guide Rings (20, 40, 60, 80, 100, 120, 140, 160 Steps)
+        const stepRings = [20, 40, 60, 80, 100, 120, 140, 160];
+        stepRings.forEach((steps) => {
+          if (steps < maxAllowedSteps) {
+            ctx.lineWidth = 1.8;
+            ctx.setLineDash([6, 6]);
+            ctx.strokeStyle = steps <= 40
+              ? 'rgba(52, 211, 153, 0.45)'
+              : steps <= 80
+              ? 'rgba(245, 158, 11, 0.45)'
+              : steps <= 120
+              ? 'rgba(56, 189, 248, 0.45)'
+              : 'rgba(168, 85, 247, 0.45)';
+            ctx.beginPath();
+            ctx.arc(ts / 2, ts / 2, steps * ts, 0, Math.PI * 2);
+            ctx.stroke();
 
-        // 2. Middle Range Boundary (40 Steps)
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.65)';
-        ctx.beginPath();
-        ctx.arc(ts / 2, ts / 2, 40 * ts, 0, Math.PI * 2);
-        ctx.stroke();
+            ctx.font = 'bold 10px system-ui';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = ctx.strokeStyle;
+            ctx.fillText(`— ${steps} STEPS —`, ts / 2, ts / 2 - steps * ts - 4);
+          }
+        });
 
-        // 3. Impassable Perimeter Boundary (60 Steps)
+        // Impassable / Expansion Boundary Ring at maxAllowedSteps
         ctx.lineWidth = 4;
         ctx.setLineDash([12, 6]);
         ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)';
         ctx.beginPath();
-        ctx.arc(ts / 2, ts / 2, 60 * ts, 0, Math.PI * 2);
+        ctx.arc(ts / 2, ts / 2, maxAllowedSteps * ts, 0, Math.PI * 2);
         ctx.stroke();
 
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 4]);
         ctx.strokeStyle = 'rgba(251, 191, 36, 0.75)';
         ctx.beginPath();
-        ctx.arc(ts / 2, ts / 2, 59.7 * ts, 0, Math.PI * 2);
+        ctx.arc(ts / 2, ts / 2, (maxAllowedSteps - 0.3) * ts, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Luminous labels along top of rings
-        ctx.font = 'bold 11px system-ui';
+        ctx.font = 'bold 12px system-ui';
         ctx.textAlign = 'center';
-
-        ctx.fillStyle = 'rgba(52, 211, 153, 0.75)';
-        ctx.fillText('— CLOSE RANGE (20 STEPS) —', ts / 2, ts / 2 - 20 * ts - 6);
-
-        ctx.fillStyle = 'rgba(245, 158, 11, 0.75)';
-        ctx.fillText('— MIDDLE RANGE (40 STEPS) —', ts / 2, ts / 2 - 40 * ts - 6);
-
         ctx.fillStyle = '#f87171';
-        ctx.fillText('⛔ IMPASSABLE WILDERNESS BOUNDARY (60 STEPS) ⛔', ts / 2, ts / 2 - 60 * ts - 8);
-        ctx.fillText('⛔ IMPASSABLE WILDERNESS BOUNDARY (60 STEPS) ⛔', ts / 2, ts / 2 + 60 * ts + 16);
+        const boundaryLabel = maxAllowedSteps >= 160
+          ? '⛔ MAXIMUM WILDERNESS EXPEDITION BOUNDARY (160 STEPS) ⛔'
+          : `⛔ EXPEDITION BOUNDARY (${maxAllowedSteps} STEPS • EXPANSION MAP REQUIRED BEYOND) ⛔`;
+        ctx.fillText(boundaryLabel, ts / 2, ts / 2 - maxAllowedSteps * ts - 8);
+        ctx.fillText(boundaryLabel, ts / 2, ts / 2 + maxAllowedSteps * ts + 16);
 
         // --- WILDERNESS EXPEDITION BASECAMP HUB (0, 0) ---
         ctx.save();
@@ -26935,6 +27536,238 @@ export default function App() {
               ctx.beginPath();
               ctx.arc(9, -9, 2.2, 0, Math.PI * 2);
               ctx.fill();
+
+            } else if (rt === 'scrap_metal_triple') {
+              // 8. SCRAP METAL TRIO (3x): Layered trio of metallic scrap plates
+              ctx.fillStyle = '#334155';
+              ctx.beginPath();
+              ctx.ellipse(0, 11, 24, 7, 0, 0, Math.PI * 2);
+              ctx.fill();
+
+              const drawTrioPlate = (px: number, py: number, sc = 1, isBright = false) => {
+                ctx.save();
+                ctx.translate(px, py);
+                ctx.scale(sc, sc);
+
+                const plateGrad = ctx.createLinearGradient(-10, -7, 10, 7);
+                plateGrad.addColorStop(0, isBright ? '#f59e0b' : '#78350f');
+                plateGrad.addColorStop(0.5, isBright ? '#d97706' : '#5c2b09');
+                plateGrad.addColorStop(1, '#451a03');
+                ctx.fillStyle = plateGrad;
+                ctx.beginPath();
+                ctx.roundRect(-10, -5, 20, 13, 2);
+                ctx.fill();
+                ctx.strokeStyle = isBright ? '#fef08a' : '#b45309';
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+
+                [-6, 6].forEach((rx) => {
+                  ctx.fillStyle = '#fef08a';
+                  ctx.beginPath();
+                  ctx.arc(rx, -2, 1.2, 0, Math.PI * 2);
+                  ctx.arc(rx, 4, 1.2, 0, Math.PI * 2);
+                  ctx.fill();
+                });
+                ctx.restore();
+              };
+
+              drawTrioPlate(-11, 3, 0.85, false);
+              drawTrioPlate(0, -2, 0.9, false);
+              drawTrioPlate(10, 2, 0.95, true);
+
+              // 3x Badge
+              ctx.fillStyle = '#f59e0b';
+              ctx.beginPath();
+              ctx.roundRect(6, -18, 17, 10, 3);
+              ctx.fill();
+              ctx.strokeStyle = '#fef08a';
+              ctx.lineWidth = 0.8;
+              ctx.stroke();
+              ctx.fillStyle = '#1c1917';
+              ctx.font = 'bold 8px system-ui';
+              ctx.textAlign = 'center';
+              ctx.fillText('3x', 14.5, -10.5);
+
+            } else if (rt === 'copper_wire_triple') {
+              // 9. COPPER WIRE SPOOLS (3x): Trio of overlapping coiled wire spools
+              ctx.fillStyle = 'rgba(0,0,0,0.45)';
+              ctx.beginPath();
+              ctx.ellipse(0, 12, 24, 7, 0, 0, Math.PI * 2);
+              ctx.fill();
+
+              const drawSpoolSmall = (sx: number, sy: number, isFront = false) => {
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.scale(0.85, 0.85);
+
+                ctx.fillStyle = '#5c2b09';
+                ctx.beginPath();
+                ctx.ellipse(0, 6, 9, 3.2, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 0.9;
+                ctx.stroke();
+
+                ctx.fillStyle = '#78350f';
+                ctx.beginPath();
+                ctx.ellipse(0, -8, 9, 3.2, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 0.9;
+                ctx.stroke();
+
+                ctx.fillStyle = isFront ? '#f97316' : '#ea580c';
+                ctx.fillRect(-7, -8, 14, 14);
+
+                ctx.strokeStyle = '#fed7aa';
+                ctx.lineWidth = 0.9;
+                for (let c = -6; c <= 4; c += 2.5) {
+                  ctx.beginPath();
+                  ctx.moveTo(-7, c);
+                  ctx.lineTo(7, c);
+                  ctx.stroke();
+                }
+
+                ctx.fillStyle = '#fef08a';
+                ctx.beginPath();
+                ctx.arc(0, -8, 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+              };
+
+              drawSpoolSmall(-10, 0, false);
+              drawSpoolSmall(10, 0, false);
+              drawSpoolSmall(0, 4, true);
+
+              // 3x Badge
+              ctx.fillStyle = '#ea580c';
+              ctx.beginPath();
+              ctx.roundRect(6, -18, 17, 10, 3);
+              ctx.fill();
+              ctx.strokeStyle = '#fef08a';
+              ctx.lineWidth = 0.8;
+              ctx.stroke();
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 8px system-ui';
+              ctx.textAlign = 'center';
+              ctx.fillText('3x', 14.5, -10.5);
+
+            } else if (rt === 'brass_gears_double') {
+              // 10. INTERLOCKING BRASS GEARS (2x): Pair of interlocking cogs
+              ctx.fillStyle = '#1e293b';
+              ctx.beginPath();
+              ctx.ellipse(0, 8, 20, 7, 0, 0, Math.PI * 2);
+              ctx.fill();
+
+              const drawGroundedCogSmall = (gx: number, gy: number, rad: number, teeth: number, rot: number) => {
+                ctx.save();
+                ctx.translate(gx, gy);
+                ctx.rotate(rot);
+
+                const cogGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, rad + 3);
+                cogGrad.addColorStop(0, '#fef08a');
+                cogGrad.addColorStop(0.5, '#f59e0b');
+                cogGrad.addColorStop(1, '#b45309');
+                ctx.fillStyle = cogGrad;
+                ctx.strokeStyle = '#fef08a';
+                ctx.lineWidth = 1;
+
+                ctx.beginPath();
+                for (let i = 0; i < teeth; i++) {
+                  const a1 = (i * Math.PI * 2) / teeth;
+                  const a2 = a1 + Math.PI / teeth / 2;
+                  const a3 = a1 + Math.PI / teeth;
+                  const outer = rad + 2.5;
+                  const inner = rad;
+                  if (i === 0) ctx.moveTo(Math.cos(a1) * inner, Math.sin(a1) * inner);
+                  ctx.lineTo(Math.cos(a1) * outer, Math.sin(a1) * outer);
+                  ctx.lineTo(Math.cos(a2) * outer, Math.sin(a2) * outer);
+                  ctx.lineTo(Math.cos(a2) * inner, Math.sin(a2) * inner);
+                  ctx.lineTo(Math.cos(a3) * inner, Math.sin(a3) * inner);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#78350f';
+                ctx.beginPath();
+                ctx.arc(0, 0, rad * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#fef08a';
+                ctx.beginPath();
+                ctx.arc(0, 0, rad * 0.15, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+              };
+
+              drawGroundedCogSmall(-6, 2, 9, 8, 0.2);
+              drawGroundedCogSmall(8, -3, 7, 6, -0.3);
+
+              // 2x Badge
+              ctx.fillStyle = '#eab308';
+              ctx.beginPath();
+              ctx.roundRect(6, -18, 17, 10, 3);
+              ctx.fill();
+              ctx.strokeStyle = '#fef08a';
+              ctx.lineWidth = 0.8;
+              ctx.stroke();
+              ctx.fillStyle = '#1c1917';
+              ctx.font = 'bold 8px system-ui';
+              ctx.textAlign = 'center';
+              ctx.fillText('2x', 14.5, -10.5);
+
+            } else if (rt === 'circuit_boards_double') {
+              // 11. LAYERED CIRCUITS (2x): Stack of 2 printed circuit boards
+              ctx.fillStyle = 'rgba(0,0,0,0.45)';
+              ctx.beginPath();
+              ctx.ellipse(0, 10, 20, 6, 0, 0, Math.PI * 2);
+              ctx.fill();
+
+              // Bottom board
+              ctx.fillStyle = '#064e3b';
+              ctx.beginPath();
+              ctx.roundRect(-14, -8, 24, 16, 2);
+              ctx.fill();
+              ctx.strokeStyle = '#059669';
+              ctx.lineWidth = 1;
+              ctx.stroke();
+
+              // Top board (offset)
+              ctx.fillStyle = '#047857';
+              ctx.beginPath();
+              ctx.roundRect(-8, -13, 24, 16, 2);
+              ctx.fill();
+              ctx.strokeStyle = '#34d399';
+              ctx.lineWidth = 1.2;
+              ctx.stroke();
+
+              // Gold pins
+              ctx.fillStyle = '#fde047';
+              [-5, -1, 3, 7].forEach((px) => {
+                ctx.fillRect(px, 1, 2, 2);
+              });
+
+              // Microchip die
+              ctx.fillStyle = '#0f172a';
+              ctx.fillRect(-2, -9, 8, 7);
+              ctx.strokeStyle = '#fde047';
+              ctx.lineWidth = 0.8;
+              ctx.strokeRect(-2, -9, 8, 7);
+
+              // 2x Badge
+              ctx.fillStyle = '#059669';
+              ctx.beginPath();
+              ctx.roundRect(7, -19, 17, 10, 3);
+              ctx.fill();
+              ctx.strokeStyle = '#34d399';
+              ctx.lineWidth = 0.8;
+              ctx.stroke();
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 8px system-ui';
+              ctx.textAlign = 'center';
+              ctx.fillText('2x', 15.5, -11.5);
             }
 
             // Grounded Badge below
@@ -26946,6 +27779,10 @@ export default function App() {
               electronic_chips: {name: 'Electronic Chip', weight: '1.5kg', color: '#38bdf8'},
               scrap_metal_double: {name: 'Heavy Scrap 2x', weight: '1.6kg', color: '#f59e0b'},
               copper_wire_double: {name: 'Heavy Wire 2x', weight: '1.0kg', color: '#fb923c'},
+              scrap_metal_triple: {name: 'Scrap Trio (3x)', weight: '2.4kg', color: '#f59e0b'},
+              copper_wire_triple: {name: 'Wire Spools (3x)', weight: '1.5kg', color: '#fb923c'},
+              brass_gears_double: {name: 'Gears Pair (2x)', weight: '2.4kg', color: '#eab308'},
+              circuit_boards_double: {name: 'Circuits (2x)', weight: '2.0kg', color: '#34d399'},
             };
 
             const info = rt ? nameShortMap[rt] : undefined;
@@ -28396,18 +29233,6 @@ export default function App() {
         <div className="flex items-center gap-1.5 sm:gap-2">
           {location === 'SANCTUARY' ? (
             <>
-              {/* 💾 Save & Load Archives */}
-              <button
-                onClick={() => {
-                  setIsSaveLoadModalOpen(true);
-                  gameAudio.playCrispClick();
-                }}
-                title="Manage Save Slots &amp; Autosave"
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition-transform active:scale-95 border border-slate-700 cursor-pointer">
-                <Save className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Save/Load</span>
-              </button>
-
               {/* 📦 Nursery Inventory */}
               <button
                 onClick={() => {
@@ -29843,14 +30668,10 @@ export default function App() {
                   );
                 } else if (targetNode.type === 'RESOURCE' && targetNode.resourceType) {
                   const rt = targetNode.resourceType;
-                  const isDoubleScrap = rt === 'scrap_metal_double';
-                  const isDoubleWire = rt === 'copper_wire_double';
                   const weight = ITEM_WEIGHTS[rt] || 0.8;
                   const curWeight = getCargoWeight();
                   const maxWeight = getMaxRoverCargo();
                   const canFit = curWeight + weight <= maxWeight;
-                  const remainingSpace = maxWeight - curWeight;
-                  const singleWeight = isDoubleScrap ? 0.8 : isDoubleWire ? 0.5 : weight;
 
                   const nameMap: Record<string, string> = {
                     scrap_metal: 'Scrap Metal',
@@ -29860,15 +30681,15 @@ export default function App() {
                     electronic_chips: 'Electronic Chip',
                     scrap_metal_double: 'Heavy Scrap Metal (2x)',
                     copper_wire_double: 'Heavy Copper Wire (2x)',
+                    scrap_metal_triple: 'Scrap Metal Trio (3x)',
+                    copper_wire_triple: 'Copper Wire Spools (3x)',
+                    brass_gears_double: 'Interlocking Brass Gears (2x)',
+                    circuit_boards_double: 'Layered Microcircuits (2x)',
                   };
 
-                  let btnLabel = `[E] Collect ${nameMap[rt] || 'Resource'} (${weight}kg)`;
+                  let btnLabel = `[E] Collect ${nameMap[rt] || 'Resource'} (${weight.toFixed(1)}kg)`;
                   if (!canFit) {
-                    if ((isDoubleScrap || isDoubleWire) && remainingSpace >= singleWeight) {
-                      btnLabel = `[Requires 2 cargo slots - only 1 left]`;
-                    } else {
-                      btnLabel = `[Backpack Full - ${curWeight}/${maxWeight}kg]`;
-                    }
+                    btnLabel = `[Backpack Full - ${curWeight}/${maxWeight}kg]`;
                   }
 
                   return (
@@ -30410,476 +31231,27 @@ export default function App() {
       {/* ========================================================================= */}
       {/* MODAL: ROVER GARAGE BAY (EXPEDITIONS & MODULAR LOADOUT) */}
       {/* ========================================================================= */}
-      {isBiomeSelectOpen && (() => {
-        const chassisTier = inv.rover_chassis_tier || 1;
-        const maxSlots = getRoverChassisMaxSlots(chassisTier);
-        const attached = inv.attached_rover_modules || [];
-        const effBattery = getMaxRoverBattery();
-        const effCargo = getMaxRoverCargo();
-        const effVision = getRoverVisionRadius();
-        const ALL_ROVER_MODULE_KEYS: RoverModuleType[] = [
-          'storage_1',
-          'storage_2',
-          'storage_3',
-          'battery_1',
-          'battery_2',
-          'battery_3',
-          'radar_1',
-          'radar_2',
-          'radar_3',
-        ];
-        const totalUnattached = ALL_ROVER_MODULE_KEYS.reduce(
-          (acc, k) => acc + (inv.rover_modules[k] || 0),
-          0,
-        );
-
-        return (
-          <div className="fixed top-12 left-0 right-0 bottom-0 z-40 bg-slate-950/95 backdrop-blur-md p-3 sm:p-5 flex flex-col overflow-hidden border-t border-slate-800 text-left">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-3 shrink-0">
-              <div className="flex items-center gap-3">
-                <Truck className="w-6 h-6 text-cyan-400" />
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h2 className="text-xl font-bold text-cyan-100">Rover Garage Bay</h2>
-                  <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-cyan-900/60 border border-cyan-500/30 text-cyan-300">
-                    Tier {chassisTier}: {getRoverChassisName(chassisTier)}
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsBiomeSelectOpen(false)}
-                className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Top-Level Tabs Switcher */}
-            <div className="grid grid-cols-2 gap-2 mb-3 shrink-0">
-              <button
-                onClick={() => {
-                  setGarageTab('expeditions');
-                  gameAudio.playCrispClick();
-                }}
-                className={`py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all shadow ${
-                  garageTab === 'expeditions'
-                    ? 'bg-amber-600 text-white ring-2 ring-amber-400/40'
-                    : 'bg-slate-800 text-slate-400 hover:bg-slate-750'
-                }`}>
-                <Truck className="w-4 h-4" />
-                <span>🚜 Expeditions</span>
-                <span className="text-[10px] bg-slate-950/60 px-1.5 py-0.5 rounded-full font-mono text-amber-300">
-                  3 Regions
-                </span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setGarageTab('loadout');
-                  gameAudio.playCrispClick();
-                }}
-                className={`py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all shadow ${
-                  garageTab === 'loadout'
-                    ? 'bg-sky-600 text-white ring-2 ring-sky-400/40'
-                    : 'bg-slate-800 text-slate-400 hover:bg-slate-750'
-                }`}>
-                <Wrench className="w-4 h-4" />
-                <span>⚙️ Rover Loadout</span>
-                <span className="text-[10px] bg-slate-950/60 px-1.5 py-0.5 rounded-full font-mono text-sky-300">
-                  {attached.length} / {maxSlots} Slots
-                </span>
-              </button>
-            </div>
-
-            {/* TAB 1: EXPEDITIONS DEPARTURE & CODEX */}
-            {garageTab === 'expeditions' && (
-              <div className="flex-1 space-y-3 mb-3 overflow-y-auto pr-1">
-                {(['FOOTHILLS', 'HIGHLANDS', 'OVERGROWTH'] as ExpeditionBiomeId[]).map((biomeId, bIdx) => {
-                  const b = getExpeditionBiomeDef(biomeId);
-                  const reqKey = b.requiredMapKey;
-                  const isUnlocked = b.unlockedByDefault || (reqKey ? inv[reqKey] : false);
-                  const isFocused = focusedGarageIdx === bIdx;
-
-                  return (
-                    <div
-                      key={biomeId}
-                      style={{borderColor: isFocused ? '#38bdf8' : isUnlocked ? b.accentColor : '#334155'}}
-                      className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all ${
-                        isFocused
-                          ? 'bg-slate-850 ring-4 ring-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.5)] scale-[1.01]'
-                          : isUnlocked
-                          ? 'bg-slate-900/90 hover:bg-slate-850'
-                          : 'bg-slate-900/50 opacity-80'
-                      }`}>
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            style={{backgroundColor: isUnlocked ? b.themeColor : '#334155'}}
-                            className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shrink-0 shadow">
-                            {biomeId === 'FOOTHILLS' ? <Trees className="w-5 h-5" /> : biomeId === 'HIGHLANDS' ? <Mountain className="w-5 h-5" /> : <Flower2 className="w-5 h-5" />}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-1.5">
-                                {isFocused && <span className="text-sky-400 text-xs">► [E/A]</span>}
-                                <span>{b.name}</span>
-                              </h4>
-                              <span
-                                style={{backgroundColor: `${b.themeColor}25`, color: b.accentColor}}
-                                className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-current">
-                                ⚡ {b.batteryCostPerStep} kWh / Step
-                              </span>
-                            </div>
-                            <span className="text-[11px] text-slate-400">{b.subtitle}</span>
-                          </div>
-                        </div>
-
-                        {isUnlocked ? (
-                          <button
-                            onClick={() => startBiomeExcursion(biomeId)}
-                            style={{backgroundColor: b.themeColor}}
-                            className={`hover:opacity-90 text-white font-bold text-xs px-4 py-2 rounded-xl shadow transition-transform active:scale-95 flex items-center gap-1 shrink-0 ${
-                              isFocused ? 'ring-2 ring-white scale-105' : ''
-                            }`}>
-                            <span>Depart Rover [E/A]</span>
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
-                        ) : (
-                          <div className="flex items-center gap-1.5 bg-slate-800/90 text-amber-300 px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 border border-slate-700">
-                            <Lock className="w-3.5 h-3.5 text-amber-400" />
-                            <span>Locked</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <p className="text-xs text-slate-300 mb-2.5">{b.description}</p>
-
-                      {/* ROVER GARAGE DISCOVERY CODEX ("FOG-OF-WAR" AREA EXPLORATION GRID) */}
-                      <div className="bg-slate-950/80 border border-slate-800/90 rounded-2xl p-3 space-y-2.5 mb-2">
-                        {/* Row 1: Bonsai Species (Seedling Foliage Preview) */}
-                        <div>
-                          <div className="text-[10px] font-bold text-emerald-400/90 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                            <Sprout className="w-3 h-3 text-emerald-400" />
-                            <span>Bonsai Species</span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {(BIOME_CODEX_SPECIES[biomeId] || []).map((leafType) => (
-                              <CodexSeedlingBox
-                                key={leafType}
-                                leafType={leafType}
-                                discovered={(areaDiscoveryRef.current.species[biomeId] || []).includes(leafType)}
-                              />
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Row 2: Maturity Ratings (Kanji Characters) */}
-                        <div>
-                          <div className="text-[10px] font-bold text-amber-400/90 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                            <Award className="w-3 h-3 text-amber-400" />
-                            <span>Maturity Ratings</span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {(BIOME_CODEX_MATURITIES[biomeId] || []).map((matTier) => (
-                              <CodexMaturityBox
-                                key={matTier}
-                                matDef={getMaturityDef(matTier)}
-                                discovered={(areaDiscoveryRef.current.maturities[biomeId] || []).includes(matTier)}
-                              />
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Row 3: Expedition Resources */}
-                        <div>
-                          <div className="text-[10px] font-bold text-sky-400/90 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                            <Package className="w-3 h-3 text-sky-400" />
-                            <span>Expedition Resources</span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {(BIOME_CODEX_RESOURCES[biomeId] || []).map((resKey) => (
-                              <CodexResourceBox
-                                key={resKey}
-                                resKey={resKey}
-                                discovered={(areaDiscoveryRef.current.resources[biomeId] || []).includes(resKey)}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {!isUnlocked && (
-                        <div className="mt-2 text-xs font-semibold text-amber-400 flex items-center gap-2 bg-amber-950/40 p-2 rounded-xl border border-amber-500/30">
-                          <Lock className="w-3.5 h-3.5 shrink-0" />
-                          <span>Locked: Purchase map at the Botanical Market ({b.mapCost} Verdure)</span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* TAB 2: ROVER LOADOUT (CHASSIS & MODULAR OUTFITTING) */}
-            {garageTab === 'loadout' && (
-              <div className="flex-1 space-y-3 mb-3 overflow-y-auto pr-1">
-                {/* 1. Interactive Chassis Overview Card */}
-                <div className="bg-slate-900/90 border border-sky-500/40 p-4 rounded-2xl shadow-lg space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-900 to-indigo-950 border-2 border-sky-400/60 flex items-center justify-center text-2xl shadow">
-                        {chassisTier === 3 ? '👑' : chassisTier === 2 ? '🚜' : '🚙'}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="bg-sky-950 text-sky-300 border border-sky-500/60 text-xs px-2.5 py-0.5 rounded-full font-black">
-                            Tier {chassisTier}
-                          </span>
-                          <h4 className="text-base sm:text-lg font-black text-slate-100">
-                            {getRoverChassisName(chassisTier)}
-                          </h4>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          {chassisTier === 3
-                            ? 'Vanguard Heavy Chassis: 10 upgrade slots for extended wilderness operations.'
-                            : chassisTier === 2
-                            ? 'Surveyor Chassis: 5 upgrade slots with reinforced load brackets.'
-                            : 'Scout Chassis: 3 upgrade slots. Upgrade at Workbench for more module capacity.'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <div className="text-xs text-slate-400 font-semibold">Chassis Module Slots</div>
-                      <div className="text-lg font-black text-sky-300 font-mono">
-                        {attached.length} / {maxSlots} Slots Used
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Telemetry Stats Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 pt-2 border-t border-slate-800 text-xs">
-                    <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">Max Battery:</span>
-                      <strong className="text-amber-300 text-sm font-mono">{effBattery} kWh</strong>
-                      <span className="text-[10px] text-slate-500 block">Base 50 + {effBattery - 50} kWh</span>
-                    </div>
-
-                    <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">Max Cargo Payload:</span>
-                      <strong className="text-emerald-300 text-sm font-mono">{effCargo} kg</strong>
-                      <span className="text-[10px] text-slate-500 block">Base 15.0 + {(effCargo - 15.0).toFixed(1)} kg</span>
-                    </div>
-
-                    <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">Radar Vision:</span>
-                      <strong className="text-sky-300 text-sm font-mono">{effVision} Steps</strong>
-                      <span className="text-[10px] text-slate-500 block">Base 2 + {effVision - 2} Steps</span>
-                    </div>
-
-                    <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">Grid Power Draw:</span>
-                      <strong className="text-amber-400 text-sm font-mono">{power.roverPowerDrain} kW</strong>
-                      <span className="text-[10px] text-slate-500 block">Rover Modules Load</span>
-                    </div>
-
-                    <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">Attached Modules:</span>
-                      <strong className="text-sky-300 text-sm font-mono">{attached.length} Installed</strong>
-                      <span className="text-[10px] text-slate-500 block">{maxSlots - attached.length} Free Bays</span>
-                    </div>
-
-                    <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">Unattached Storage:</span>
-                      <strong className="text-slate-200 text-sm font-mono">{totalUnattached} in Bag</strong>
-                      <span className="text-[10px] text-slate-500 block">Spare Modules</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Visual Grid of Chassis Module Slots (10 Total Visualized) */}
-                <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1.5 font-bold text-slate-200">
-                      <span>⚙️ Chassis Module Bays (Slots 1 - 10)</span>
-                    </div>
-                    <span className="text-[11px] text-slate-400 font-mono">
-                      Active: {maxSlots} Slots • {10 - maxSlots > 0 ? `${10 - maxSlots} Locked` : 'All Unlocked'}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    {Array.from({ length: 10 }).map((_, slotIdx) => {
-                      const isSlotActive = slotIdx < maxSlots;
-                      const equippedMod = isSlotActive ? attached[slotIdx] : null;
-                      const modCfg = equippedMod ? ROVER_MODULE_CONFIGS[equippedMod] : null;
-
-                      if (!isSlotActive) {
-                        return (
-                          <div
-                            key={slotIdx}
-                            className="bg-slate-950/60 border border-dashed border-slate-800 p-2.5 rounded-xl flex flex-col items-center justify-center text-center gap-1 opacity-60">
-                            <Lock className="w-4 h-4 text-slate-600" />
-                            <span className="text-[10px] font-bold text-slate-500 font-mono">
-                              Bay {slotIdx + 1}
-                            </span>
-                            <span className="text-[9px] text-amber-400/80 font-semibold line-clamp-1">
-                              {slotIdx < 5 ? 'T2 Chassis' : 'T3 Chassis'}
-                            </span>
-                          </div>
-                        );
-                      }
-
-                      if (equippedMod && modCfg) {
-                        return (
-                          <div
-                            key={slotIdx}
-                            className="bg-slate-950 border border-sky-500/60 p-2.5 rounded-xl flex flex-col justify-between gap-1 shadow-md">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-mono font-bold text-sky-400">
-                                Bay {slotIdx + 1}
-                              </span>
-                              <span className="text-sm">{modCfg.icon}</span>
-                            </div>
-                            <div className="my-0.5">
-                              <div className="text-[11px] font-bold text-slate-100 truncate">
-                                {modCfg.name}
-                              </div>
-                              <div className={`text-[10px] font-bold ${
-                                modCfg.category === 'battery'
-                                  ? 'text-amber-300'
-                                  : modCfg.category === 'radar'
-                                  ? 'text-sky-300'
-                                  : 'text-emerald-300'
-                              }`}>
-                                {modCfg.bonusLabel} • ⚡ {modCfg.kw} kW
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => detachRoverModule(slotIdx)}
-                              className="w-full bg-slate-800 hover:bg-red-950 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-500/60 text-[10px] font-bold py-1 rounded-lg transition-all active:scale-95">
-                              Detach
-                            </button>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div
-                          key={slotIdx}
-                          className="bg-slate-950/80 border border-dashed border-sky-500/40 p-2.5 rounded-xl flex flex-col items-center justify-center text-center gap-1">
-                          <span className="text-[10px] font-mono font-bold text-sky-400/70">
-                            Bay {slotIdx + 1}
-                          </span>
-                          <span className="text-[11px] font-bold text-slate-400">
-                            Available Slot
-                          </span>
-                          <span className="text-[9px] text-slate-500">
-                            Attach below
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 3. Unattached Modules in Inventory Storage */}
-                <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl space-y-2.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1.5 font-bold text-emerald-300">
-                      <Package className="w-4 h-4" />
-                      <span>Unattached Modules in Storage ({totalUnattached})</span>
-                    </div>
-                    <span className="text-[11px] text-slate-400">
-                      Craft more at Artisan Workbench
-                    </span>
-                  </div>
-
-                  {totalUnattached === 0 && (
-                    <div className="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800 text-center space-y-1.5">
-                      <p className="text-xs text-slate-300 font-semibold">
-                        No unattached modules in storage.
-                      </p>
-                      <p className="text-[11px] text-slate-400 leading-relaxed max-w-md mx-auto">
-                        Craft <strong>Storage Modules (I-III)</strong>, <strong>Battery Modules (I-III)</strong>, or <strong>Radar Modules (I-III)</strong> in the <strong>Workbench</strong> (Rover tab), or purchase blueprints at the Botanical Market!
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {ALL_ROVER_MODULE_KEYS.map((mKey, mIdx) => {
-                      const cfg = ROVER_MODULE_CONFIGS[mKey];
-                      const inStock = inv.rover_modules[mKey] || 0;
-                      const isFull = attached.length >= maxSlots;
-                      const canAttach = inStock > 0 && !isFull;
-                      const isFocused = focusedGarageIdx === mIdx;
-
-                      return (
-                        <div
-                          key={mKey}
-                          className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-all ${
-                            isFocused
-                              ? 'bg-slate-850 border-sky-300 ring-4 ring-sky-400 scale-[1.01] shadow-[0_0_15px_rgba(56,189,248,0.5)]'
-                              : inStock > 0
-                              ? 'bg-slate-950/90 border-slate-700 shadow-sm'
-                              : 'bg-slate-950/40 border-slate-850 opacity-60'
-                          }`}>
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="text-2xl shrink-0">{cfg.icon}</span>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <h5 className="font-bold text-xs text-slate-100 truncate">
-                                  {isFocused && <span className="text-sky-400 mr-1">► [E/A]</span>}
-                                  {cfg.name}
-                                </h5>
-                                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
-                                  cfg.category === 'battery'
-                                    ? 'bg-amber-950/80 text-amber-300 border-amber-500/50'
-                                    : cfg.category === 'radar'
-                                    ? 'bg-sky-950/80 text-sky-300 border-sky-500/50'
-                                    : 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
-                                }`}>
-                                  {cfg.bonusLabel} • ⚡ {cfg.kw} kW
-                                </span>
-                              </div>
-                              <span className="text-[10px] text-slate-400 block mt-0.5 line-clamp-1">
-                                {cfg.description} • Stock: <strong className={inStock > 0 ? 'text-sky-300 font-mono' : 'text-slate-500 font-mono'}>{inStock}</strong>
-                              </span>
-                            </div>
-                          </div>
-
-                          <button
-                            disabled={!canAttach}
-                            onClick={() => attachRoverModule(mKey)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all shadow ${
-                              canAttach
-                                ? 'bg-sky-600 hover:bg-sky-500 text-white active:scale-95'
-                                : inStock <= 0
-                                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                                : 'bg-slate-800 text-amber-400/80 cursor-not-allowed'
-                            }`}>
-                            {inStock <= 0 ? 'No Stock' : isFull ? 'Bays Full' : 'Attach (+)'}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* FOOTER CONTROLLER & KEYBOARD PROMPTS STRIP */}
-            <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 shrink-0 mt-1">
-              <span className="font-mono text-cyan-400 text-[11px] hidden sm:inline">
-                🎮 [A/D / LB/RB] Switch Tabs • [W/S] Select • [E / A] Depart/Equip • [Arrows / R-Stick] Scroll • [Esc / B] Close
-              </span>
-              <button
-                onClick={() => setIsBiomeSelectOpen(false)}
-                className="px-5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-all border border-slate-700">
-                Close [Esc / B]
-              </button>
-            </div>
-          </div>
-        );
-      })()}
+      {isBiomeSelectOpen && (
+        <RoverModal
+          isOpen={isBiomeSelectOpen}
+          onClose={() => setIsBiomeSelectOpen(false)}
+          inventory={sanctuaryInventoryRef.current}
+          areaDiscovery={areaDiscoveryRef.current}
+          garageTab={garageTab}
+          setGarageTab={setGarageTab}
+          focusedGarageIdx={focusedGarageIdx}
+          onStartBiomeExcursion={startBiomeExcursion}
+          onAttachRoverModule={attachRoverModule}
+          onDetachRoverModule={detachRoverModule}
+          maxRoverBattery={getMaxRoverBattery()}
+          maxRoverCargo={getMaxRoverCargo()}
+          roverVisionRadius={getRoverVisionRadius()}
+          roverPowerDrain={power.roverPowerDrain}
+          CodexSeedlingBox={CodexSeedlingBox}
+          CodexMaturityBox={CodexMaturityBox}
+          CodexResourceBox={CodexResourceBox}
+        />
+      )}
 
       {/* ========================================================================= */}
       {/* MODAL: BOTANICAL MARKET (MAPS, EXPANSIONS, DECORATIONS, EQUIPMENT) */}
@@ -30899,6 +31271,7 @@ export default function App() {
         assets={assets}
         deployedStructures={deployedStructuresRef.current}
         discountRate={(zenSkillsRef.current.discountHunter || 0) * 0.02}
+        masterQuests={masterQuestsRef.current}
       />
 
       {/* ========================================================================= */}
@@ -31112,7 +31485,7 @@ export default function App() {
                   <div className="text-[11px] font-bold text-amber-400 mb-1">Excavated Saplings:</div>
                   {excursionReport.saplings.map((sap, i) => (
                     <div key={i} className="flex items-center justify-between text-xs py-0.5">
-                      <span className="text-slate-300">🌿 {sap.name} ({sap.rarity})</span>
+                      <span className="text-slate-300">🌿 {sap.name}</span>
                       <span className={`font-bold ${sap.retained ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {sap.retained ? '✓ Retained' : '✗ Lost in Wild'}
                       </span>

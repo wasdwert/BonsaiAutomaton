@@ -74,8 +74,19 @@ export const INITIAL_RESOURCES: GameStateResources = {
 };
 
 export const INITIAL_GAME_STATE = {
-  verdure: 250,
-  coins: 250,
+  verdure: 12000,
+  coins: 12000,
+  battery: 500,
+  maxBattery: 500,
+  roverBattery: 500,
+  roverMaxBattery: 500,
+  rover: {
+    battery: 500,
+    maxBattery: 500,
+    batteryKwh: 500,
+    maxBatteryKwh: 500,
+  },
+  unlockedMaps: ['area1_base'],
   player_level: 0,
   player_exp: 0,
   level: 0,

@@ -323,9 +323,6 @@ export default function BonsaiExcavationModal({
                         className="text-[10px] px-2 py-0.5 rounded-full font-black border">
                         {matDef.name} (Rank {matDef.rank})
                       </span>
-                      <span className="text-[10px] bg-slate-900 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-full font-semibold">
-                        {result.rarity || leafDef.rarity}
-                      </span>
                     </div>
                     <h4 className="font-bold text-sm sm:text-base text-slate-100 mt-1 truncate">
                       {getBonsaiDisplayName(result)}

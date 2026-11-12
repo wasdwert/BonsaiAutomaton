@@ -105,7 +105,7 @@ export const CONFIG = {
     group: 'Rules',
   },
   roverBaseBattery: {
-    value: 50,
+    value: 500,
     type: 'number',
     label: 'Rover Base Battery (kWh)',
     group: 'Rules',

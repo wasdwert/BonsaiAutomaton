@@ -525,27 +525,6 @@ export default function BonsaiInspectionModal({
               {/* Tree Canvas */}
               <InspectedBonsaiCanvas bonsai={bonsai} />
 
-              {/* Specimen Details & Vitality */}
-              <div className="bg-slate-950/80 border border-slate-800/90 rounded-xl p-2.5 space-y-1.5 text-xs">
-                <div className="flex items-center justify-between text-slate-300 font-semibold">
-                  <span className="flex items-center gap-1.5 text-emerald-300">
-                    <Heart className="w-3.5 h-3.5 text-rose-400" />
-                    <span>Health &amp; Vitality</span>
-                  </span>
-                  <span className="text-emerald-400 font-bold">100% (Flourishing)</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-slate-800/70">
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Specimen Rarity:</span>
-                    <strong className="text-slate-200">{bonsai.rarity || leafDef.rarity || 'Common'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Ceramic Pot:</span>
-                    <strong className="text-slate-200">{bonsai.potStyle || 'Carved Ceramic'}</strong>
-                  </div>
-                </div>
-              </div>
-
               {/* Level & Progress Bar */}
               <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 space-y-2">
                 <div className="flex items-center justify-between">

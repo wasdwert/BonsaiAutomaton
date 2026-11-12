@@ -51,9 +51,9 @@
   ],
   "sections": [
     {
-      "title": "Economy and Progression",
-      "content": "1. Level 0 Player Onboarding: New sessions explicitly initialize at Botanist Level 0 with 0 XP. Reaching Level 1 requires 200 XP (displaying 0 / 200 XP). Advancing to Level 1 triggers the first Level Up milestone and awards 5 Zen Points. 2. Subsequent Level Scaling: From Level 1 onward, advancing to Level 2 requires 263 XP, Level 3 requires 329 XP, scaling recursively up to Level 100 at 156,685 XP.",
-      "summary": "Initial Level 0 Baseline Architecture and 200 XP Progression Scaling."
+      "title": "Core Mechanics",
+      "content": "1. Master Quest Gated Grid Expansions: The 8-phase grid territorial expansion progression enforces strict Master Quest branch rank prerequisites: Expansions I-IV (Inner Wings through Upper 8x16 Rows) are accessible from Rank 0; Expansions V & VI (Left 8x8 and Right 8x8 Wings) require completing at least one Master Quest branch to Rank 1; and Expansions VII & VIII (Southern Rows 8-15) require completing at least one branch to Rank 2. 2. Interactive Single-Phase Mini-Map Presentation: Renamed the 'Plots' market submenu to 'Grid Expansions' and transformed the interface into a single-phase presentation engine. An architectural SVG mini-map depicts the entire tri-field sanctuary (central 16x16 megagrid and elevated flanking 8x8 wings) using color telemetry: emerald green for currently active plots, pulsing amber gold for plots unlocked in the target phase, and muted slate for future locked plots. The panel details plot capacity, prerequisite Master Quest status, discounted Verdure pricing, and dynamic purchase acquisition.",
+      "summary": "Master-Quest Gated Grid Expansions, Single-Phase Focused Progression, and Sanctuary Architectural Mini-Map."
     }
   ]
 }

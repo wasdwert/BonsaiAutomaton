@@ -580,18 +580,6 @@ export default function ZenLibraryModal({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Botanist Profile: Level, Current XP, and XP to Next Level */}
-          <div className="bg-slate-900/90 border border-emerald-500/60 px-2.5 py-1 rounded-xl text-xs font-bold text-emerald-300 flex items-center gap-2 shadow-sm">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Botanist Lv.{playerLevel}</span>
-            <span className="text-slate-600 font-light">|</span>
-            <span className="font-mono text-[11px] text-slate-300">
-              {playerLevel >= 100
-                ? 'MAX'
-                : `${Math.floor(playerExp)} / ${getExpRequiredForLevel(playerLevel + 1)} XP`}
-            </span>
-          </div>
-
           <button
             onClick={onClose}
             className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer">
@@ -813,9 +801,6 @@ export default function ZenLibraryModal({
                   <div className="flex items-center gap-1.5">
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${getBonsaiGroupBadgeClass(selectedDef.group)}`}>
                       {selectedDef.group}
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-950 border border-slate-700 text-slate-300">
-                      {selectedDef.rarity}
                     </span>
                   </div>
                 )}

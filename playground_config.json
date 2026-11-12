@@ -22,10 +22,10 @@
       "name": "roverBaseBattery",
       "type": "number",
       "label": "Rover Base Battery Steps",
-      "default": 50,
-      "min": 20,
-      "max": 100,
-      "step": 5
+      "default": 500,
+      "min": 50,
+      "max": 1000,
+      "step": 25
     },
     {
       "name": "roverBaseCargo",
@@ -85,7 +85,7 @@
   "values": {
     "growthSpeedMultiplier": 1.0,
     "playerWalkSpeed": 220,
-    "roverBaseBattery": 50,
+    "roverBaseBattery": 500,
     "roverBaseCargo": 15.0,
     "solarPeakKw": 3.0,
     "turbineBaseKw": 1.8,
