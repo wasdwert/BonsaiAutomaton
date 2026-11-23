@@ -386,6 +386,7 @@ export function BonsaiStyleThumbnail({
   flowerColor,
   width = 86,
   height = 74,
+  variant = 'normal',
 }: {
   leafType: BonsaiLeafType;
   styleKey: BonsaiStyle;
@@ -393,6 +394,7 @@ export function BonsaiStyleThumbnail({
   flowerColor: string;
   width?: number;
   height?: number;
+  variant?: 'normal' | 'blooming';
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -458,8 +460,10 @@ export function BonsaiStyleThumbnail({
       leafType,
       color,
       flowerColor,
+      false,
+      variant,
     );
-  }, [leafType, styleKey, color, flowerColor, width, height]);
+  }, [leafType, styleKey, color, flowerColor, width, height, variant]);
 
   return (
     <canvas
@@ -477,10 +481,12 @@ function SeedlingSpeciesIcon({
   leafType,
   color,
   accentColor,
+  isBlooming = false,
 }: {
   leafType: BonsaiLeafType;
   color?: string;
   accentColor?: string;
+  isBlooming?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -511,8 +517,8 @@ function SeedlingSpeciesIcon({
     ctx.stroke();
 
     // Seedling foliage using authentic leaf shape
-    drawLeafShape(ctx, 22, 14, 12, leafType, color || '#10b981', accentColor || '#34d399');
-  }, [leafType, color, accentColor]);
+    drawLeafShape(ctx, 22, 14, 12, leafType, color || '#10b981', accentColor || '#34d399', isBlooming);
+  }, [leafType, color, accentColor, isBlooming]);
 
   return (
     <canvas
@@ -1033,6 +1039,7 @@ export default function DeploymentModal({
                       styleKey={curStyleKey}
                       color={seedling.color || leafDef.color}
                       flowerColor={seedling.flowerColor || leafDef.accentColor}
+                      variant={seedling.variant || 'normal'}
                       width={64}
                       height={50}
                     />
@@ -1172,6 +1179,7 @@ export default function DeploymentModal({
                       orientation: 'horizontal',
                       style: curStyleKey,
                       nature: natureObj,
+                      variant: seedling.variant || 'normal',
                     });
                   } else {
                     onPlantSeedling(seedling, curStyleKey, natureObj);
@@ -1319,14 +1327,21 @@ export default function DeploymentModal({
                                 leafType={leafType}
                                 color={seedling.color || leafDef.color}
                                 accentColor={seedling.flowerColor || leafDef.accentColor}
+                                isBlooming={seedling.variant === 'blooming'}
                               />
                             </div>
                             <div className="min-w-0 flex-1 space-y-1.5">
                               <h4 className="font-bold text-xs sm:text-sm text-slate-100 truncate">
-                                {getBonsaiDisplayName(seedling)}
+                                {seedling.variant === 'blooming' ? '🌸 Blooming ' : ''}{getBonsaiDisplayName(seedling)}
                               </h4>
-                              {/* Directly underneath the name: Maturity rating badge, Tree type group badge, and Nature pill */}
+                              {/* Directly underneath the name: Maturity rating badge, Tree type group badge, Nature pill, and Blooming badge */}
                               <div className="flex items-center gap-1.5 flex-wrap">
+                                {seedling.variant === 'blooming' && (
+                                  <span className="text-[9.5px] px-2 py-0.5 rounded-full font-black border bg-pink-950/90 text-pink-300 border-pink-400 flex items-center gap-1 shadow-sm">
+                                    <span>🌸</span>
+                                    <span>Blooming</span>
+                                  </span>
+                                )}
                                 <span
                                   style={{
                                     backgroundColor: matDef.bg,

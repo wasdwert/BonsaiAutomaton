@@ -52,6 +52,7 @@ import {
   SkillCategory,
   SkillDefinition,
 } from './skillsData';
+export const SKILLS = ZEN_SKILLS_DATA;
 import { MasterQuestsState } from './types';
 
 export type ShrineTab = 'bondex' | 'blueprints' | 'skills';
@@ -141,10 +142,12 @@ export function BondexLeafThumbnail({
   leafType,
   color,
   accentColor,
+  variant = 'normal',
 }: {
   leafType: BonsaiLeafType;
   color: string;
   accentColor: string;
+  variant?: 'normal' | 'blooming';
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -160,8 +163,8 @@ export function BondexLeafThumbnail({
     ctx.setTransform(2, 0, 0, 2, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    renderLeafFoliage(ctx, 16, 16, 9.5, leafType, color, accentColor);
-  }, [leafType, color, accentColor]);
+    renderLeafFoliage(ctx, 16, 16, 9.5, leafType, color, accentColor, variant === 'blooming');
+  }, [leafType, color, accentColor, variant]);
 
   return (
     <canvas
@@ -174,6 +177,69 @@ export function BondexLeafThumbnail({
   );
 }
 
+export interface BondexEntryItem {
+  num: string;
+  id: BonsaiLeafType;
+  variant: 'normal' | 'blooming';
+  key: string;
+}
+
+export const ALL_BONDEX_ENTRIES: BondexEntryItem[] = [
+  ...BONDEX_SPECIES_LIST.map((sp) => ({
+    num: sp.num,
+    id: sp.id,
+    variant: 'normal' as const,
+    key: `${sp.id}_normal`,
+  })),
+  ...BONDEX_SPECIES_LIST.map((sp) => ({
+    num: `${sp.num}🌸`,
+    id: sp.id,
+    variant: 'blooming' as const,
+    key: `${sp.id}_blooming`,
+  })),
+];
+
+export function getEntryDiscoveryInfo(
+  discoveredSpeciesMap: Record<string, any>,
+  leafType: BonsaiLeafType,
+  variant: 'normal' | 'blooming',
+): {
+  isDiscovered: boolean;
+  highestMaturity: MaturityTier;
+  stylesRaised: BonsaiStyle[];
+} {
+  const baseEntry = discoveredSpeciesMap[leafType];
+  const suffixedEntry = discoveredSpeciesMap[`${leafType}_${variant}`];
+
+  if (variant === 'blooming') {
+    const isDiscovered = Boolean(
+      suffixedEntry?.discovered ||
+      baseEntry?.bloomingDiscovered ||
+      (baseEntry?.bloomingStylesRaised && baseEntry.bloomingStylesRaised.length > 0)
+    );
+    const highestMaturity: MaturityTier =
+      suffixedEntry?.highestMaturity ||
+      baseEntry?.bloomingHighestMaturity ||
+      'sprout';
+    const stylesRaised: BonsaiStyle[] =
+      suffixedEntry?.stylesRaised ||
+      baseEntry?.bloomingStylesRaised ||
+      [];
+    return { isDiscovered, highestMaturity, stylesRaised };
+  } else {
+    const isDiscovered = Boolean(baseEntry?.discovered || suffixedEntry?.discovered);
+    const highestMaturity: MaturityTier =
+      baseEntry?.highestMaturity ||
+      suffixedEntry?.highestMaturity ||
+      'sprout';
+    const stylesRaised: BonsaiStyle[] =
+      baseEntry?.stylesRaised ||
+      suffixedEntry?.stylesRaised ||
+      [];
+    return { isDiscovered, highestMaturity, stylesRaised };
+  }
+}
+
 /**
  * Live Procedural Canvas Preview for the Bondex Pokédex Display
  */
@@ -184,6 +250,7 @@ export function BondexStylePreviewCanvas({
   accentColor,
   isUndiscovered,
   isStyleUnlogged,
+  variant = 'normal',
   width = 240,
   height = 200,
 }: {
@@ -193,6 +260,7 @@ export function BondexStylePreviewCanvas({
   accentColor: string;
   isUndiscovered?: boolean;
   isStyleUnlogged?: boolean;
+  variant?: 'normal' | 'blooming';
   width?: number;
   height?: number;
 }) {
@@ -318,29 +386,10 @@ export function BondexStylePreviewCanvas({
       color,
       accentColor,
       isStyleUnlogged,
+      variant,
     );
 
-    if (!isStyleUnlogged) {
-      if (leafType === 'star') {
-        ctx.fillStyle = '#fef08a';
-        for (let s = 0; s < 5; s++) {
-          const sx = bx + Math.sin(s * 1.8) * 32 * stageScale;
-          const sy = by - 4 - trunkHeight * 0.7 + Math.cos(s * 2.2) * 20 * stageScale;
-          ctx.beginPath();
-          ctx.arc(sx, sy, 2.2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      } else if (leafType === 'fire') {
-        ctx.fillStyle = '#facc15';
-        for (let s = 0; s < 4; s++) {
-          const sx = bx + Math.sin(s * 1.5) * 28 * stageScale;
-          const sy = by - 4 - trunkHeight * 0.75 + Math.cos(s * 1.7) * 18 * stageScale;
-          ctx.beginPath();
-          ctx.arc(sx, sy, 2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-    } else {
+    if (isStyleUnlogged) {
       ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
       ctx.beginPath();
       ctx.roundRect(w / 2 - 58, 10, 116, 20, 6);
@@ -355,7 +404,7 @@ export function BondexStylePreviewCanvas({
       ctx.textBaseline = 'middle';
       ctx.fillText('🔒 Style Unlogged', w / 2, 20);
     }
-  }, [leafType, styleKey, color, accentColor, isUndiscovered, isStyleUnlogged, width, height]);
+  }, [leafType, styleKey, color, accentColor, isUndiscovered, isStyleUnlogged, variant, width, height]);
 
   return (
     <canvas
@@ -443,6 +492,7 @@ export default function ZenLibraryModal({
 
   // Bondex Filter and Selected Species State
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>('ALL');
+  const [variantFilter, setVariantFilter] = useState<'ALL' | 'NORMAL' | 'BLOOMING'>('ALL');
   const [selectedSpeciesIndex, setSelectedSpeciesIndex] = useState<number>(0);
   const [viewerStyle, setViewerStyle] = useState<BonsaiStyle>('MOYOGI');
 
@@ -526,25 +576,62 @@ export default function ZenLibraryModal({
     };
   }, [isOpen, activeTab, onClose]);
 
-  // Calculate Bondex Discovery Statistics
-  let discoveredSpeciesCount = 0;
-  let totalStylesLoggedCount = 0;
+  // Calculate Bondex Discovery Statistics for Normal and Blooming
+  let discoveredNormalSpeciesCount = 0;
+  let discoveredBloomingSpeciesCount = 0;
+  let normalStylesLoggedCount = 0;
+  let bloomingStylesLoggedCount = 0;
 
   BONDEX_SPECIES_LIST.forEach((sp) => {
-    const entry = discoveredSpeciesMap[sp.id];
-    if (entry && entry.discovered) {
-      discoveredSpeciesCount += 1;
-      totalStylesLoggedCount += entry.stylesRaised ? entry.stylesRaised.length : 0;
+    const normalInfo = getEntryDiscoveryInfo(discoveredSpeciesMap, sp.id, 'normal');
+    if (normalInfo.isDiscovered) {
+      discoveredNormalSpeciesCount++;
+      normalStylesLoggedCount += normalInfo.stylesRaised.length;
+    }
+    const bloomingInfo = getEntryDiscoveryInfo(discoveredSpeciesMap, sp.id, 'blooming');
+    if (bloomingInfo.isDiscovered) {
+      discoveredBloomingSpeciesCount++;
+      bloomingStylesLoggedCount += bloomingInfo.stylesRaised.length;
     }
   });
 
-  const selectedEntry = BONDEX_SPECIES_LIST[selectedSpeciesIndex] || BONDEX_SPECIES_LIST[0];
+  const totalSpeciesCount =
+    variantFilter === 'NORMAL'
+      ? discoveredNormalSpeciesCount
+      : variantFilter === 'BLOOMING'
+      ? discoveredBloomingSpeciesCount
+      : discoveredNormalSpeciesCount + discoveredBloomingSpeciesCount;
+
+  const maxSpeciesPossible = variantFilter === 'ALL' ? 40 : 20;
+
+  const totalStylesCount =
+    variantFilter === 'NORMAL'
+      ? normalStylesLoggedCount
+      : variantFilter === 'BLOOMING'
+      ? bloomingStylesLoggedCount
+      : normalStylesLoggedCount + bloomingStylesLoggedCount;
+
+  const maxStylesPossible = variantFilter === 'ALL' ? 400 : 200;
+
+  const filteredBondexList = useMemo(() => {
+    return ALL_BONDEX_ENTRIES.filter((entry) => {
+      if (variantFilter === 'NORMAL' && entry.variant !== 'normal') return false;
+      if (variantFilter === 'BLOOMING' && entry.variant !== 'blooming') return false;
+      if (selectedGroupFilter !== 'ALL') {
+        const def = getLeafTypeDef(entry.id);
+        if (def.group !== selectedGroupFilter) return false;
+      }
+      return true;
+    });
+  }, [variantFilter, selectedGroupFilter]);
+
+  const selectedEntry = filteredBondexList[selectedSpeciesIndex] || filteredBondexList[0] || ALL_BONDEX_ENTRIES[0];
   const selectedDef = getLeafTypeDef(selectedEntry.id);
-  const selectedDiscovery = discoveredSpeciesMap[selectedEntry.id];
-  const isSelectedDiscovered = selectedDiscovery ? selectedDiscovery.discovered : false;
-  const selectedHighestMaturity = selectedDiscovery?.highestMaturity || 'sprout';
+  const selectedInfo = getEntryDiscoveryInfo(discoveredSpeciesMap, selectedEntry.id, selectedEntry.variant);
+  const isSelectedDiscovered = selectedInfo.isDiscovered;
+  const selectedHighestMaturity = selectedInfo.highestMaturity;
   const selectedMatDef = getMaturityDef(selectedHighestMaturity);
-  const selectedRaisedStyles = selectedDiscovery?.stylesRaised || [];
+  const selectedRaisedStyles = selectedInfo.stylesRaised;
   const selectedBiomes = getSpeciesBiomeEncounters(selectedEntry.id);
 
   const revealedBiomes = selectedBiomes.filter(
@@ -552,14 +639,6 @@ export default function ZenLibraryModal({
       discoveredAreaSpecies &&
       (discoveredAreaSpecies[bio.biomeId] || []).includes(selectedEntry.id),
   );
-
-  const filteredBondexList =
-    selectedGroupFilter === 'ALL'
-      ? BONDEX_SPECIES_LIST
-      : BONDEX_SPECIES_LIST.filter((sp) => {
-          const def = getLeafTypeDef(sp.id);
-          return def.group === selectedGroupFilter;
-        });
 
   if (!isOpen) return null;
 
@@ -643,86 +722,141 @@ export default function ZenLibraryModal({
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse" />
               <span className="font-bold text-slate-200 text-xs">Botanical Bondex</span>
+              <span className="text-[10px] bg-slate-950 border border-slate-800 px-2 py-0.5 rounded text-slate-400 font-mono">
+                {variantFilter === 'ALL' ? '40 Total Catalog Entries' : variantFilter === 'NORMAL' ? '20 Normal Species' : '20 Blooming Variants'}
+              </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="bg-slate-950/90 border border-emerald-500/60 px-2.5 py-0.5 rounded-lg text-emerald-300 font-bold font-mono text-[11px] shadow-sm">
-                🌿 {discoveredSpeciesCount} / 20 Species Discovered ({Math.round((discoveredSpeciesCount / 20) * 100)}%)
+                🌿 {totalSpeciesCount} / {maxSpeciesPossible} Species Discovered ({Math.round((totalSpeciesCount / maxSpeciesPossible) * 100)}%)
               </div>
               <div className="bg-slate-950/90 border border-amber-500/60 px-2.5 py-0.5 rounded-lg text-amber-300 font-bold font-mono text-[11px] shadow-sm">
-                🎋 {totalStylesLoggedCount} / 200 Styles
+                🎋 {totalStylesCount} / {maxStylesPossible} Styles Logged
               </div>
             </div>
           </div>
 
-          {/* TREE TYPE GROUP (TTG) FILTER CHIPS */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 shrink-0 scrollbar-none">
-            <button
-              onClick={() => {
-                setSelectedGroupFilter('ALL');
-                gameAudio.playCrispClick();
-              }}
-              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 border cursor-pointer ${
-                selectedGroupFilter === 'ALL'
-                  ? 'bg-slate-100 text-slate-950 border-white shadow'
-                  : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700'
-              }`}>
-              All Species (20)
-            </button>
-            {(Object.keys(BONSAI_GROUPS) as BonsaiGroup[]).map((grpKey) => {
-              const grp = BONSAI_GROUPS[grpKey];
-              const isSelected = selectedGroupFilter === grpKey;
-              return (
-                <button
-                  key={grpKey}
-                  onClick={() => {
-                    setSelectedGroupFilter(grpKey);
-                    gameAudio.playCrispClick();
-                  }}
-                  style={{
-                    borderColor: isSelected ? grp.themeColor : undefined,
-                    color: isSelected ? grp.themeColor : undefined,
-                  }}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 border cursor-pointer ${
-                    isSelected
-                      ? 'bg-slate-900 font-black shadow'
-                      : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:border-slate-700'
-                  }`}>
-                  <span>{grp.name}</span>
-                  <span className="text-[10px] ml-1 opacity-70">({grp.leafTypes.length})</span>
-                </button>
-              );
-            })}
+          {/* VARIANT FILTER TABS & TREE TYPE GROUP (TTG) FILTER CHIPS */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shrink-0">
+            {/* Clean Variant Mode Selector: [All (40)] [🌿 Normal (20)] [🌸 Blooming (20)] */}
+            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 shrink-0 shadow-inner">
+              <button
+                onClick={() => {
+                  setVariantFilter('ALL');
+                  setSelectedSpeciesIndex(0);
+                  gameAudio.playCrispClick();
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  variantFilter === 'ALL'
+                    ? 'bg-slate-800 text-white shadow ring-1 ring-slate-400/50'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}>
+                All (40)
+              </button>
+              <button
+                onClick={() => {
+                  setVariantFilter('NORMAL');
+                  setSelectedSpeciesIndex(0);
+                  gameAudio.playCrispClick();
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  variantFilter === 'NORMAL'
+                    ? 'bg-emerald-700 text-white shadow ring-1 ring-emerald-400/50'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}>
+                🌿 Normal (20)
+              </button>
+              <button
+                onClick={() => {
+                  setVariantFilter('BLOOMING');
+                  setSelectedSpeciesIndex(0);
+                  gameAudio.playCrispClick();
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  variantFilter === 'BLOOMING'
+                    ? 'bg-pink-700 text-white shadow ring-1 ring-pink-400/60 shadow-[0_0_12px_rgba(244,114,182,0.4)]'
+                    : 'text-pink-300 hover:text-pink-100'
+                }`}>
+                <span>🌸</span>
+                <span>Blooming (20)</span>
+              </button>
+            </div>
+
+            {/* Tree Type Groups */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 max-w-full no-scrollbar">
+              <button
+                onClick={() => {
+                  setSelectedGroupFilter('ALL');
+                  setSelectedSpeciesIndex(0);
+                  gameAudio.playCrispClick();
+                }}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all shrink-0 border cursor-pointer ${
+                  selectedGroupFilter === 'ALL'
+                    ? 'bg-slate-100 text-slate-950 border-white shadow'
+                    : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700'
+                }`}>
+                All Groups
+              </button>
+              {(Object.keys(BONSAI_GROUPS) as BonsaiGroup[]).map((grpKey) => {
+                const grp = BONSAI_GROUPS[grpKey];
+                const isSelected = selectedGroupFilter === grpKey;
+                return (
+                  <button
+                    key={grpKey}
+                    onClick={() => {
+                      setSelectedGroupFilter(grpKey);
+                      setSelectedSpeciesIndex(0);
+                      gameAudio.playCrispClick();
+                    }}
+                    style={{
+                      borderColor: isSelected ? grp.themeColor : undefined,
+                      color: isSelected ? grp.themeColor : undefined,
+                    }}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all shrink-0 border cursor-pointer ${
+                      isSelected
+                        ? 'bg-slate-900 font-black shadow'
+                        : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:border-slate-700'
+                    }`}>
+                    <span>{grp.name}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* POKÉDEX MASTER-DETAIL TWO-COLUMN VIEWPORT */}
           <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-3 min-h-0 overflow-hidden">
-            {/* LEFT PANE: 20 SPECIES INDEX LIST (#001 TO #020) */}
+            {/* LEFT PANE: 20 TO 40 SPECIES INDEX LIST */}
             <div className="md:col-span-5 bg-slate-900/80 border border-slate-800 rounded-2xl p-2 flex flex-col min-h-0 overflow-y-auto space-y-1.5 pr-1.5">
-              {filteredBondexList.map((entry) => {
+              {filteredBondexList.map((entry, idx) => {
                 const def = getLeafTypeDef(entry.id);
-                const disc = discoveredSpeciesMap[entry.id];
-                const isDiscovered = disc ? disc.discovered : false;
-                const isSelected = selectedEntry.id === entry.id;
-                const raisedCount = disc?.stylesRaised?.length || 0;
+                const info = getEntryDiscoveryInfo(discoveredSpeciesMap, entry.id, entry.variant);
+                const isDiscovered = info.isDiscovered;
+                const isSelected = selectedEntry.key === entry.key;
+                const raisedCount = info.stylesRaised.length;
+                const isBlooming = entry.variant === 'blooming';
 
                 return (
                   <div
-                    key={entry.id}
+                    key={entry.key}
                     onClick={() => {
-                      const realIdx = BONDEX_SPECIES_LIST.findIndex((sp) => sp.id === entry.id);
-                      if (realIdx !== -1) setSelectedSpeciesIndex(realIdx);
+                      setSelectedSpeciesIndex(idx);
                       gameAudio.playCrispClick();
                     }}
                     style={{
                       borderColor: isSelected
-                        ? isDiscovered
+                        ? isBlooming
+                          ? '#f472b6'
+                          : isDiscovered
                           ? def.color
                           : '#64748b'
                         : undefined,
                     }}
                     className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
                       isSelected
-                        ? isDiscovered
+                        ? isBlooming
+                          ? 'bg-slate-850 ring-2 ring-pink-500/50 shadow-md'
+                          : isDiscovered
                           ? 'bg-slate-850 ring-2 ring-emerald-500/40 shadow-md'
                           : 'bg-slate-850 ring-2 ring-slate-500/40 shadow-md'
                         : 'bg-slate-950/70 border-slate-850 hover:border-slate-700'
@@ -734,29 +868,48 @@ export default function ZenLibraryModal({
 
                       <div
                         style={{
-                          backgroundColor: isDiscovered ? `${def.color}25` : '#0f172a',
-                          borderColor: isDiscovered ? def.color : '#334155',
+                          backgroundColor: isDiscovered
+                            ? isBlooming
+                              ? 'rgba(244, 114, 182, 0.25)'
+                              : `${def.color}25`
+                            : '#0f172a',
+                          borderColor: isDiscovered
+                            ? isBlooming
+                              ? '#f472b6'
+                              : def.color
+                            : '#334155',
                         }}
-                        className="w-8 h-8 rounded-lg border flex items-center justify-center text-sm font-bold shrink-0 overflow-hidden">
+                        className="w-8 h-8 rounded-lg border flex items-center justify-center text-sm font-bold shrink-0 overflow-hidden relative">
                         {isDiscovered ? (
-                          <BondexLeafThumbnail
-                            leafType={entry.id}
-                            color={def.color}
-                            accentColor={def.accentColor}
-                          />
+                          <>
+                            <BondexLeafThumbnail
+                              leafType={entry.id}
+                              color={def.color}
+                              accentColor={def.accentColor}
+                              variant={entry.variant}
+                            />
+                            {isBlooming && (
+                              <span className="absolute bottom-0 right-0 text-[10px]">🌸</span>
+                            )}
+                          </>
                         ) : (
                           <Lock className="w-3.5 h-3.5 text-slate-600" />
                         )}
                       </div>
 
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <h4
                             className={`text-xs font-bold truncate ${
-                              isDiscovered ? 'text-slate-100' : 'text-slate-500'
+                              isDiscovered ? (isBlooming ? 'text-pink-300' : 'text-slate-100') : 'text-slate-500'
                             }`}>
-                            {isDiscovered ? getBonsaiDisplayName(entry.id) : '??? Unknown Specimen'}
+                            {isDiscovered ? `${isBlooming ? '🌸 ' : ''}${getBonsaiDisplayName(entry.id)}` : '??? Unknown Specimen'}
                           </h4>
+                          {isBlooming && isDiscovered && (
+                            <span className="text-[9px] px-1 py-0.2 rounded font-bold bg-pink-950 text-pink-300 border border-pink-500/50">
+                              Blooming
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-1 text-[10px] text-slate-400 truncate">
                           {isDiscovered ? (
@@ -764,12 +917,14 @@ export default function ZenLibraryModal({
                               <span className={`px-1 py-0.2 rounded border font-semibold ${getBonsaiGroupBadgeClass(def.group)}`}>
                                 {def.group}
                               </span>
-                              <span className="text-emerald-400 font-mono">
+                              <span className={isBlooming ? 'text-pink-400 font-mono font-bold' : 'text-emerald-400 font-mono'}>
                                 Styles: {raisedCount}/10
                               </span>
                             </>
                           ) : (
-                            <span className="text-slate-600">Undiscovered Flora</span>
+                            <span className="text-slate-600">
+                              {isBlooming ? 'Undiscovered Blooming Variant' : 'Undiscovered Flora'}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -777,7 +932,7 @@ export default function ZenLibraryModal({
 
                     <ChevronRight
                       className={`w-4 h-4 shrink-0 transition-transform ${
-                        isSelected ? 'text-emerald-400 translate-x-0.5' : 'text-slate-600'
+                        isSelected ? (isBlooming ? 'text-pink-400' : 'text-emerald-400') + ' translate-x-0.5' : 'text-slate-600'
                       }`}
                     />
                   </div>
@@ -792,13 +947,49 @@ export default function ZenLibraryModal({
                   <span className="text-xs font-mono font-black text-emerald-400">
                     {selectedEntry.num}
                   </span>
-                  <h4 className="text-sm sm:text-base font-black text-slate-100">
-                    {isSelectedDiscovered ? getBonsaiDisplayName(selectedEntry.id) : '??? Undiscovered Specimen'}
-                  </h4>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {selectedEntry.variant === 'blooming' && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-black border bg-pink-950 text-pink-300 border-pink-400 flex items-center gap-1">
+                        <span>🌸</span>
+                        <span>Blooming Variant</span>
+                      </span>
+                    )}
+                    <h4 className="text-sm sm:text-base font-black text-slate-100">
+                      {isSelectedDiscovered
+                        ? `${selectedEntry.variant === 'blooming' ? '🌸 Blooming ' : ''}${getBonsaiDisplayName(selectedEntry.id)}`
+                        : `??? Undiscovered ${selectedEntry.variant === 'blooming' ? 'Blooming ' : ''}Specimen`}
+                    </h4>
+                  </div>
                 </div>
 
                 {isSelectedDiscovered && (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      onClick={() => {
+                        const targetVariant = selectedEntry.variant === 'blooming' ? 'normal' : 'blooming';
+                        const matchIdx = filteredBondexList.findIndex(
+                          (e) => e.id === selectedEntry.id && e.variant === targetVariant,
+                        );
+                        if (matchIdx !== -1) {
+                          setSelectedSpeciesIndex(matchIdx);
+                        } else {
+                          setVariantFilter('ALL');
+                          const allMatchIdx = ALL_BONDEX_ENTRIES.findIndex(
+                            (e) => e.id === selectedEntry.id && e.variant === targetVariant,
+                          );
+                          if (allMatchIdx !== -1) setSelectedSpeciesIndex(allMatchIdx);
+                        }
+                        gameAudio.playCrispClick();
+                      }}
+                      title="Toggle between Normal and Blooming variants"
+                      className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                        selectedEntry.variant === 'blooming'
+                          ? 'bg-pink-950 text-pink-300 border-pink-400 hover:bg-pink-900'
+                          : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-pink-400 hover:text-pink-300'
+                      }`}>
+                      <span>{selectedEntry.variant === 'blooming' ? '🌸' : '🌿'}</span>
+                      <span>{selectedEntry.variant === 'blooming' ? 'Switch to Normal' : 'Switch to Blooming 🌸'}</span>
+                    </button>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${getBonsaiGroupBadgeClass(selectedDef.group)}`}>
                       {selectedDef.group}
                     </span>
@@ -816,13 +1007,16 @@ export default function ZenLibraryModal({
                     accentColor={selectedDef.accentColor}
                     isUndiscovered={!isSelectedDiscovered}
                     isStyleUnlogged={isSelectedDiscovered && !selectedRaisedStyles.includes(viewerStyle)}
+                    variant={selectedEntry.variant}
                     width={220}
                     height={180}
                   />
                   {isSelectedDiscovered && selectedRaisedStyles.includes(viewerStyle) && (
-                    <span className="text-[10px] text-emerald-400 font-mono mt-1 font-bold flex items-center gap-1">
+                    <span className={`text-[10px] font-mono mt-1 font-bold flex items-center gap-1 ${
+                      selectedEntry.variant === 'blooming' ? 'text-pink-400' : 'text-emerald-400'
+                    }`}>
                       <span>Viewing: {getBonsaiStyleDef(viewerStyle).japanese} ({getBonsaiStyleDef(viewerStyle).name})</span>
-                      <span className="text-emerald-300 font-semibold">✓ Logged</span>
+                      <span className={selectedEntry.variant === 'blooming' ? 'text-pink-300 font-semibold' : 'text-emerald-300 font-semibold'}>✓ Logged</span>
                     </span>
                   )}
                 </div>
@@ -851,6 +1045,7 @@ export default function ZenLibraryModal({
                     const stDef = getBonsaiStyleDef(stKey);
                     const isSelected = viewerStyle === stKey;
                     const hasRaised = selectedRaisedStyles.includes(stKey);
+                    const isBlooming = selectedEntry.variant === 'blooming';
 
                     return (
                       <button
@@ -864,7 +1059,9 @@ export default function ZenLibraryModal({
                           !isSelectedDiscovered
                             ? 'bg-slate-900/40 border-slate-800 text-slate-600 cursor-not-allowed'
                             : isSelected
-                            ? 'bg-emerald-950/80 border-emerald-500 text-emerald-200 ring-1 ring-emerald-500/50 shadow'
+                            ? isBlooming
+                              ? 'bg-pink-950/80 border-pink-500 text-pink-200 ring-1 ring-pink-500/50 shadow'
+                              : 'bg-emerald-950/80 border-emerald-500 text-emerald-200 ring-1 ring-emerald-500/50 shadow'
                             : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 text-slate-300'
                         }`}>
                         <div>
@@ -878,7 +1075,9 @@ export default function ZenLibraryModal({
                         <span
                           className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shrink-0 border ${
                             hasRaised
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                              ? isBlooming
+                                ? 'bg-pink-500/20 text-pink-300 border-pink-500/50'
+                                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
                               : 'bg-slate-800 text-amber-300 border-amber-500/40'
                           }`}>
                           {hasRaised ? '✓ Logged' : '🔒 Unlogged'}

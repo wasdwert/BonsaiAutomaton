@@ -60,6 +60,9 @@ import {
   MaturityTier,
   LeafTypeDefinition,
   MaturityDefinition,
+  BonsaiStyleDefinition,
+  BONSAI_STYLES,
+  getBonsaiStyleDef,
   LEAF_TYPE_CONFIGS,
   BONSAI_GROUPS,
   MATURITY_CONFIGS,
@@ -84,13 +87,18 @@ import {
   getBonsaiDonationBreakdown,
   renderLeafFoliage,
   drawLeafShape,
+  drawCherryBlossom,
+  drawCherryBlossomsOverPad,
   drawBonsaiTrunkAndCanopy,
   getBonsaiHaloOffsets,
   getBonsaiHaloPlots,
   getBonsaiMaturityRating,
   getMaturityBadgeColor,
 } from './bonsaiData';
+export type { BonsaiStyleDefinition };
 export {
+  BONSAI_STYLES,
+  getBonsaiStyleDef,
   getSpeciesFindOdds,
   getSpeciesName,
   getBonsaiDisplayName,
@@ -156,6 +164,11 @@ import {
   INITIAL_GAME_STATE,
   defaultGameState,
   initialGameState,
+  BASE_ROVER_BATTERY,
+  getRoverMaxBattery,
+  getRoverExtraBattery,
+  getRoverMaxPayload,
+  getRoverExtraStorage,
 } from './gameState';
 export {
   calculateWateringGrowthRate,
@@ -174,6 +187,11 @@ export {
   INITIAL_GAME_STATE,
   defaultGameState,
   initialGameState,
+  BASE_ROVER_BATTERY,
+  getRoverMaxBattery,
+  getRoverExtraBattery,
+  getRoverMaxPayload,
+  getRoverExtraStorage,
 };
 import BlueprintsCatalogView from './BlueprintsCatalogView';
 import {
@@ -199,6 +217,8 @@ import {
   getPrecisionColor,
   TIERS,
   AREA_EXCAVATION_SPEEDS,
+  MATURITY_SPEEDS,
+  MATURITY_ZONE_COUNTS,
   BonsaiNature,
   BONSAI_NATURES,
   getBonsaiNature,
@@ -230,9 +250,17 @@ import {
   DEFAULT_CARE_DISPENSER_LIMITS,
 } from './types';
 export type { RoverModuleType };
-export { calculateBaseAesthetic };
+export { calculateBaseAesthetic, MATURITY_SPEEDS, MATURITY_ZONE_COUNTS };
+import {
+  calculateArcForOdds,
+  getCrystalArtifactDigConfig,
+  startDigMinigame,
+} from './ExcursionCanvas';
+export { calculateArcForOdds, getCrystalArtifactDigConfig, startDigMinigame };
 import BonsaiExcavationModal, { ExcavationResultData } from './BonsaiExcavationModal';
 import BonsaiInspectionModal from './BonsaiInspectionModal';
+import BonsaiMaturedModal, { BonsaiMaturedModalData } from './BonsaiMaturedModal';
+import OffshootPlantingModal from './OffshootPlantingModal';
 import DeploymentModal, { BonsaiStyleThumbnail } from './DeploymentModal';
 import RoverModal from './RoverModal';
 import { SeedlingItem } from './types';
@@ -416,114 +444,7 @@ export function getBonsaiGroupBadgeClass(group: BonsaiGroup): string {
   }
 }
 
-export interface BonsaiStyleDefinition {
-  id: BonsaiStyle;
-  name: string;
-  kanji: string;
-  japanese: string;
-  subtitle: string;
-  description: string;
-  icon: string;
-}
-
-export const BONSAI_STYLES: Record<string, BonsaiStyleDefinition> = {
-  CHOKAN: {
-    id: 'CHOKAN',
-    name: 'Formal Upright',
-    kanji: '直幹',
-    japanese: 'Chokan',
-    subtitle: 'Tapering, straight vertical trunk with symmetrical horizontal branch pads',
-    description: 'A classic towering silhouette representing strength, upright dignity, and pristine architectural balance.',
-    icon: '🌲',
-  },
-  MOYOGI: {
-    id: 'MOYOGI',
-    name: 'Informal Upright',
-    kanji: '模様木',
-    japanese: 'Moyogi',
-    subtitle: 'Elegant sinuous S-curve trunk with balanced asymmetric foliage pads',
-    description: 'Graceful undulating natural trunk curvature reflecting harmony with passing winds and gentle sunlight.',
-    icon: '🌿',
-  },
-  SHAKAN: {
-    id: 'SHAKAN',
-    name: 'Slanting Style',
-    kanji: '斜幹',
-    japanese: 'Shakan',
-    subtitle: 'Expressive windswept angled trunk (35-45°) with counterbalancing branch',
-    description: 'Dynamic slanting posture molded by mountain gales, anchored by a deep resilient counter-weight canopy.',
-    icon: '🎋',
-  },
-  HAN_KENGAI: {
-    id: 'HAN_KENGAI',
-    name: 'Semi-Cascade Style',
-    kanji: '半懸崖',
-    japanese: 'Han-Kengai',
-    subtitle: 'Trunk curving gently over pot rim with draping foliage and strong anchor roots',
-    description: 'A resilient riverbank silhouette bending gracefully over the water rim without dipping below the pot base.',
-    icon: '🌊',
-  },
-  SOKAN: {
-    id: 'SOKAN',
-    name: 'Double Trunk',
-    kanji: '双幹',
-    japanese: 'Sokan',
-    subtitle: 'Two distinct trunks sharing a unified root flare, father and child harmony',
-    description: 'Dual trunks growing from a single base in intimate harmony, sharing space, sun, and balanced foliage.',
-    icon: '🌳',
-  },
-  KENGAI: {
-    id: 'KENGAI',
-    name: 'Full Cascade Style',
-    kanji: '懸崖',
-    japanese: 'Kengai',
-    subtitle: 'Dramatic cliffside growth plunging boldly below the pot and pedestal base',
-    description: 'A breathtaking cliffhanger enduring harsh mountain ravines, anchored by deep gripping root flares.',
-    icon: '🏔️',
-  },
-  KABUDACHI: {
-    id: 'KABUDACHI',
-    name: 'Multi-Trunk Clump',
-    kanji: '株立ち',
-    japanese: 'Kabudachi',
-    subtitle: 'Clump of 3-5 slender trunks radiating outward with a unified shared canopy',
-    description: 'A natural grove silhouette born from a single root system, radiating outwards in communal harmony.',
-    icon: '🎋',
-  },
-  HOKIDACHI: {
-    id: 'HOKIDACHI',
-    name: 'Broom Style',
-    kanji: '箒立ち',
-    japanese: 'Hokidachi',
-    subtitle: 'Upright trunk branching evenly into a balanced, fan-like canopy',
-    description: 'Upright trunk branching evenly into a balanced, fan-like canopy.',
-    icon: '🧹',
-  },
-  BUNJINGI: {
-    id: 'BUNJINGI',
-    name: 'Literati Style',
-    kanji: '文人木',
-    japanese: 'Bunjingi',
-    subtitle: 'Graceful, slender, sinuous trunk with minimalist cloud pads',
-    description: 'Graceful, slender, sinuous trunk with minimalist cloud pads.',
-    icon: '🖌️',
-  },
-  FUKINAASHI: {
-    id: 'FUKINAASHI',
-    name: 'Windswept Style',
-    kanji: '吹流し',
-    japanese: 'Fukinaashi',
-    subtitle: 'Dynamic wind-sculpted posture with branches swept decisively in one direction',
-    description: 'Dynamic wind-sculpted posture with branches swept decisively in one direction.',
-    icon: '💨',
-  },
-};
-
-export function getBonsaiStyleDef(style?: string): BonsaiStyleDefinition {
-  if (!style) return BONSAI_STYLES['MOYOGI'];
-  const upper = style.toUpperCase().replace('-', '_');
-  return BONSAI_STYLES[upper] || BONSAI_STYLES['MOYOGI'];
-}
+// BonsaiStyleDefinition and BONSAI_STYLES are imported and re-exported from ./bonsaiData
 
 export interface BiomeDefinition {
   id: ExpeditionBiomeId;
@@ -1014,7 +935,7 @@ export const WORKBENCH_RECIPES: Record<CraftingRecipeId, CraftingRecipeDef> = {
     category: 'rover',
     durationSeconds: 12,
     kw: 4,
-    description: 'Modular cargo bin outfitting (+2.5 kg). Consumes 4 kW when active.',
+    description: 'Modular cargo bin outfitting (+1.0 kg). Consumes 4 kW when active.',
     icon: '📦',
     requiresGuide: 'has_storage_module_1_guide',
     guideName: 'Storage Module I Guidebook',
@@ -1026,7 +947,7 @@ export const WORKBENCH_RECIPES: Record<CraftingRecipeId, CraftingRecipeDef> = {
     category: 'rover',
     durationSeconds: 25,
     kw: 7,
-    description: 'Reinforced pneumatic cargo module (+5.0 kg). Consumes 7 kW when active.',
+    description: 'Reinforced pneumatic cargo module (+2.0 kg). Consumes 7 kW when active.',
     icon: '📦',
     requiresGuide: 'has_storage_module_2_guide',
     guideName: 'Storage Module II Guidebook',
@@ -1038,7 +959,7 @@ export const WORKBENCH_RECIPES: Record<CraftingRecipeId, CraftingRecipeDef> = {
     category: 'rover',
     durationSeconds: 40,
     kw: 10,
-    description: 'Titanium-alloy high-capacity cargo rack (+7.5 kg). Consumes 10 kW when active.',
+    description: 'Titanium-alloy high-capacity cargo rack (+3.0 kg). Consumes 10 kW when active.',
     icon: '🚜',
     requiresGuide: 'has_storage_module_3_guide',
     guideName: 'Storage Module III Guidebook',
@@ -1423,9 +1344,9 @@ export const ROVER_MODULE_CONFIGS: Record<RoverModuleType, RoverModuleConfig> = 
     category: 'storage',
     tier: 1,
     icon: '📦',
-    bonusValue: 2.5,
-    bonusLabel: '+2.5 kg Cargo',
-    description: 'Modular cargo bin outfitting. Expands Rover carrying capacity by +2.5 kg (4 kW).',
+    bonusValue: 1.0,
+    bonusLabel: '+1.0 kg Cargo',
+    description: 'Modular cargo bin outfitting. Expands Rover carrying capacity by +1.0 kg (4 kW).',
     kw: 4,
   },
   storage_2: {
@@ -1434,9 +1355,9 @@ export const ROVER_MODULE_CONFIGS: Record<RoverModuleType, RoverModuleConfig> = 
     category: 'storage',
     tier: 2,
     icon: '📦',
-    bonusValue: 5.0,
-    bonusLabel: '+5.0 kg Cargo',
-    description: 'Reinforced pneumatic cargo module. Expands Rover carrying capacity by +5.0 kg (7 kW).',
+    bonusValue: 2.0,
+    bonusLabel: '+2.0 kg Cargo',
+    description: 'Reinforced pneumatic cargo module. Expands Rover carrying capacity by +2.0 kg (7 kW).',
     kw: 7,
   },
   storage_3: {
@@ -1445,9 +1366,9 @@ export const ROVER_MODULE_CONFIGS: Record<RoverModuleType, RoverModuleConfig> = 
     category: 'storage',
     tier: 3,
     icon: '🚜',
-    bonusValue: 7.5,
-    bonusLabel: '+7.5 kg Cargo',
-    description: 'Titanium-alloy high-capacity cargo rack. Expands Rover carrying capacity by +7.5 kg (10 kW).',
+    bonusValue: 3.0,
+    bonusLabel: '+3.0 kg Cargo',
+    description: 'Titanium-alloy high-capacity cargo rack. Expands Rover carrying capacity by +3.0 kg (10 kW).',
     kw: 10,
   },
   battery_1: {
@@ -2864,6 +2785,7 @@ export interface PlantedBonsai {
   name: string;
   rarity?: BonsaiRarity;
   nature?: BonsaiNature | string;
+  variant?: 'normal' | 'blooming';
   level: number;
   progressSeconds: number;
   gridX: number;
@@ -2888,6 +2810,7 @@ export interface PlantedBonsai {
   findOdds?: number;
   foundOdds?: number;
   attributes?: BonsaiAttributes;
+  geneticPotential?: BonsaiAttributes;
   cultivationPotential?: CultivationPotential;
   baseAesthetic?: number;
   basePriceBonus?: number;
@@ -2908,6 +2831,7 @@ export interface StoredPottedBonsai {
   name: string;
   rarity?: BonsaiRarity;
   nature?: BonsaiNature | string;
+  variant?: 'normal' | 'blooming';
   level: number;
   progressSeconds: number;
   color: string;
@@ -2917,6 +2841,7 @@ export interface StoredPottedBonsai {
   findOdds?: number;
   foundOdds?: number;
   attributes?: BonsaiAttributes;
+  geneticPotential?: BonsaiAttributes;
   cultivationPotential?: CultivationPotential;
   width?: number;
   height?: number;
@@ -2936,6 +2861,7 @@ export interface StoredSapling {
   name: string;
   rarity?: BonsaiRarity;
   nature?: BonsaiNature | string;
+  variant?: 'normal' | 'blooming';
   count: number;
   color: string;
   flowerColor: string;
@@ -3292,18 +3218,23 @@ export interface ExcursionBackpack {
   electronic_chips: number;
   crystals?: CrystalItem[];
   saplings: {
+    id?: string;
     leafType: BonsaiLeafType;
     group: BonsaiGroup;
     maturity: MaturityTier;
     species?: string;
     name: string;
     rarity?: BonsaiRarity;
+    variant?: 'normal' | 'blooming';
     color: string;
     flowerColor: string;
     findOdds?: number;
     foundOdds?: number;
     attributes?: BonsaiAttributes;
+    geneticPotential?: BonsaiAttributes;
     cultivationPotential?: CultivationPotential;
+    discoveredAreaId?: string;
+    nature?: BonsaiNature | string;
   }[];
 }
 
@@ -3331,6 +3262,8 @@ export interface ExcursionTileNode {
   saplingGroup?: BonsaiGroup;
   saplingMaturity?: MaturityTier;
   saplingSpecies?: string;
+  saplingVariant?: 'normal' | 'blooming';
+  variant?: 'normal' | 'blooming';
   saplingRarity?: BonsaiRarity;
   saplingName?: string;
   spawnChance?: number;
@@ -3340,6 +3273,7 @@ export interface ExcursionTileNode {
   crystalName?: string;
   crystalColor?: string;
   collected: boolean;
+  revealed?: boolean;
 }
 
 export interface RadialDigState {
@@ -3351,8 +3285,10 @@ export interface RadialDigState {
   leafType: BonsaiLeafType;
   group: BonsaiGroup;
   maturity: MaturityTier;
+  maturityRating?: number;
   species?: string;
   rarity?: BonsaiRarity;
+  variant?: 'normal' | 'blooming';
   needleAngle: number;
   angularVelocity: number;
   sectors: {
@@ -3373,10 +3309,13 @@ export interface RadialDigState {
   arcDeg: number;
   isCrystal?: boolean;
   crystalItem?: CrystalItem;
+  isMaturing?: boolean;
+  maturingBonsai?: PlantedBonsai | any;
+  targetRating?: number;
 }
 
 export interface ZenSkills {
-  [key: string]: number;
+  [key: string]: any;
   carefulTrowel: number;
   steady_hands: number;
   broadSpade: number;
@@ -3395,11 +3334,13 @@ export interface ZenSkills {
   hydrodynamicsSprinklerT1: number;
   hydrodynamicsSprinklerT2: number;
   hydrodynamicsSprinklerT3: number;
-  automatonGreenThumb: number;
-  automatonHydrodynamics: number;
   hydrodynamicsIrrigationT1: number;
   hydrodynamicsIrrigationT2: number;
   hydrodynamicsIrrigationT3: number;
+  propagation_expert?: number;
+  propagationExpert?: number;
+  offshoot_multiplier?: number;
+  offshootMultiplier?: number;
   expertNegotiator: number;
   discountHunter: number;
   solarExpert: number;
@@ -3457,6 +3398,10 @@ export interface GameStats {
   totalBonsaisBroughtBack?: number;
   totalResourcesBroughtBack?: number;
   totalCrystalsBroughtBack?: number;
+  discoveredSpecies?: string[];
+  discoveredStyles?: string[];
+  discoveredBloomingSpecies?: string[];
+  discoveredBloomingStyles?: string[];
 }
 
 export const DEFAULT_STATS: GameStats = {
@@ -3500,6 +3445,10 @@ export const DEFAULT_STATS: GameStats = {
   totalBonsaisBroughtBack: 0,
   totalResourcesBroughtBack: 0,
   totalCrystalsBroughtBack: 0,
+  discoveredSpecies: [],
+  discoveredStyles: [],
+  discoveredBloomingSpecies: [],
+  discoveredBloomingStyles: [],
 };
 
 export type MilestoneCategory = 'BONDEX' | 'MATURITY' | 'AUTOMATION' | 'EXPEDITIONS';
@@ -3549,12 +3498,24 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
     targetValue: 5,
     unit: 'Species',
     currentValue: (stats, planted, stored, discoveredMap) => {
-      if (!discoveredMap) return 0;
-      return Object.values(discoveredMap).filter((d: any) => d?.discovered).length;
+      const set = new Set<string>();
+      (stats?.discoveredSpecies || []).forEach((id) => set.add(id));
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && d?.discovered) set.add(`normal_${k}`);
+        });
+      }
+      return set.size;
     },
     isUnlocked: (stats, planted, stored, discoveredMap) => {
-      if (!discoveredMap) return false;
-      return Object.values(discoveredMap).filter((d: any) => d?.discovered).length >= 5;
+      const set = new Set<string>();
+      (stats?.discoveredSpecies || []).forEach((id) => set.add(id));
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && d?.discovered) set.add(`normal_${k}`);
+        });
+      }
+      return set.size >= 5;
     },
   },
   {
@@ -3568,12 +3529,24 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
     targetValue: 10,
     unit: 'Species',
     currentValue: (stats, planted, stored, discoveredMap) => {
-      if (!discoveredMap) return 0;
-      return Object.values(discoveredMap).filter((d: any) => d?.discovered).length;
+      const set = new Set<string>();
+      (stats?.discoveredSpecies || []).forEach((id) => set.add(id));
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && d?.discovered) set.add(`normal_${k}`);
+        });
+      }
+      return set.size;
     },
     isUnlocked: (stats, planted, stored, discoveredMap) => {
-      if (!discoveredMap) return false;
-      return Object.values(discoveredMap).filter((d: any) => d?.discovered).length >= 10;
+      const set = new Set<string>();
+      (stats?.discoveredSpecies || []).forEach((id) => set.add(id));
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && d?.discovered) set.add(`normal_${k}`);
+        });
+      }
+      return set.size >= 10;
     },
   },
   {
@@ -3587,12 +3560,24 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
     targetValue: 20,
     unit: 'Species',
     currentValue: (stats, planted, stored, discoveredMap) => {
-      if (!discoveredMap) return 0;
-      return Object.values(discoveredMap).filter((d: any) => d?.discovered).length;
+      const set = new Set<string>();
+      (stats?.discoveredSpecies || []).forEach((id) => set.add(id));
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && d?.discovered) set.add(`normal_${k}`);
+        });
+      }
+      return set.size;
     },
     isUnlocked: (stats, planted, stored, discoveredMap) => {
-      if (!discoveredMap) return false;
-      return Object.values(discoveredMap).filter((d: any) => d?.discovered).length >= 20;
+      const set = new Set<string>();
+      (stats?.discoveredSpecies || []).forEach((id) => set.add(id));
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && d?.discovered) set.add(`normal_${k}`);
+        });
+      }
+      return set.size >= 20;
     },
   },
   {
@@ -3606,19 +3591,28 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
     targetValue: 15,
     unit: 'Styles',
     currentValue: (stats, planted, stored, discoveredMap) => {
-      if (!discoveredMap) return 0;
-      return Object.values(discoveredMap).reduce(
-        (acc: number, d: any) => acc + (d?.stylesRaised?.length || 0),
-        0,
-      );
+      const set = new Set<string>();
+      (stats?.discoveredStyles || []).forEach((id) => set.add(id));
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && Array.isArray(d?.stylesRaised)) {
+            d.stylesRaised.forEach((st: string) => set.add(`normal_${k}_${st.toUpperCase().replace('-', '_')}`));
+          }
+        });
+      }
+      return set.size;
     },
     isUnlocked: (stats, planted, stored, discoveredMap) => {
-      if (!discoveredMap) return false;
-      const count = Object.values(discoveredMap).reduce(
-        (acc: number, d: any) => acc + (d?.stylesRaised?.length || 0),
-        0,
-      );
-      return count >= 15;
+      const set = new Set<string>();
+      (stats?.discoveredStyles || []).forEach((id) => set.add(id));
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && Array.isArray(d?.stylesRaised)) {
+            d.stylesRaised.forEach((st: string) => set.add(`normal_${k}_${st.toUpperCase().replace('-', '_')}`));
+          }
+        });
+      }
+      return set.size >= 15;
     },
   },
   {
@@ -3632,19 +3626,28 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
     targetValue: 30,
     unit: 'Styles',
     currentValue: (stats, planted, stored, discoveredMap) => {
-      if (!discoveredMap) return 0;
-      return Object.values(discoveredMap).reduce(
-        (acc: number, d: any) => acc + (d?.stylesRaised?.length || 0),
-        0,
-      );
+      const set = new Set<string>();
+      (stats?.discoveredStyles || []).forEach((id) => set.add(id));
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && Array.isArray(d?.stylesRaised)) {
+            d.stylesRaised.forEach((st: string) => set.add(`normal_${k}_${st.toUpperCase().replace('-', '_')}`));
+          }
+        });
+      }
+      return set.size;
     },
     isUnlocked: (stats, planted, stored, discoveredMap) => {
-      if (!discoveredMap) return false;
-      const count = Object.values(discoveredMap).reduce(
-        (acc: number, d: any) => acc + (d?.stylesRaised?.length || 0),
-        0,
-      );
-      return count >= 30;
+      const set = new Set<string>();
+      (stats?.discoveredStyles || []).forEach((id) => set.add(id));
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && Array.isArray(d?.stylesRaised)) {
+            d.stylesRaised.forEach((st: string) => set.add(`normal_${k}_${st.toUpperCase().replace('-', '_')}`));
+          }
+        });
+      }
+      return set.size >= 30;
     },
   },
   {
@@ -3658,19 +3661,28 @@ export const ACHIEVEMENTS_LIST: AchievementDef[] = [
     targetValue: 60,
     unit: 'Styles',
     currentValue: (stats, planted, stored, discoveredMap) => {
-      if (!discoveredMap) return 0;
-      return Object.values(discoveredMap).reduce(
-        (acc: number, d: any) => acc + (d?.stylesRaised?.length || 0),
-        0,
-      );
+      const set = new Set<string>();
+      (stats?.discoveredStyles || []).forEach((id) => set.add(id));
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && Array.isArray(d?.stylesRaised)) {
+            d.stylesRaised.forEach((st: string) => set.add(`normal_${k}_${st.toUpperCase().replace('-', '_')}`));
+          }
+        });
+      }
+      return set.size;
     },
     isUnlocked: (stats, planted, stored, discoveredMap) => {
-      if (!discoveredMap) return false;
-      const count = Object.values(discoveredMap).reduce(
-        (acc: number, d: any) => acc + (d?.stylesRaised?.length || 0),
-        0,
-      );
-      return count >= 60;
+      const set = new Set<string>();
+      (stats?.discoveredStyles || []).forEach((id) => set.add(id));
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && Array.isArray(d?.stylesRaised)) {
+            d.stylesRaised.forEach((st: string) => set.add(`normal_${k}_${st.toUpperCase().replace('-', '_')}`));
+          }
+        });
+      }
+      return set.size >= 60;
     },
   },
 
@@ -4134,6 +4146,7 @@ export interface ExcursionReportData {
     group: BonsaiGroup;
     maturity: MaturityTier;
     rarity?: BonsaiRarity;
+    variant?: 'normal' | 'blooming';
     retained: boolean;
   }[];
 }
@@ -4385,21 +4398,35 @@ export function pickResourceDepositEx(
   }
 }
 
+// BONSAI WEIGHTS BY MATURITY RATING (kg)
+export const BONSAI_MATURITY_WEIGHTS: Record<number, number> = {
+  1: 1.0,
+  2: 1.2,
+  3: 1.6,
+  4: 2.2,
+  5: 3.0,
+};
+
+export function getBonsaiWeight(maturityOrRating?: any): number {
+  const rating = getBonsaiMaturityRating(maturityOrRating);
+  return BONSAI_MATURITY_WEIGHTS[rating] ?? 1.0;
+}
+
 // WEIGHT DEFINITIONS (kg)
 export const ITEM_WEIGHTS: Record<ResourceItemKey | 'sapling' | 'crystal', number> = {
-  scrap_metal: 0.8,
-  copper_wire: 0.5,
-  brass_gears: 1.2,
+  scrap_metal: 0.4,
+  copper_wire: 0.6,
+  brass_gears: 0.8,
   circuit_boards: 1.0,
   electronic_chips: 1.5,
-  scrap_metal_double: 1.6,
-  copper_wire_double: 1.0,
-  scrap_metal_triple: 2.4,
-  copper_wire_triple: 1.5,
-  brass_gears_double: 2.4,
+  scrap_metal_double: 0.8,
+  copper_wire_double: 1.2,
+  scrap_metal_triple: 1.2,
+  copper_wire_triple: 1.8,
+  brass_gears_double: 1.6,
   circuit_boards_double: 2.0,
-  sapling: 3.0,
-  crystal: 0.5,
+  sapling: 1.0,
+  crystal: 1.0,
 };
 
 export const SEEDLING_DIG_EXP: Record<BonsaiLeafType, number> = {
@@ -4478,12 +4505,14 @@ export function calculateBonsaiSellPrice(
         level?: number;
         findOdds?: number;
         foundOdds?: number;
+        variant?: 'normal' | 'blooming';
         skills?: Record<string, number>;
         expertNegotiatorLvl?: number;
       },
   level?: number,
   leafType?: BonsaiLeafType,
   skills?: Record<string, number> | number,
+  variant?: 'normal' | 'blooming',
 ): number {
   if (maturityOrBonsai && typeof maturityOrBonsai === 'object') {
     return calculateDonationValue(maturityOrBonsai, skills);
@@ -4492,6 +4521,7 @@ export function calculateBonsaiSellPrice(
     leafType: leafType || 'circle',
     maturity: maturityOrBonsai as MaturityTier | undefined,
     level: level !== undefined ? level : 0,
+    variant: variant || 'normal',
   }, skills);
 }
 
@@ -11914,7 +11944,10 @@ export default function App() {
   const [garageTab, setGarageTab] = useState<'expeditions' | 'loadout'>('expeditions');
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [excursionReport, setExcursionReport] = useState<ExcursionReportData | null>(null);
+  const [isCargoModalOpen, setIsCargoModalOpen] = useState(false);
   const [excavationResult, setExcavationResult] = useState<ExcavationResultData | null>(null);
+  const [maturedModalData, setMaturedModalData] = useState<BonsaiMaturedModalData | null>(null);
+  const [propagatingBonsai, setPropagatingBonsai] = useState<any | null>(null);
   const [inspectingBonsaiId, setInspectingBonsaiId] = useState<string | null>(null);
   const [inspectingStructureId, setInspectingStructureId] = useState<string | null>(null);
   const [inspectingLoaderId, setInspectingLoaderId] = useState<string | null>(null);
@@ -12297,8 +12330,8 @@ export default function App() {
 
   // Permanent Sanctuary Storage (with Coins Currency, Purchased Maps, Expansions, Organic Waste & Composting)
   const sanctuaryInventoryRef = useRef<SanctuaryInventory>({
-    coins: 12000,
-    verdure: 12000,
+    coins: 50,
+    verdure: 50,
     license_t1: 0,
     license_t2: 0,
     license_t3: 0,
@@ -12516,6 +12549,16 @@ export default function App() {
     has_radar_module_1_guide: false,
     has_radar_module_2_guide: false,
     has_radar_module_3_guide: false,
+    baseBattery: 50,
+    extraBattery: 0,
+    extra_battery: 0,
+    maxBattery: 50,
+    extraStorage: 0.0,
+    extra_storage: 0.0,
+    baseCargo: 3.0,
+    maxCargo: 3.0,
+    basePayload: 3.0,
+    maxPayload: 3.0,
     rover_chassis_tier: 1,
     rover_modules: {
       storage_1: 0,
@@ -12547,7 +12590,7 @@ export default function App() {
   const activeCraftingRef = useRef<CraftingQueueItem | null>(null);
   const craftingQueueRef = useRef<CraftingQueueItem[]>([]);
 
-  // Area Exploration Discovery Codex State (Fog-of-War per Biome Area)
+      // Area Exploration Discovery Codex State (Fog-of-War per Biome Area)
   const areaDiscoveryRef = useRef<AreaDiscoveryState>({
     species: { FOOTHILLS: [], HIGHLANDS: [], OVERGROWTH: [] },
     maturities: { FOOTHILLS: [], HIGHLANDS: [], OVERGROWTH: [] },
@@ -12562,46 +12605,141 @@ export default function App() {
         discovered: boolean;
         highestMaturity?: MaturityTier;
         stylesRaised: BonsaiStyle[];
+        bloomingDiscovered?: boolean;
+        bloomingHighestMaturity?: MaturityTier;
+        bloomingStylesRaised?: BonsaiStyle[];
       }
     >
   >({});
 
   const recordBondexEntry = useCallback(
-    (leafType: BonsaiLeafType, maturity?: MaturityTier, style?: BonsaiStyle) => {
+    (
+      leafType: BonsaiLeafType,
+      maturity?: MaturityTier,
+      style?: BonsaiStyle,
+      variant: 'normal' | 'blooming' = 'normal',
+    ) => {
       const current = bondexDiscoveryRef.current[leafType] || {
         discovered: false,
         stylesRaised: [],
+        bloomingDiscovered: false,
+        bloomingStylesRaised: [],
       };
-      current.discovered = true;
 
-      if (maturity) {
-        const matRanks: Record<MaturityTier, number> = {
-          sprout: 1,
-          sapling: 2,
-          notable: 3,
-          refined: 4,
-          premium: 5,
-        };
-        const currentRank = current.highestMaturity
-          ? matRanks[current.highestMaturity] || 1
-          : 0;
-        const newRank = matRanks[maturity] || 1;
-        if (newRank >= currentRank) {
-          current.highestMaturity = maturity;
+      const matRanks: Record<MaturityTier, number> = {
+        sprout: 1,
+        sapling: 2,
+        notable: 3,
+        refined: 4,
+        premium: 5,
+      };
+
+      const stats = statsRef.current;
+      if (!stats.discoveredSpecies) stats.discoveredSpecies = [];
+      if (!stats.discoveredStyles) stats.discoveredStyles = [];
+      if (!stats.discoveredBloomingSpecies) stats.discoveredBloomingSpecies = [];
+      if (!stats.discoveredBloomingStyles) stats.discoveredBloomingStyles = [];
+
+      if (variant === 'blooming') {
+        current.bloomingDiscovered = true;
+        if (!current.bloomingStylesRaised) current.bloomingStylesRaised = [];
+        if (maturity) {
+          const currentRank = current.bloomingHighestMaturity
+            ? matRanks[current.bloomingHighestMaturity] || 1
+            : 0;
+          const newRank = matRanks[maturity] || 1;
+          if (newRank >= currentRank) {
+            current.bloomingHighestMaturity = maturity;
+          }
+        }
+        if (style) {
+          const upperStyle = style.toUpperCase().replace('-', '_') as BonsaiStyle;
+          if (!current.bloomingStylesRaised.includes(upperStyle) && !current.bloomingStylesRaised.includes(style)) {
+            current.bloomingStylesRaised.push(upperStyle);
+          }
+        }
+
+        const bSpeciesId = `blooming_${leafType}`;
+        if (!stats.discoveredBloomingSpecies.includes(bSpeciesId)) {
+          stats.discoveredBloomingSpecies.push(bSpeciesId);
+        }
+        if (style) {
+          const upperStyle = style.toUpperCase().replace('-', '_');
+          const bStyleId = `blooming_${leafType}_${upperStyle}`;
+          if (!stats.discoveredBloomingStyles.includes(bStyleId)) {
+            stats.discoveredBloomingStyles.push(bStyleId);
+          }
+        }
+      } else {
+        current.discovered = true;
+        if (!current.stylesRaised) current.stylesRaised = [];
+        if (maturity) {
+          const currentRank = current.highestMaturity
+            ? matRanks[current.highestMaturity] || 1
+            : 0;
+          const newRank = matRanks[maturity] || 1;
+          if (newRank >= currentRank) {
+            current.highestMaturity = maturity;
+          }
+        }
+        if (style) {
+          const upperStyle = style.toUpperCase().replace('-', '_') as BonsaiStyle;
+          if (!current.stylesRaised.includes(upperStyle) && !current.stylesRaised.includes(style)) {
+            current.stylesRaised.push(upperStyle);
+          }
+        }
+
+        const nSpeciesId = `normal_${leafType}`;
+        if (!stats.discoveredSpecies.includes(nSpeciesId)) {
+          stats.discoveredSpecies.push(nSpeciesId);
+        }
+        if (style) {
+          const upperStyle = style.toUpperCase().replace('-', '_');
+          const nStyleId = `normal_${leafType}_${upperStyle}`;
+          if (!stats.discoveredStyles.includes(nStyleId)) {
+            stats.discoveredStyles.push(nStyleId);
+          }
         }
       }
 
-      if (style && !current.stylesRaised.includes(style)) {
-        current.stylesRaised.push(style);
-      }
-
       bondexDiscoveryRef.current[leafType] = current;
+
+      // Keep suffixed entry cleanly synchronized without leaking blooming into normal discovered count
+      const suffixedKey = `${leafType}_${variant}`;
+      const suffixed = (bondexDiscoveryRef.current as any)[suffixedKey] || {
+        discovered: variant === 'normal',
+        bloomingDiscovered: variant === 'blooming',
+        stylesRaised: [],
+        variant,
+      };
+      if (variant === 'normal') {
+        suffixed.discovered = true;
+      } else {
+        suffixed.bloomingDiscovered = true;
+      }
+      if (maturity) {
+        const curRank = suffixed.highestMaturity ? matRanks[suffixed.highestMaturity] || 1 : 0;
+        const newRank = matRanks[maturity] || 1;
+        if (newRank >= curRank) suffixed.highestMaturity = maturity;
+      }
+      if (style) {
+        const upperStyle = style.toUpperCase().replace('-', '_') as BonsaiStyle;
+        if (!suffixed.stylesRaised.includes(upperStyle) && !suffixed.stylesRaised.includes(style)) {
+          suffixed.stylesRaised.push(upperStyle);
+        }
+      }
+      (bondexDiscoveryRef.current as any)[suffixedKey] = suffixed;
     },
     [],
   );
 
   const revealAreaSpecies = useCallback(
-    (areaId: ExpeditionBiomeId, leafType: BonsaiLeafType, maturity?: MaturityTier) => {
+    (
+      areaId: ExpeditionBiomeId,
+      leafType: BonsaiLeafType,
+      maturity?: MaturityTier,
+      variant: 'normal' | 'blooming' = 'normal',
+    ) => {
       const disc = areaDiscoveryRef.current;
       if (!disc.species[areaId].includes(leafType)) {
         disc.species[areaId].push(leafType);
@@ -12609,7 +12747,7 @@ export default function App() {
       if (maturity && !disc.maturities[areaId].includes(maturity)) {
         disc.maturities[areaId].push(maturity);
       }
-      recordBondexEntry(leafType, maturity);
+      recordBondexEntry(leafType, maturity, undefined, variant);
       refreshHud();
     },
     [recordBondexEntry, refreshHud],
@@ -12618,16 +12756,28 @@ export default function App() {
   // Synchronize any existing species in planted, stored, or area discovery into bondexDiscoveryRef
   useEffect(() => {
     plantedBonsaisRef.current.forEach((b) => {
-      recordBondexEntry(b.leafType, b.maturity, b.style);
+      recordBondexEntry(b.leafType, b.maturity, b.style, b.variant || 'normal');
     });
     storedPottedBonsaisRef.current.forEach((b) => {
-      recordBondexEntry(b.leafType, b.maturity, b.style);
+      recordBondexEntry(b.leafType, b.maturity, b.style, b.variant || 'normal');
     });
     // Note: Do not pre-discover unplanted starter seeds in inventory until actually planted or excavated!
     Object.values(areaDiscoveryRef.current.species).forEach((arr) => {
       arr.forEach((lt) => recordBondexEntry(lt));
     });
   }, [recordBondexEntry]);
+
+  // Synchronize inspected bonsai into Bondex
+  useEffect(() => {
+    if (inspectingBonsaiId) {
+      const b =
+        plantedBonsaisRef.current.find((tree) => tree.id === inspectingBonsaiId) ||
+        storedPottedBonsaisRef.current.find((tree) => tree.id === inspectingBonsaiId);
+      if (b) {
+        recordBondexEntry(b.leafType, b.maturity, b.style, b.variant || 'normal');
+      }
+    }
+  }, [inspectingBonsaiId, recordBondexEntry]);
 
   // Excursion Backpack
   const backpackInventoryRef = useRef<ExcursionBackpack>({
@@ -12660,11 +12810,13 @@ export default function App() {
     hydrodynamicsSprinklerT1: 0,
     hydrodynamicsSprinklerT2: 0,
     hydrodynamicsSprinklerT3: 0,
-    automatonGreenThumb: 0,
-    automatonHydrodynamics: 0,
     hydrodynamicsIrrigationT1: 0,
     hydrodynamicsIrrigationT2: 0,
     hydrodynamicsIrrigationT3: 0,
+    propagation_expert: 0,
+    propagationExpert: 0,
+    offshoot_multiplier: 0,
+    offshootMultiplier: 0,
     expertNegotiator: 0,
     discountHunter: 0,
     solarExpert: 0,
@@ -12725,6 +12877,10 @@ export default function App() {
     totalBonsaisBroughtBack: 0,
     totalResourcesBroughtBack: 0,
     totalCrystalsBroughtBack: 0,
+    discoveredSpecies: [],
+    discoveredStyles: [],
+    discoveredBloomingSpecies: [],
+    discoveredBloomingStyles: [],
   });
 
   // Walkable Botanist Avatar in Sanctuary
@@ -12759,8 +12915,20 @@ export default function App() {
     facing: 'up' as 'up' | 'down' | 'left' | 'right',
     facingDirection: 1 as 1 | -1, // 1 = right, -1 = left
     rotation: 0,
-    batteryKwh: 500,
-    maxBatteryKwh: 500,
+    baseBattery: 50,
+    extraBattery: 0,
+    batteryKwh: 50,
+    maxBatteryKwh: 50,
+    baseCargo: 3.0,
+    extraStorage: 0.0,
+    cargo: 0.0,
+    maxCargo: 3.0,
+    basePayload: 3.0,
+    extraPayload: 0.0,
+    payload: 0.0,
+    maxPayload: 3.0,
+    installedModules: [] as RoverModuleType[],
+    storageModule: 0.0,
     isMovingAnim: false,
     moveCooldown: 0,
     maxDistanceReached: 0,
@@ -13165,7 +13333,7 @@ export default function App() {
 
   // Compute Maximum Battery Points (kWh) with Modules & Chassis Outfitting
   const getMaxRoverBattery = useCallback(() => {
-    const base = (getConfig('roverBaseBattery') as number) || 500;
+    const base = (getConfig('roverBaseBattery') as number) || BASE_ROVER_BATTERY;
     const attached = sanctuaryInventoryRef.current.attached_rover_modules || [];
     const moduleBonus = attached.reduce((acc, modType) => {
       const cfg = ROVER_MODULE_CONFIGS[modType];
@@ -13176,13 +13344,13 @@ export default function App() {
 
   // Compute Maximum Cargo Weight with Modules & Chassis Outfitting
   const getMaxRoverCargo = useCallback(() => {
-    const base = (getConfig('roverBaseCargo') as number) || 15.0;
-    const attached = sanctuaryInventoryRef.current.attached_rover_modules || [];
-    const moduleBonus = attached.reduce((acc, modType) => {
-      const cfg = ROVER_MODULE_CONFIGS[modType];
-      return acc + (cfg?.category === 'storage' ? cfg.bonusValue : 0);
-    }, 0);
-    return Math.round((base + moduleBonus) * 10) / 10;
+    return getRoverMaxPayload({
+      rover: {
+        basePayload: (getConfig('roverBaseCargo') as number) || 3.0,
+        extraStorage: sanctuaryInventoryRef.current.extraStorage ?? 0.0,
+        installedModules: sanctuaryInventoryRef.current.attached_rover_modules || [],
+      },
+    });
   }, []);
 
   // Compute Maximum Dig Strikes Allowed (Base 2 + Careful Trowel skill ranks)
@@ -13327,8 +13495,9 @@ export default function App() {
     // Compute Current Total Rover Cargo Weight (kg)
   const getCargoWeight = useCallback(() => {
     const back = backpackInventoryRef.current;
-    const crystalWeight = (back.crystals || []).reduce(
-      (acc, c) => acc + (c.strength === 1.0 ? 1.0 : 0.5),
+    const crystalWeight = (back.crystals || []).length * 1.0;
+    const saplingsWeight = back.saplings.reduce(
+      (acc, s) => acc + getBonsaiWeight(s.maturity || (s as any).maturityRating || s),
       0,
     );
     const w =
@@ -13338,7 +13507,7 @@ export default function App() {
       back.circuit_boards * ITEM_WEIGHTS.circuit_boards +
       back.electronic_chips * ITEM_WEIGHTS.electronic_chips +
       crystalWeight +
-      back.saplings.length * ITEM_WEIGHTS.sapling;
+      saplingsWeight;
     return Math.round(w * 10) / 10;
   }, []);
 
@@ -13642,6 +13811,12 @@ export default function App() {
 
           const spawnChance = totalW > 0 ? (wArray[chosenMaturityIdx] / totalW) : 1.0;
 
+          // Strict 2% Blooming Bonsai chance
+          const isBlooming = Math.random() < 0.02;
+          const saplingVariant: 'normal' | 'blooming' = isBlooming ? 'blooming' : 'normal';
+          const chosenMaturityRating = getMaturityDef(chosenMaturity).rank;
+          const chosenSpeciesName = getSpeciesName(chosenLeaf.id);
+
           nodes.set(`${gx},${gy}`, {
             id: `sap_${gx}_${gy}`,
             tileX: gx,
@@ -13651,11 +13826,21 @@ export default function App() {
             saplingGroup: chosenLeaf.group,
             saplingMaturity: chosenMaturity,
             saplingSpecies: chosenLeaf.id,
-            saplingName: `${getSpeciesName(chosenLeaf.id)} Bonsai`,
+            saplingVariant,
+            variant: saplingVariant,
+            saplingName: `${isBlooming ? '🌸 Blooming ' : ''}${chosenSpeciesName} Bonsai`,
             saplingRarity: chosenLeaf.rarity,
             spawnChance,
             collected: false,
-          });
+            revealed: false,
+            bonsai: {
+              speciesName: chosenSpeciesName,
+              maturityRating: chosenMaturityRating,
+              maturity: chosenMaturity,
+              leafType: chosenLeaf.id,
+              variant: saplingVariant,
+            },
+          } as any);
         } else if (tileRoll < bonsaiRate + resourceRate) {
           // 2. RESOURCE DEPOSIT TILE
           const resRoll = pseudoNoise(gx, gy, 888.8);
@@ -13774,7 +13959,9 @@ export default function App() {
       hasMovedOffSpawnRef.current = false;
       setHasMovedOffSpawn(false);
 
+      const baseBat = (getConfig('roverBaseBattery') as number) || BASE_ROVER_BATTERY;
       const maxBat = getMaxRoverBattery();
+      const currentMaxCargo = getMaxRoverCargo();
       roverRef.current = {
         tileX: 0,
         tileY: 0,
@@ -13783,8 +13970,20 @@ export default function App() {
         facing: 'up',
         facingDirection: 1,
         rotation: 0,
+        baseBattery: baseBat,
+        extraBattery: Math.max(0, maxBat - baseBat),
         batteryKwh: maxBat,
         maxBatteryKwh: maxBat,
+        baseCargo: 3.0,
+        extraStorage: 0.0,
+        cargo: 0.0,
+        maxCargo: currentMaxCargo,
+        basePayload: 3.0,
+        extraPayload: Math.max(0, currentMaxCargo - 3.0),
+        payload: 0.0,
+        maxPayload: currentMaxCargo,
+        installedModules: [...(sanctuaryInventoryRef.current.attached_rover_modules || [])],
+        storageModule: Math.max(0, currentMaxCargo - 3.0),
         isMovingAnim: false,
         moveCooldown: 0,
         maxDistanceReached: 0,
@@ -13871,6 +14070,7 @@ export default function App() {
         group: sap.group,
         maturity: sap.maturity || 'sprout',
         rarity: sap.rarity,
+        variant: (sap as any).variant || 'normal',
         retained: idx < retainedSaplingCount || !isStranded,
       }));
 
@@ -13899,10 +14099,10 @@ export default function App() {
         }
       });
 
-      // Seedlings/Bonsais: Math.round(5.0 * maturityFactor * speciesOdds)
+      // Seedlings/Bonsais: Math.round(5.0 * maturityFactor * speciesOdds * lookFactor)
       saplingBreakdown.forEach((s) => {
         if (s.retained) {
-          totalExpeditionXP += calculateFindingSeedlingXP(s.maturity, s.leafType);
+          totalExpeditionXP += calculateFindingSeedlingXP(s.maturity, s.leafType, s.variant);
         }
       });
 
@@ -13969,7 +14169,8 @@ export default function App() {
         if (sap) {
           const lType = sap.leafType;
           const mat = sap.maturity || 'sprout';
-          recordBondexEntry(lType, mat);
+          const sapVariant = (sap as any).variant || 'normal';
+          recordBondexEntry(lType, mat, undefined, sapVariant);
 
           const uniqueId = (sap as any).id || `seedling_${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${idx}`;
           const pickedNature = (sap as any).nature
@@ -13982,6 +14183,7 @@ export default function App() {
             group: sap.group || getLeafTypeDef(lType).group,
             maturity: mat,
             species: lType,
+            variant: sapVariant,
             name: bName,
             rarity: sap.rarity,
             nature: pickedNature,
@@ -14004,6 +14206,7 @@ export default function App() {
             group: sap.group,
             maturity: mat,
             species: lType,
+            variant: sapVariant,
             name: bName,
             rarity: sap.rarity,
             count: 1,
@@ -14097,36 +14300,39 @@ export default function App() {
     (node: ExcursionTileNode) => {
       const curWeight = getCargoWeight();
       const maxWeight = getMaxRoverCargo();
+      const remaining = maxWeight - curWeight;
 
-      if (node.type === 'CRYSTAL') {
-        const cWeight = node.crystalStrength === 1.0 ? 1.0 : 0.5;
+      if (node.type === 'CRYSTAL' || (node as any).type === 'crystal_artifact') {
+        const cWeight = 1.0;
         if (curWeight + cWeight > maxWeight) {
           gameAudio.playErrorBuzz();
-          triggerNotification(`🎒 Rover Cargo Bed is full (${cWeight}kg needed)! Return to Campsite to unload.`, '#ef4444');
+          triggerNotification(`🎒 Rover Cargo Bed is full (${cWeight.toFixed(1)}kg needed)! Return to Campsite to unload.`, '#ef4444');
           return;
         }
 
-        const strength = node.crystalStrength || 0.5;
-        const totalSpots = strength === 1.0 ? 5 : 3;
+        const rawVal = (node as any).value ?? (node as any).strength ?? node.crystalStrength ?? 0.5;
+        const isTier2 = rawVal >= 1.0;
+        const strength: 0.5 | 1.0 = isTier2 ? 1.0 : 0.5;
+
+        // Shovel Speed & Number of Digging Areas for Crystal Artifacts:
+        // +0.5 Points Crystal Artifact: Mapped to Maturity Rating 2: 3 digging areas & 3.6 rad/s shovel speed
+        // +1.0 Points Crystal Artifact: Mapped to Maturity Rating 4: 5 digging areas & 5.0 rad/s shovel speed
+        const crystalRating = isTier2 ? 4 : 2;
+        const totalSpots = MATURITY_ZONE_COUNTS[crystalRating] ?? (isTier2 ? 5 : 3);
+        const shovelRotationSpeed = MATURITY_SPEEDS[crystalRating] ?? (isTier2 ? 5.0 : 3.6);
 
         const maxStrikesAllowed = getMaxDigStrikes();
         const isGated = maxStrikesAllowed < totalSpots;
 
-        const baseNormalArc = 0.16 * 2 * Math.PI;
-        const speciesFindOdds = 25; // 25% chance for each crystal
-        const oddsSizeMult = 1.0 - (33 - speciesFindOdds) * 0.01;
-
-        // Size multiplier for crystals (3 targets for 0.5 -> 0.92, 5 targets for 1.0 -> 0.76)
-        const maturitySizeMult = strength === 1.0 ? 0.76 : 0.92;
+        // Base finding odds for Crystal Artifacts = 25% (translating to the 25% finding odds base arc width)
+        // Shrinking factor applied to the target arc:
+        // +0.5 Points Crystal Artifact: -0% digging area size (full 25% size, factor 1.0)
+        // +1.0 Points Crystal Artifact: -10% digging area size (yielding 22.5% effective digging area size, factor 0.90)
         const broadSpadeLevel = zenSkillsRef.current.broadSpade || 0;
-        const broadSpadeBonus = broadSpadeLevel * 0.05;
-        const arcWidth = baseNormalArc * oddsSizeMult * maturitySizeMult * (1 + broadSpadeBonus);
+        const baseArc = calculateArcForOdds(25, broadSpadeLevel);
+        const shrinkFactor = isTier2 ? 0.90 : 1.0;
+        const arcWidth = baseArc * shrinkFactor;
         const arcDeg = (arcWidth * 180) / Math.PI;
-
-        const currentArea = activeBiomeIdRef.current;
-        let shovelRotationSpeed: number = AREA_EXCAVATION_SPEEDS.FOOTHILLS;
-        if (currentArea === 'HIGHLANDS') shovelRotationSpeed = AREA_EXCAVATION_SPEEDS.HIGHLANDS;
-        else if (currentArea === 'OVERGROWTH') shovelRotationSpeed = AREA_EXCAVATION_SPEEDS.OVERGROWTH;
 
         const sectors: RadialDigState['sectors'] = [];
         const slice = (Math.PI * 2) / totalSpots;
@@ -14158,7 +14364,7 @@ export default function App() {
           strength,
           name: `✨ ${cTypeLabel} Crystal (${strength} Strength)`,
           color: node.crystalColor || '#22c55e',
-          discoveredAreaId: currentArea,
+          discoveredAreaId: activeBiomeIdRef.current,
         };
 
         digStateRef.current = {
@@ -14169,9 +14375,11 @@ export default function App() {
           saplingName: `✨ ${cTypeLabel} Crystal (${strength} Strength)`,
           leafType: 'circle',
           group: 'Raundo',
-          maturity: 'sprout', // Internal placeholder, UI strictly checks isCrystal
+          maturity: isTier2 ? 'refined' : 'sapling',
+          maturityRating: crystalRating,
           species: cType,
-          rarity: strength === 1.0 ? 'RARE' : 'UNCOMMON',
+          rarity: isTier2 ? 'RARE' : 'UNCOMMON',
+          variant: 'normal',
           needleAngle: 0,
           angularVelocity: shovelRotationSpeed,
           sectors,
@@ -14182,11 +14390,14 @@ export default function App() {
           isGated,
           wobbleTimer: 0,
           status: 'DIGGING',
-          speciesChance: 0.25,
+          speciesChance: isTier2 ? 0.225 : 0.25,
           arcDeg,
+          targetArc: arcWidth,
+          zoneAngleSpan: arcWidth,
+          perfectZoneSpan: arcWidth,
           isCrystal: true,
           crystalItem,
-        };
+        } as any;
 
         gameAudio.playPowerupChime();
         if (isGated) {
@@ -14196,77 +14407,93 @@ export default function App() {
         return;
       }
 
-      if (curWeight + ITEM_WEIGHTS.sapling > maxWeight) {
+      // Handle Seedling / Bonsai Node
+      const sMaturity: MaturityTier = node.saplingMaturity || (node as any).bonsai?.maturity || 'sprout';
+      const seedlingWeight = getBonsaiWeight(sMaturity || (node as any).bonsai?.maturityRating || node);
+      const leafType: BonsaiLeafType = node.saplingLeafType || (node as any).bonsai?.leafType || 'circle';
+      const speciesName = getSpeciesName(leafType || node.saplingSpecies || (node as any).bonsai?.speciesName);
+      const isBlooming = Boolean(
+        node.saplingVariant === 'blooming' ||
+        (node as any).variant === 'blooming' ||
+        (node as any).bonsai?.variant === 'blooming' ||
+        (node as any).pendingBonsai?.variant === 'blooming' ||
+        (node.saplingName && node.saplingName.toLowerCase().includes('blooming'))
+      );
+      const sapVariant: 'normal' | 'blooming' = isBlooming ? 'blooming' : 'normal';
+
+      // OVERWEIGHT CHECK: If seedlingWeight > remaining capacity, do NOT start digging minigame!
+      if (seedlingWeight > remaining) {
+        node.revealed = true;
+        node.saplingVariant = sapVariant;
+        (node as any).variant = sapVariant;
+        node.saplingName = `${isBlooming ? '🌸 Blooming ' : ''}${speciesName} Bonsai`;
+        revealAreaSpecies(activeBiomeIdRef.current, leafType, sMaturity, sapVariant);
         gameAudio.playErrorBuzz();
-        triggerNotification('🎒 Rover Cargo Bed is full (3.0kg)! Return to Campsite to unload.', '#ef4444');
+        triggerNotification(
+          `${speciesName} (${seedlingWeight.toFixed(1)}kg) - Cargo Full! Too heavy to carry.`,
+          '#ef4444',
+          4000,
+        );
+        refreshHud();
         return;
       }
 
-      const leafType: BonsaiLeafType = node.saplingLeafType || 'circle';
       const leafDef = getLeafTypeDef(leafType);
       const group: BonsaiGroup = node.saplingGroup || leafDef.group;
-      const maturity: MaturityTier = node.saplingMaturity || 'sprout';
-      const matDef = getMaturityDef(maturity);
+      const matDef = getMaturityDef(sMaturity);
       const rarity = node.saplingRarity || leafDef.rarity;
 
-      // Number of digging zones: Rating 1: 2 zones, Rating 2: 3 zones, Rating 3: 4 zones, Rating 4: 5 zones, Rating 5: 6 zones (zonesCount = maturity + 1)
-      const matRank = matDef.rank; // 1 to 5
-      const totalSpots = MATURITY_SPOTS_COUNT[maturity] || (matRank + 1);
+      // Peg Shovel Speed & Number of Digging Areas Strictly to Maturity Rating:
+      // Rating 1: 2 zones, 3.2 rad/s
+      // Rating 2: 3 zones, 3.6 rad/s
+      // Rating 3: 4 zones, 4.2 rad/s
+      // Rating 4: 5 zones, 5.0 rad/s
+      // Rating 5: 6 zones, 6.0 rad/s
+      const maturityRating = getBonsaiMaturityRating(sMaturity || (node as any).bonsai?.maturityRating || node);
+      const speed = MATURITY_SPEEDS[maturityRating] ?? 3.2;
+      const numZones = MATURITY_ZONE_COUNTS[maturityRating] ?? 2;
+      const totalSpots = numZones;
 
       const maxStrikesAllowed = getMaxDigStrikes(); // Base 2 + Careful Trowel ranks
       const isGated = maxStrikesAllowed < totalSpots; // Cannot win without enough strikes!
 
+      node.saplingVariant = sapVariant;
+      (node as any).variant = sapVariant;
+      node.saplingName = `${isBlooming ? '🌸 Blooming ' : ''}${speciesName} Bonsai`;
+      node.revealed = true;
+
       // Digging Arc Calculation:
-      // Base normal (100% size) digging area width = 16% of the full circle (0.16 * 2 * Math.PI radians, or 57.6°)
+      // Base normal arc is 0.16 * 2 * PI = 57.6 degrees
       const baseNormalArc = 0.16 * 2 * Math.PI;
 
-      // Species Find Odds scaling:
-      // 33% odds = 100% (1.0). Each 1% less in odds reduces digging area size by 1%:
-      // oddsSizeMult = 1.0 - (33 - speciesFindOdds) * 0.01 (e.g., 1% odds -> 1.0 - 0.32 = 0.68)
+      // Species Find Odds scaling: (e.g. 10% finding odds -> 44.4 deg)
       const rawOdds = node.findOdds ?? Math.round(getSpeciesAreaProbability(activeBiomeIdRef.current, leafType) * 100);
       const speciesFindOdds = Math.max(1, Math.min(33, rawOdds));
       const oddsSizeMult = 1.0 - (33 - speciesFindOdds) * 0.01;
-
-      // Maturity Rating scaling:
-      // Rating 1: 100% (1.00), Rating 2: 92% (0.92), Rating 3: 84% (0.84), Rating 4: 76% (0.76), Rating 5: 68% (0.68)
-      const maturitySizeMultMap: Record<number, number> = {
-        1: 1.00,
-        2: 0.92,
-        3: 0.84,
-        4: 0.76,
-        5: 0.68,
-      };
-      const maturitySizeMult = maturitySizeMultMap[matRank] ?? Math.max(0.68, 1.00 - (matRank - 1) * 0.08);
 
       // Broad Spade skill bonus: +5% arc width per level (+25% max at level 5)
       const broadSpadeLevel = zenSkillsRef.current.broadSpade || 0;
       const broadSpadeBonus = broadSpadeLevel * 0.05;
 
-      // Combined arc width = (0.16 * 2 * Math.PI) * oddsSizeMult * maturitySizeMult * (1 + broadSpadeBonus)
-      const arcWidth = baseNormalArc * oddsSizeMult * maturitySizeMult * (1 + broadSpadeBonus);
+      // Base target zone arc length pegged strictly to finding odds
+      const baseArc = baseNormalArc * oddsSizeMult * (1 + broadSpadeBonus);
+
+      // Blooming Bonsai: -33% shrinkage (width * 0.67)
+      const arcWidth = isBlooming ? baseArc * 0.67 : baseArc;
       const arcDeg = (arcWidth * 180) / Math.PI;
 
-      // Shovel rotation speed by expedition area:
-      // Area 1 (Sunlit Foothills): ~3.2 rad/s
-      // Area 2 (Misty Highlands): ~4.4 rad/s
-      // Area 3 (Ancient Caldera): ~5.8 rad/s
-      const currentArea = activeBiomeIdRef.current;
-      let shovelRotationSpeed: number = AREA_EXCAVATION_SPEEDS.FOOTHILLS;
-      if (currentArea === 'HIGHLANDS') {
-        shovelRotationSpeed = AREA_EXCAVATION_SPEEDS.HIGHLANDS;
-      } else if (currentArea === 'OVERGROWTH') {
-        shovelRotationSpeed = AREA_EXCAVATION_SPEEDS.OVERGROWTH;
-      }
+      // Shovel needle angular speed strictly pegged to maturity rating (no distance, area, or skill scaling)
+      const shovelRotationSpeed = speed;
 
-      // 100% Hit Requirement: requiredHits EQUALS totalSpots!
-      const reqHits = totalSpots;
+      // 100% Hit Requirement: requiredHits EQUALS numZones
+      const reqHits = numZones;
 
-      // Distribute targetCount = targetMaturity + 1 targets around the circle without overlapping
+      // Distribute numZones targets around the circle without overlapping
       const sectors: RadialDigState['sectors'] = [];
-      const slice = (Math.PI * 2) / totalSpots;
+      const slice = (Math.PI * 2) / numZones;
       const effectiveArc = Math.min(arcWidth, slice - 0.06);
 
-      for (let i = 0; i < totalSpots; i++) {
+      for (let i = 0; i < numZones; i++) {
         const maxOffset = Math.max(0, slice - effectiveArc - 0.04);
         const start = i * slice + 0.02 + Math.random() * maxOffset;
         sectors.push({
@@ -14281,12 +14508,18 @@ export default function App() {
         nodeId: node.id,
         tileX: node.tileX,
         tileY: node.tileY,
-        saplingName: node.saplingName || getBonsaiDisplayName(leafType),
+        saplingName: node.saplingName,
         leafType,
         group,
-        maturity,
+        maturity: sMaturity,
         species: leafType,
         rarity,
+        variant: sapVariant,
+        pendingBonsai: {
+          variant: sapVariant,
+          leafType,
+          maturity: sMaturity,
+        },
         needleAngle: 0,
         angularVelocity: shovelRotationSpeed,
         sectors,
@@ -14299,19 +14532,251 @@ export default function App() {
         status: 'DIGGING',
         speciesChance: speciesFindOdds / 100,
         arcDeg,
-      };
+        targetArc: arcWidth,
+        zoneAngleSpan: arcWidth,
+        perfectZoneSpan: arcWidth,
+      } as any;
 
       // Reveal species in Rover Garage Codex and Bondex immediately upon excavation initiation
-      revealAreaSpecies(activeBiomeIdRef.current, leafType, maturity);
+      revealAreaSpecies(activeBiomeIdRef.current, leafType, sMaturity, sapVariant);
 
-      if (isGated) {
+      if (isBlooming) {
+        gameAudio.playLevelUpStinger();
+        triggerNotification(`🌸 BLOOMING VARIANT ENCOUNTERED! 🌸 Rare 2% Specimen in Bloom!`, '#f472b6', 5000);
+      } else if (isGated) {
         gameAudio.playErrorBuzz();
         triggerNotification(`⚠️ Requires ${totalSpots} Strikes (Current: ${maxStrikesAllowed})! Upgrade Careful Trowel in Zen Skills.`, '#f59e0b');
       } else {
         gameAudio.playPowerupChime();
       }
     },
-    [getCargoWeight, getMaxDigStrikes, getMaxRoverCargo, triggerNotification],
+    [getCargoWeight, getMaxDigStrikes, getMaxRoverCargo, triggerNotification, revealAreaSpecies, refreshHud],
+  );
+  const startDigMinigame = triggerRadialDig;
+
+  // --- LEVEL 100 MATURING MINIGAME INITIATION ---
+  const handleMatureBonsai = useCallback(
+    (bonsai: PlantedBonsai | any) => {
+      if (!bonsai || bonsai.level < 100) return;
+      const currentRating = getBonsaiMaturityRating(bonsai);
+      if (currentRating >= 5) {
+        gameAudio.playErrorBuzz();
+        triggerNotification('Max Maturity Rating Reached! This tree cannot mature further.', '#f59e0b');
+        return;
+      }
+      const targetRating = currentRating + 1;
+      const requiredStrikes = targetRating + 1; // Target 2: 3 strikes; 3: 4 strikes; 4: 5 strikes; 5: 6 strikes
+      const availableStrikes = getMaxDigStrikes(); // 2 + carefulTrowel
+      if (availableStrikes < requiredStrikes) {
+        gameAudio.playErrorBuzz();
+        triggerNotification(`Requires at least ${requiredStrikes} Shovel Strikes (Current: ${availableStrikes})! Upgrade Careful Trowel in Zen Skills.`, '#ef4444');
+        return;
+      }
+
+      // 1. Remove/delete the Level 100 bonsai from its active sanctuary plot or stored inventory
+      const pIdx = plantedBonsaisRef.current.findIndex((b) => b.id === bonsai.id);
+      if (pIdx !== -1) {
+        plantedBonsaisRef.current.splice(pIdx, 1);
+      } else {
+        const sIdx = storedPottedBonsaisRef.current.findIndex((b) => b.id === bonsai.id);
+        if (sIdx !== -1) {
+          storedPottedBonsaisRef.current.splice(sIdx, 1);
+          sanctuaryInventoryRef.current.storedBonsais = storedPottedBonsaisRef.current;
+        }
+      }
+
+      setInspectingBonsaiId(null);
+      invalidateSynergiesCache();
+      refreshHud();
+
+      // 2. Launch radial shovel minigame configured for targetRating = currentRating + 1
+      // Target Rating 2: 3 digging areas, 3.6 rad/s.
+      // Target Rating 3: 4 digging areas, 4.2 rad/s.
+      // Target Rating 4: 5 digging areas, 5.0 rad/s.
+      // Target Rating 5: 6 digging areas, 6.0 rad/s.
+      const speeds: Record<number, number> = {
+        2: 3.6,
+        3: 4.2,
+        4: 5.0,
+        5: 6.0,
+      };
+      const speed = speeds[targetRating] ?? 3.6;
+      const numZones = requiredStrikes;
+
+      const rawOdds = bonsai.findOdds ?? getSpeciesFindOdds(bonsai.leafType);
+      const speciesFindOdds = Math.max(1, Math.min(33, rawOdds));
+      const oddsSizeMult = 1.0 - (33 - speciesFindOdds) * 0.01;
+      const broadSpadeLevel = zenSkillsRef.current.broadSpade || 0;
+      const baseArc = (0.16 * 2 * Math.PI) * oddsSizeMult * (1 + broadSpadeLevel * 0.05);
+      const isBlooming = bonsai.variant === 'blooming';
+      const arcWidth = isBlooming ? baseArc * 0.67 : baseArc;
+      const arcDeg = (arcWidth * 180) / Math.PI;
+
+      const slice = (Math.PI * 2) / numZones;
+      const effectiveArc = Math.min(arcWidth, slice - 0.06);
+
+      const sectors: RadialDigState['sectors'] = [];
+      for (let i = 0; i < numZones; i++) {
+        const maxOffset = Math.max(0, slice - effectiveArc - 0.04);
+        const start = i * slice + 0.02 + Math.random() * maxOffset;
+        sectors.push({
+          startAngle: start,
+          arcLength: effectiveArc,
+          hit: false,
+        });
+      }
+
+      const ratingTiers: Record<number, MaturityTier> = {
+        1: 'sprout',
+        2: 'sapling',
+        3: 'notable',
+        4: 'refined',
+        5: 'premium',
+      };
+      const targetTier = ratingTiers[targetRating] ?? 'sapling';
+
+      digStateRef.current = {
+        active: true,
+        nodeId: `maturing_${bonsai.id}`,
+        tileX: 0,
+        tileY: 0,
+        saplingName: `Maturing ${getBonsaiDisplayName(bonsai)}`,
+        leafType: bonsai.leafType,
+        group: bonsai.group,
+        maturity: targetTier,
+        maturityRating: targetRating,
+        species: bonsai.leafType,
+        rarity: bonsai.rarity,
+        variant: bonsai.variant || 'normal',
+        needleAngle: 0,
+        angularVelocity: speed,
+        sectors,
+        requiredHits: numZones,
+        currentHits: 0,
+        strikesUsed: 0,
+        maxStrikes: availableStrikes,
+        isGated: false,
+        wobbleTimer: 0,
+        status: 'DIGGING',
+        speciesChance: speciesFindOdds / 100,
+        arcDeg,
+        isMaturing: true,
+        maturingBonsai: bonsai,
+        targetRating,
+      } as any;
+
+      gameAudio.playPowerupChime();
+      triggerNotification(`🌟 Maturing Minigame Started! Elevate to Rating ${targetRating} (${numZones} zones)`, '#f59e0b', 4000);
+    },
+    [getMaxDigStrikes, invalidateSynergiesCache, refreshHud, triggerNotification],
+  );
+
+  const handleConfirmMaturedDeposit = useCallback(() => {
+    if (!maturedModalData) return;
+    const maturedBonsai = maturedModalData.maturedSpecimen;
+    storedPottedBonsaisRef.current.push(maturedBonsai);
+    sanctuaryInventoryRef.current.storedBonsais = storedPottedBonsaisRef.current;
+    gameAudio.playVictoryFanfare();
+    triggerNotification(`🎉 ${maturedBonsai.name} (Rating ${maturedModalData.targetRating}) deposited into Nursery Inventory! Replant anytime on the grid.`, '#10b981', 4500);
+    setMaturedModalData(null);
+    refreshHud();
+  }, [maturedModalData, refreshHud, triggerNotification]);
+
+  // --- LEVEL 100 PROPAGATING & OFFSHOOT PLANTING ---
+  const handlePropagateBonsai = useCallback(
+    (bonsai: PlantedBonsai | any) => {
+      if (!bonsai || bonsai.level < 100) return;
+
+      // DO NOT delete original bonsai from grid or storage! Keep it in its existing sanctuary grid plot!
+      setInspectingBonsaiId(null);
+
+      // Launch the Offshoot Planting minigame
+      setPropagatingBonsai(bonsai);
+      gameAudio?.playPowerupChime?.();
+      triggerNotification(
+        `🌱 Propagating ${getBonsaiDisplayName(bonsai)}! Offshoot Planting minigame launched.`,
+        '#10b981',
+        4000,
+      );
+    },
+    [triggerNotification],
+  );
+
+  const handleCompletePropagation = useCallback(
+    (seedlingsCount: number, seedlings: SeedlingItem[]) => {
+      const parent = propagatingBonsai;
+      if (parent) {
+        // Reset parent bonsai level to baseResetLevel = 0 (+10 per Propagation Expert upgrade)
+        const propExpertRank =
+          zenSkillsRef.current.propagation_expert ||
+          zenSkillsRef.current.propagationExpert ||
+          0;
+        const resetLevel = propExpertRank * 10;
+
+        const plantedParent = plantedBonsaisRef.current.find((b) => b.id === parent.id);
+        const storedParent = storedPottedBonsaisRef.current.find((b) => b.id === parent.id);
+        const targetParent = plantedParent || storedParent;
+        if (targetParent) {
+          targetParent.level = resetLevel;
+          targetParent.progressSeconds = 0;
+          (targetParent as any).currentXP = 0;
+          (targetParent as any).growthTimer = 0;
+          // Care Points (CP / cultivationPotential), Genetic Potential (GP / attributes), Maturity Rating, Style, Variant remain 100% intact!
+        }
+      }
+
+      if (seedlings && seedlings.length > 0) {
+        if (!sanctuaryInventoryRef.current.seedlingList) {
+          sanctuaryInventoryRef.current.seedlingList = [];
+        }
+        seedlings.forEach((s) => {
+          sanctuaryInventoryRef.current.seedlingList.push(s);
+          const leafDef = getLeafTypeDef(s.leafType);
+          const matTier: MaturityTier = typeof s.maturity === 'number'
+            ? (['sprout', 'sapling', 'notable', 'refined', 'premium'][Math.max(0, Math.min(4, Math.round(s.maturity) - 1))] as MaturityTier)
+            : s.maturity;
+          storedSaplingsRef.current.push({
+            id: s.id,
+            leafType: s.leafType,
+            group: s.group || leafDef.group,
+            maturity: matTier,
+            species: s.species || s.leafType,
+            variant: s.variant,
+            name: s.name || getBonsaiDisplayName(s),
+            rarity: (s.rarity as BonsaiRarity) || leafDef.rarity,
+            count: 1,
+            color: s.color || leafDef.color,
+            flowerColor: s.flowerColor || leafDef.accentColor,
+            potColor: '#1e293b',
+            potStyle: 'Carved Ceramic',
+            findOdds: s.findOdds,
+            attributes: s.attributes || s.geneticPotential,
+            cultivationPotential: { foliage: 0, branches: 0, trunk: 0, roots: 0 },
+          });
+        });
+
+        const propRank = zenSkillsRef.current.propagation_expert || zenSkillsRef.current.propagationExpert || 0;
+        gameAudio?.playVictoryFanfare?.();
+        triggerNotification(
+          `🎉 Bonsai Propagated! +${seedlings.length} Seedling(s) added to Nursery Inventory! Parent preserved in plot (Reset to Lv.${propRank * 10} with CP preserved).`,
+          '#10b981',
+          4500,
+        );
+      } else {
+        const propRank = zenSkillsRef.current.propagation_expert || zenSkillsRef.current.propagationExpert || 0;
+        gameAudio?.playDefeatMotif?.();
+        triggerNotification(
+          `No offshoot branches rooted into pots this time. Parent bonsai preserved in plot (Reset to Lv.${propRank * 10} with CP preserved).`,
+          '#94a3b8',
+          4000,
+        );
+      }
+
+      invalidateSynergiesCache();
+      setPropagatingBonsai(null);
+      refreshHud();
+    },
+    [propagatingBonsai, invalidateSynergiesCache, refreshHud, triggerNotification],
   );
 
   // Discrete Grid Step Movement for Rover
@@ -14442,16 +14907,24 @@ export default function App() {
         } else if (node.type === 'SAPLING') {
           const curWeight = getCargoWeight();
           const maxWeight = getMaxRoverCargo();
-          const dName = getBonsaiDisplayName(node.saplingLeafType || node.saplingSpecies);
-          if (curWeight + ITEM_WEIGHTS.sapling <= maxWeight) {
-            triggerNotification(`Found ${dName}! Press [E] to Excavate (3.0kg).`, '#34d399');
+          const sWeight = getBonsaiWeight(node.saplingMaturity || (node as any).bonsai?.maturityRating || node);
+          const speciesName = getSpeciesName(node.saplingLeafType || node.saplingSpecies || (node as any).bonsai?.speciesName);
+          const isBloom = node.saplingVariant === 'blooming' || (node as any).variant === 'blooming';
+
+          if (!node.revealed) {
+            triggerNotification('Found Wild Seedling! Press [E] to Excavate (? kg)', '#34d399');
           } else {
-            triggerNotification(`Found ${dName}! [Backpack Full (3.0kg)]`, '#ef4444');
+            const title = `${isBloom ? '🌸 Blooming ' : ''}${speciesName} (${sWeight.toFixed(1)}kg)`;
+            if (curWeight + sWeight <= maxWeight) {
+              triggerNotification(`Found ${title}! Press [E] to Excavate.`, isBloom ? '#f472b6' : '#34d399');
+            } else {
+              triggerNotification(`${title} - Cargo Full! Too heavy to carry.`, '#ef4444');
+            }
           }
         } else if (node.type === 'CRYSTAL') {
           const curWeight = getCargoWeight();
           const maxWeight = getMaxRoverCargo();
-          const cWeight = node.crystalStrength === 1.0 ? 1.0 : 0.5;
+          const cWeight = 1.0;
           const cType = node.crystalType || 'foliage';
           const cTypeLabel =
             cType === 'foliage'
@@ -14462,9 +14935,9 @@ export default function App() {
               ? 'Trunk'
               : 'Root';
           if (curWeight + cWeight <= maxWeight) {
-            triggerNotification(`Found Glowing ✨ ${cTypeLabel} Crystal (${node.crystalStrength} Strength)! Press [E] to Excavate (${cWeight}kg).`, node.crystalColor || '#38bdf8');
+            triggerNotification(`Found Glowing ✨ ${cTypeLabel} Crystal (${node.crystalStrength} Strength)! Press [E] to Excavate (${cWeight.toFixed(1)}kg).`, node.crystalColor || '#38bdf8');
           } else {
-            triggerNotification(`Found Glowing ✨ ${cTypeLabel} Crystal (${node.crystalStrength} Strength)! [Backpack Full (${curWeight}/${maxWeight}kg)]`, '#ef4444');
+            triggerNotification(`Found Glowing ✨ ${cTypeLabel} Crystal (${node.crystalStrength} Strength)! [Cargo Bed Full (${curWeight.toFixed(1)}/${maxWeight.toFixed(1)}kg)]`, '#ef4444');
           }
         }
       }
@@ -14594,9 +15067,31 @@ export default function App() {
       deployedStructuresRef.current = fs.deployedStructures || [];
       storedPottedBonsaisRef.current = fs.storedPottedBonsais || [];
       storedSaplingsRef.current = fs.storedSaplings || [];
-      sanctuaryInventoryRef.current = fs.sanctuaryInventory || sanctuaryInventoryRef.current;
+      if (fs.sanctuaryInventory) {
+        sanctuaryInventoryRef.current = {
+          ...sanctuaryInventoryRef.current,
+          ...fs.sanctuaryInventory,
+          coins: typeof fs.sanctuaryInventory.coins === 'number'
+            ? fs.sanctuaryInventory.coins
+            : typeof fs.sanctuaryInventory.verdure === 'number'
+            ? fs.sanctuaryInventory.verdure
+            : 50,
+          storedBonsais: fs.storedPottedBonsais || fs.sanctuaryInventory.storedBonsais || [],
+        };
+        sanctuaryInventoryRef.current.verdure = sanctuaryInventoryRef.current.coins;
+      }
+      const loadedBaseBat = (getConfig('roverBaseBattery') as number) || BASE_ROVER_BATTERY;
+      const loadedMaxBat = getMaxRoverBattery();
+      roverRef.current.baseBattery = loadedBaseBat;
+      roverRef.current.extraBattery = Math.max(0, loadedMaxBat - loadedBaseBat);
+      roverRef.current.batteryKwh = loadedMaxBat;
+      roverRef.current.maxBatteryKwh = loadedMaxBat;
       zenSkillsRef.current = fs.zenSkills || zenSkillsRef.current;
       statsRef.current = fs.stats || statsRef.current;
+      if (!statsRef.current.discoveredSpecies) statsRef.current.discoveredSpecies = [];
+      if (!statsRef.current.discoveredStyles) statsRef.current.discoveredStyles = [];
+      if (!statsRef.current.discoveredBloomingSpecies) statsRef.current.discoveredBloomingSpecies = [];
+      if (!statsRef.current.discoveredBloomingStyles) statsRef.current.discoveredBloomingStyles = [];
       bondexDiscoveryRef.current = fs.bondexDiscovery || {};
       areaDiscoveryRef.current = fs.areaDiscovery || {
         species: { FOOTHILLS: [], HIGHLANDS: [], OVERGROWTH: [] },
@@ -14646,7 +15141,7 @@ export default function App() {
         setOfflineSummaryModalOpen(true);
       }
     },
-    [invalidateSynergiesCache, refreshHud, refreshMasterQuests, triggerNotification],
+    [getMaxRoverBattery, invalidateSynergiesCache, refreshHud, refreshMasterQuests, triggerNotification],
   );
 
   const handleLoadGame = useCallback(
@@ -14735,6 +15230,10 @@ export default function App() {
       totalBonsaisBroughtBack: 0,
       totalResourcesBroughtBack: 0,
       totalCrystalsBroughtBack: 0,
+      discoveredSpecies: [],
+      discoveredStyles: [],
+      discoveredBloomingSpecies: [],
+      discoveredBloomingStyles: [],
     };
 
     areaDiscoveryRef.current = {
@@ -14748,8 +15247,8 @@ export default function App() {
     storedSaplingsRef.current = [];
 
     sanctuaryInventoryRef.current = {
-      coins: 12000,
-      verdure: 12000,
+      coins: 50,
+      verdure: 50,
       license_t1: 0,
       license_t2: 0,
       license_t3: 0,
@@ -14967,6 +15466,16 @@ export default function App() {
       has_radar_module_1_guide: false,
       has_radar_module_2_guide: false,
       has_radar_module_3_guide: false,
+      baseBattery: 50,
+      extraBattery: 0,
+      extra_battery: 0,
+      maxBattery: 50,
+      extraStorage: 0.0,
+      extra_storage: 0.0,
+      baseCargo: 3.0,
+      maxCargo: 3.0,
+      basePayload: 3.0,
+      maxPayload: 3.0,
       rover_chassis_tier: 1,
       rover_modules: {
         storage_1: 0,
@@ -15026,11 +15535,13 @@ export default function App() {
       hydrodynamicsSprinklerT1: 0,
       hydrodynamicsSprinklerT2: 0,
       hydrodynamicsSprinklerT3: 0,
-      automatonGreenThumb: 0,
-      automatonHydrodynamics: 0,
       hydrodynamicsIrrigationT1: 0,
       hydrodynamicsIrrigationT2: 0,
       hydrodynamicsIrrigationT3: 0,
+      propagation_expert: 0,
+      propagationExpert: 0,
+      offshoot_multiplier: 0,
+      offshootMultiplier: 0,
       expertNegotiator: 0,
       discountHunter: 0,
       solarExpert: 0,
@@ -15077,8 +15588,20 @@ export default function App() {
       facing: 'up',
       facingDirection: 1,
       rotation: 0,
-      batteryKwh: 500,
-      maxBatteryKwh: 500,
+      baseBattery: 50,
+      extraBattery: 0,
+      batteryKwh: 50,
+      maxBatteryKwh: 50,
+      baseCargo: 3.0,
+      extraStorage: 0.0,
+      cargo: 0.0,
+      maxCargo: 3.0,
+      basePayload: 3.0,
+      extraPayload: 0.0,
+      payload: 0.0,
+      maxPayload: 3.0,
+      installedModules: [],
+      storageModule: 0.0,
       isMovingAnim: false,
       moveCooldown: 0,
       maxDistanceReached: 0,
@@ -15236,13 +15759,19 @@ export default function App() {
   // Cancel Digging Minigame safely without spending strikes or failing
   const cancelDiggingMinigame = useCallback(() => {
     if (!digStateRef.current.active) return;
-    if (!digStateRef.current.isCrystal) {
-      revealAreaSpecies(activeBiomeIdRef.current, digStateRef.current.leafType, digStateRef.current.maturity);
+    if (digStateRef.current.isMaturing && digStateRef.current.maturingBonsai) {
+      storedPottedBonsaisRef.current.push(digStateRef.current.maturingBonsai);
+      sanctuaryInventoryRef.current.storedBonsais = storedPottedBonsaisRef.current;
+      triggerNotification(`Maturing canceled. ${getBonsaiDisplayName(digStateRef.current.maturingBonsai)} returned safely to Nursery Inventory.`, '#f59e0b');
+    } else if (!digStateRef.current.isCrystal) {
+      revealAreaSpecies(activeBiomeIdRef.current, digStateRef.current.leafType, digStateRef.current.maturity, digStateRef.current.variant || 'normal');
     }
     digStateRef.current.active = false;
     digStateRef.current.status = 'DIGGING';
     gameAudio.playCrispClick();
-    triggerNotification('Left excavation site safely without spending strikes.', '#94a3b8');
+    if (!digStateRef.current.isMaturing) {
+      triggerNotification('Left excavation site safely without spending strikes.', '#94a3b8');
+    }
     refreshHud();
   }, [revealAreaSpecies, refreshHud, triggerNotification]);
 
@@ -15380,6 +15909,14 @@ export default function App() {
       if (targetTier > (inv.sanctuary_expansion_tier || 0) + 1) {
         gameAudio.playErrorBuzz();
         triggerNotification('Must purchase previous expansion tier first!', '#ef4444');
+        return;
+      }
+
+      const reqRank = targetTier <= 4 ? 0 : targetTier <= 6 ? 1 : 2;
+      const maxBranchRank = getMaxMasterQuestBranchRank(masterQuestsRef.current);
+      if (maxBranchRank < reqRank) {
+        gameAudio.playErrorBuzz();
+        triggerNotification(`Locked: Requires finishing at least 1 Master Quest Branch to Rank ${reqRank}!`, '#ef4444');
         return;
       }
 
@@ -15647,6 +16184,7 @@ export default function App() {
         name: getBonsaiDisplayName(bonsai),
         rarity: bonsai.rarity,
         nature: bonsai.nature,
+        variant: bonsai.variant || 'normal',
         level: bonsai.level,
         progressSeconds: bonsai.progressSeconds,
         color: bonsai.color,
@@ -15717,7 +16255,7 @@ export default function App() {
       inv.rover_cargo_level += 1;
       gameAudio.playPowerupChime();
       triggerNotification(
-        `🚙 Rover Cargo Bed Upgraded to Level ${inv.rover_cargo_level}! Max Capacity: ${getMaxRoverCargo()} kg`,
+        `🚙 Rover Cargo Bed Upgraded to Level ${inv.rover_cargo_level}! Max Capacity: ${getMaxRoverCargo().toFixed(1)} kg`,
         '#38bdf8',
       );
       refreshHud();
@@ -15857,7 +16395,7 @@ export default function App() {
       // Track Zen Milestones and Statistics
       const stats = statsRef.current;
       stats.totalLevelUps += 1;
-      recordBondexEntry(bonsai.leafType, bonsai.maturity, bonsai.style);
+      recordBondexEntry(bonsai.leafType, bonsai.maturity, bonsai.style, bonsai.variant || 'normal');
       if (bonsai.level >= 5) {
         if (!stats.grownLv5Ids) stats.grownLv5Ids = [];
         if (!stats.grownLv5Ids.includes(bonsai.id)) stats.grownLv5Ids.push(bonsai.id);
@@ -16022,9 +16560,9 @@ export default function App() {
       inv.organic_waste += organicWasteCount;
       inv.organicWaste = inv.organic_waste;
 
-      // 2. Botanist EXP Reward (Activity 2: Bonsai Leveling Up: XP = 1.0 * Maturity Factor * Species Finding Odds * ((Growth Duration Seconds / 100) + 1))
+      // 2. Botanist EXP Reward (Activity 2: Bonsai Leveling Up: XP = 1.0 * Maturity Factor * Species Finding Odds * ((Growth Duration Seconds / 100) + 1) * Bonsai Look Factor)
       const prevLevel = Math.max(0, bonsai.level - 1);
-      const expReward = calculateBonsaiLevelUpXP(prevLevel, bonsai, bonsai);
+      const expReward = calculateBonsaiLevelUpXP(prevLevel, bonsai, bonsai, bonsai.variant);
       addPlayerXP(expReward, `${getBonsaiDisplayName(bonsai)} Level Up`);
 
       gameAudio.playLevelUpStinger();
@@ -18643,6 +19181,10 @@ export default function App() {
         efficientChipProduction: 'efficient_chip_production',
         resourceProspectingArea1: 'resourceProspecting',
         botanicalDowsingArea1: 'botanicalDowsing',
+        propagation_expert: 'propagationExpert',
+        propagationExpert: 'propagation_expert',
+        offshoot_multiplier: 'offshootMultiplier',
+        offshootMultiplier: 'offshoot_multiplier',
       };
       if (snakeAliases[skillKey as string]) {
         (zenSkillsRef.current as any)[snakeAliases[skillKey as string]] = currentRank + 1;
@@ -18724,6 +19266,7 @@ export default function App() {
       storedPottedBonsaisRef.current.splice(idx, 1);
       sanctuaryInventoryRef.current.storedBonsais = storedPottedBonsaisRef.current;
 
+      const sapVariant: 'normal' | 'blooming' = stored.variant || 'normal';
       const newBonsai: PlantedBonsai = {
         id: stored.id,
         leafType: stored.leafType,
@@ -18732,6 +19275,7 @@ export default function App() {
         style: stored.style || 'MOYOGI',
         maturity: stored.maturity || 'sprout',
         maturityRating: rating,
+        variant: sapVariant,
         name: getBonsaiDisplayName(stored),
         rarity: stored.rarity,
         nature: stored.nature || BONSAI_NATURES[Math.floor(Math.random() * BONSAI_NATURES.length)],
@@ -18763,7 +19307,7 @@ export default function App() {
 
       plantedBonsaisRef.current.push(newBonsai);
       invalidateSynergiesCache();
-      recordBondexEntry(stored.leafType, stored.maturity, stored.style);
+      recordBondexEntry(stored.leafType, stored.maturity, stored.style, sapVariant);
       setIsUnifiedStorageOpen(false);
       setIsPlantingModalOpen(false);
       refreshHud();
@@ -18861,6 +19405,7 @@ export default function App() {
         ? getBonsaiNature(seedling.nature)
         : BONSAI_NATURES[Math.floor(Math.random() * BONSAI_NATURES.length)];
 
+      const sapVariant: 'normal' | 'blooming' = seedling.variant || 'normal';
       const newBonsai: PlantedBonsai = {
         id: `bonsai_${leafType}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         leafType,
@@ -18869,6 +19414,7 @@ export default function App() {
         style: chosenStyle,
         maturity: chosenMaturity,
         maturityRating: rating,
+        variant: sapVariant,
         name: getBonsaiDisplayName(seedling),
         rarity: (seedling.rarity as BonsaiRarity) || leafDef.rarity,
         nature: pickedNature,
@@ -18900,7 +19446,7 @@ export default function App() {
 
       plantedBonsaisRef.current.push(newBonsai);
       invalidateSynergiesCache();
-      recordBondexEntry(leafType, chosenMaturity, chosenStyle);
+      recordBondexEntry(leafType, chosenMaturity, chosenStyle, sapVariant);
       setStylingModalSapling(null);
       setIsUnifiedStorageOpen(false);
       setIsPlantingModalOpen(false);
@@ -19030,6 +19576,7 @@ export default function App() {
         ? getBonsaiNature(stored.nature)
         : BONSAI_NATURES[Math.floor(Math.random() * BONSAI_NATURES.length)];
 
+      const sapVariant: 'normal' | 'blooming' = stored.variant || 'normal';
       const newBonsai: PlantedBonsai = {
         id: `bonsai_${stored.leafType}_${Date.now()}`,
         leafType: stored.leafType,
@@ -19038,6 +19585,7 @@ export default function App() {
         style: chosenStyle,
         maturity: chosenMaturity,
         maturityRating: rating,
+        variant: sapVariant,
         name: getBonsaiDisplayName(stored),
         rarity: stored.rarity,
         nature: pickedNature,
@@ -19069,7 +19617,7 @@ export default function App() {
 
       plantedBonsaisRef.current.push(newBonsai);
       invalidateSynergiesCache();
-      recordBondexEntry(stored.leafType, chosenMaturity, chosenStyle);
+      recordBondexEntry(stored.leafType, chosenMaturity, chosenStyle, sapVariant);
       setStylingModalSapling(null);
       setIsUnifiedStorageOpen(false);
       setIsPlantingModalOpen(false);
@@ -19555,10 +20103,11 @@ export default function App() {
       bonsai.pruneBoostTimer = 1.0; // 1.0s duration
       bonsai.lastPruneTime = Date.now();
 
-      // Earning EXP: Manual Pruning & Care XP = 0.4 * Maturity Factor * Species Finding Odds Multiplier (strictly rounded to closest integer)
+      // Earning EXP: Manual Pruning & Care XP = 0.4 * Maturity Factor * Species Finding Odds Multiplier * Bonsai Look Factor (strictly rounded to closest integer)
       const pruneXP = calculatePruningXP(
         bonsai.maturityRating || bonsai.maturity,
         bonsai.leafType || bonsai.species || bonsai,
+        bonsai.variant,
       );
       gainPlayerExp(pruneXP);
 
@@ -19669,6 +20218,98 @@ export default function App() {
       gameAudio.playErrorBuzz();
     }
 
+    // SPECIAL HANDLING: LEVEL 100 MATURING MINIGAME
+    if (dig.isMaturing && dig.maturingBonsai) {
+      const remainingStrikes = dig.maxStrikes - dig.strikesUsed;
+      const isFinished = dig.currentHits >= dig.requiredHits || remainingStrikes <= 0;
+
+      if (isFinished) {
+        dig.status = 'WON';
+        dig.active = false;
+        gameAudio.playLevelUpStinger();
+
+        const orig = dig.maturingBonsai;
+        const currentRating = getBonsaiMaturityRating(orig);
+        const targetRating = dig.targetRating || (currentRating + 1);
+        const targetTier: MaturityTier =
+          targetRating === 5 ? 'premium' :
+          targetRating === 4 ? 'refined' :
+          targetRating === 3 ? 'notable' : 'sapling';
+
+        const retainRatios: Record<number, number> = {
+          2: 0.10,
+          3: 0.20,
+          4: 0.30,
+          5: 0.40,
+        };
+        const retainedRatio = retainRatios[targetRating] ?? 0.10;
+        const newRatio = 1.0 - retainedRatio;
+
+        // Missing or unhit sites count as 0% precision for new GP calculation
+        const precisions = dig.sectors.map((s) => s.precision ?? 0);
+        const { attributes: newGP, averagePrecision } = calculateBonsaiAttributes(precisions);
+
+        const oldGP = orig.attributes || orig.geneticPotential || DEFAULT_BONSAI_ATTRIBUTES;
+        const finalGP: BonsaiAttributes = {
+          foliage: Math.max(0, Math.min(100, Math.round(oldGP.foliage * retainedRatio + newGP.foliage * newRatio))),
+          branches: Math.max(0, Math.min(100, Math.round(oldGP.branches * retainedRatio + newGP.branches * newRatio))),
+          trunk: Math.max(0, Math.min(100, Math.round(oldGP.trunk * retainedRatio + newGP.trunk * newRatio))),
+          roots: Math.max(0, Math.min(100, Math.round(oldGP.roots * retainedRatio + newGP.roots * newRatio))),
+        };
+
+        const oldCP = orig.cultivationPotential || DEFAULT_CULTIVATION_POTENTIAL;
+        const finalCP: CultivationPotential = {
+          foliage: oldCP.foliage ?? 0,
+          branches: oldCP.branches ?? 0,
+          trunk: oldCP.trunk ?? 0,
+          roots: oldCP.roots ?? 0,
+        };
+
+        const maturedBonsai: StoredPottedBonsai = {
+          id: `bonsai_matured_${orig.leafType}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          leafType: orig.leafType,
+          group: orig.group,
+          species: orig.species || orig.leafType,
+          style: orig.style,
+          maturity: targetTier,
+          maturityRating: targetRating,
+          name: getBonsaiDisplayName(orig),
+          rarity: targetRating === 5 ? 'MYTHIC' : targetRating === 4 ? 'ANCIENT' : orig.rarity || 'RARE',
+          nature: orig.nature,
+          variant: orig.variant || 'normal',
+          level: 1, // Resets to Level 1 at new higher Maturity Rating!
+          progressSeconds: 0,
+          color: orig.color,
+          flowerColor: orig.flowerColor,
+          potColor: orig.potColor || '#1e293b',
+          potStyle: orig.potStyle || 'Carved Ceramic',
+          findOdds: orig.findOdds,
+          attributes: finalGP,
+          cultivationPotential: finalCP,
+          isFavorite: orig.isFavorite,
+        };
+
+        setMaturedModalData({
+          originalBonsai: orig,
+          maturedSpecimen: maturedBonsai,
+          currentRating,
+          targetRating,
+          retainedRatio,
+          newRatio,
+          oldGP,
+          newGP,
+          finalGP,
+          finalCP,
+          averagePrecision,
+          zonePrecisions: precisions,
+        });
+
+        refreshHud();
+        return;
+      }
+      return;
+    }
+
     // 100% SUCCESS: Player MUST hit EVERY single spot (requiredHits = totalSpots)
     if (dig.currentHits >= dig.requiredHits) {
       dig.status = 'WON';
@@ -19761,6 +20402,7 @@ export default function App() {
         name: finalName,
         rarity: dig.rarity,
         nature: pickedNature,
+        variant: dig.variant || 'normal',
         findOdds: Math.round((dig.speciesChance || 0.33) * 100),
         averagePrecision,
         zoneHits,
@@ -19781,7 +20423,7 @@ export default function App() {
         gameAudio.playDefeatMotif();
         // Area species is only revealed for wild bonsai seedlings, NEVER for crystals!
         if (!dig.isCrystal) {
-          revealAreaSpecies(activeBiomeIdRef.current, dig.leafType, dig.maturity);
+          revealAreaSpecies(activeBiomeIdRef.current, dig.leafType, dig.maturity, dig.variant || 'normal');
         }
         triggerNotification(
           dig.isCrystal
@@ -19810,7 +20452,7 @@ export default function App() {
         backpackInventoryRef.current.crystals = [];
       }
       backpackInventoryRef.current.crystals.push(res.crystalItem);
-      const cWeight = res.crystalItem.strength === 1.0 ? 1.0 : 0.5;
+      const cWeight = 1.0;
 
       const nodeKey = `${digStateRef.current.tileX},${digStateRef.current.tileY}`;
       const node = excursionNodesRef.current.get(nodeKey);
@@ -19819,21 +20461,23 @@ export default function App() {
       }
       setExcavationResult(null);
       gameAudio.playCoinPickup();
-      triggerNotification(`💎 Successfully extracted ${res.crystalItem.name} (${cWeight}kg)! Secured in cargo bed.`, res.crystalItem.color);
+      triggerNotification(`💎 Successfully extracted ${res.crystalItem.name} (${cWeight.toFixed(1)}kg)! Secured in cargo bed.`, res.crystalItem.color);
       refreshHud();
       return;
     }
 
-    revealAreaSpecies(activeBiomeIdRef.current, res.leafType, res.maturity);
+    revealAreaSpecies(activeBiomeIdRef.current, res.leafType, res.maturity, res.variant || 'normal');
 
     const seedlingId = res.seedlingId || res.id || `seedling_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const dName = getBonsaiDisplayName(res.leafType);
+    const sWeight = getBonsaiWeight(res.maturity || (res as any).maturityRating || res);
     backpackInventoryRef.current.saplings.push({
       id: seedlingId,
       leafType: res.leafType,
       group: res.group,
       maturity: res.maturity,
       species: res.leafType,
+      variant: res.variant || 'normal',
       name: dName,
       rarity: res.rarity as BonsaiRarity,
       nature: res.nature || BONSAI_NATURES[Math.floor(Math.random() * BONSAI_NATURES.length)],
@@ -19847,7 +20491,7 @@ export default function App() {
     } as any);
 
     triggerNotification(
-      `🌿 Collected ${dName} (Avg Precision: ${res.averagePrecision}%)! Secured in cargo bed.`,
+      `🌿 Collected ${dName} (${sWeight.toFixed(1)}kg, Avg Precision: ${res.averagePrecision}%)! Secured in cargo bed.`,
       '#38bdf8',
     );
 
@@ -19867,7 +20511,7 @@ export default function App() {
     const res = excavationResult;
 
     if (!res.isCrystal) {
-      revealAreaSpecies(activeBiomeIdRef.current, res.leafType, res.maturity);
+      revealAreaSpecies(activeBiomeIdRef.current, res.leafType, res.maturity, res.variant || 'normal');
     }
 
     const nodeKey = `${digStateRef.current.tileX},${digStateRef.current.tileY}`;
@@ -20186,6 +20830,21 @@ export default function App() {
       }
 
       if (e.key === 'Escape') {
+        if (maturedModalData) {
+          e.preventDefault();
+          handleConfirmMaturedDeposit();
+          return;
+        }
+        if (propagatingBonsai) {
+          e.preventDefault();
+          setPropagatingBonsai(null);
+          return;
+        }
+        if (isCargoModalOpen) {
+          e.preventDefault();
+          setIsCargoModalOpen(false);
+          return;
+        }
         if (offlineSummaryModalOpen) {
           e.preventDefault();
           setOfflineSummaryModalOpen(false);
@@ -20607,6 +21266,11 @@ export default function App() {
           }
         }
       } else if (e.key === ' ' || e.key === 'Enter') {
+        if (maturedModalData) {
+          e.preventDefault();
+          handleConfirmMaturedDeposit();
+          return;
+        }
         if (placementPreviewRef.current) {
           e.preventDefault();
           handleConfirmPlacement();
@@ -21220,6 +21884,14 @@ export default function App() {
 
         // Button 1 (B / Circle): Cancel / Close / Back / Leave
         if (justPressed(1)) {
+          if (maturedModalData) {
+            handleConfirmMaturedDeposit();
+            return;
+          }
+          if (isCargoModalOpen) {
+            setIsCargoModalOpen(false);
+            return;
+          }
           if (offlineSummaryModalOpen) {
             setOfflineSummaryModalOpen(false);
             setOfflineSummaryData(null);
@@ -21489,6 +22161,9 @@ export default function App() {
         isSaveLoadModalOpen ||
         offlineSummaryModalOpen ||
         isHowToPlayOpen ||
+        isCargoModalOpen ||
+        maturedModalData !== null ||
+        propagatingBonsai !== null ||
         excursionReport !== null ||
         excavationResult !== null ||
         digStateRef.current.active ||
@@ -22352,17 +23027,17 @@ export default function App() {
               inv.rover_modules.storage_1 = (inv.rover_modules.storage_1 || 0) + 1;
               if (inv.roverModules) inv.roverModules.storage_1 = inv.rover_modules.storage_1;
               gameAudio.playLevelUpStinger();
-              triggerNotification('📦 Crafted T1 Storage Module (+2.5 kg)! Attach in Rover Loadout.', '#38bdf8');
+              triggerNotification('📦 Crafted T1 Storage Module (+1.0 kg)! Attach in Rover Loadout.', '#38bdf8');
             } else if (recipeId === 'rover_storage_module_2') {
               inv.rover_modules.storage_2 = (inv.rover_modules.storage_2 || 0) + 1;
               if (inv.roverModules) inv.roverModules.storage_2 = inv.rover_modules.storage_2;
               gameAudio.playLevelUpStinger();
-              triggerNotification('📦 Crafted T2 Storage Module (+5.0 kg)! Attach in Rover Loadout.', '#38bdf8');
+              triggerNotification('📦 Crafted T2 Storage Module (+2.0 kg)! Attach in Rover Loadout.', '#38bdf8');
             } else if (recipeId === 'rover_storage_module_3') {
               inv.rover_modules.storage_3 = (inv.rover_modules.storage_3 || 0) + 1;
               if (inv.roverModules) inv.roverModules.storage_3 = inv.rover_modules.storage_3;
               gameAudio.playLevelUpStinger();
-              triggerNotification('🚜 Crafted T3 Storage Module (+7.5 kg)! Attach in Rover Loadout.', '#38bdf8');
+              triggerNotification('🚜 Crafted T3 Storage Module (+3.0 kg)! Attach in Rover Loadout.', '#38bdf8');
             } else if (recipeId === 'rover_battery_module_1') {
               inv.rover_modules.battery_1 = (inv.rover_modules.battery_1 || 0) + 1;
               if (inv.roverModules) inv.roverModules.battery_1 = inv.rover_modules.battery_1;
@@ -25848,6 +26523,8 @@ export default function App() {
                 leafType,
                 foliageColor,
                 foliageAccent,
+                false,
+                prev.variant || seedlingData.variant || 'normal',
               );
             } else {
               // Infrastructure or Decoration
@@ -26191,28 +26868,9 @@ export default function App() {
               bLeafType,
               foliageColor,
               foliageAccent,
+              false,
+              bonsai.variant || 'normal',
             );
-
-            // Foliage sparkle / astral aura for Roku-men Star & Elemental Fire
-            if (bLeafType === 'star') {
-              ctx.fillStyle = '#fef08a';
-              for (let g = 0; g < (is2x2 ? 8 : 5); g++) {
-                const gx = bx + Math.sin(g * 2 + Date.now() * 0.003) * (is2x2 ? 26 : 16) * stageScale;
-                const gy = by - 4 - trunkHeight * 0.8 + Math.cos(g * 2) * (is2x2 ? 18 : 12) * stageScale;
-                ctx.beginPath();
-                ctx.arc(gx, gy, 2.2 * stageScale, 0, Math.PI * 2);
-                ctx.fill();
-              }
-            } else if (bLeafType === 'fire') {
-              ctx.fillStyle = '#facc15';
-              for (let b = 0; b < (is2x2 ? 7 : 4); b++) {
-                const sx = bx + Math.sin(b * 1.6 + Date.now() * 0.004) * (is2x2 ? 22 : 14) * stageScale;
-                const sy = by - 4 - trunkHeight * 0.75 + Math.cos(b * 1.6) * (is2x2 ? 16 : 10) * stageScale;
-                ctx.beginPath();
-                ctx.arc(sx, sy, 2.2 * stageScale, 0, Math.PI * 2);
-                ctx.fill();
-              }
-            }
 
             // Level 100 Mastery Radiant Aura
             if (bonsai.level >= 100) {
@@ -27772,16 +28430,16 @@ export default function App() {
 
             // Grounded Badge below
             const nameShortMap: Record<string, {name: string; weight: string; color: string}> = {
-              scrap_metal: {name: 'Scrap Metal', weight: '0.8kg', color: '#fbbf24'},
-              copper_wire: {name: 'Copper Wire', weight: '0.5kg', color: '#f97316'},
-              brass_gears: {name: 'Brass Gears', weight: '1.2kg', color: '#eab308'},
+              scrap_metal: {name: 'Scrap Metal', weight: '0.4kg', color: '#fbbf24'},
+              copper_wire: {name: 'Copper Wire', weight: '0.6kg', color: '#f97316'},
+              brass_gears: {name: 'Brass Gears', weight: '0.8kg', color: '#eab308'},
               circuit_boards: {name: 'Circuit Board', weight: '1.0kg', color: '#34d399'},
               electronic_chips: {name: 'Electronic Chip', weight: '1.5kg', color: '#38bdf8'},
-              scrap_metal_double: {name: 'Heavy Scrap 2x', weight: '1.6kg', color: '#f59e0b'},
-              copper_wire_double: {name: 'Heavy Wire 2x', weight: '1.0kg', color: '#fb923c'},
-              scrap_metal_triple: {name: 'Scrap Trio (3x)', weight: '2.4kg', color: '#f59e0b'},
-              copper_wire_triple: {name: 'Wire Spools (3x)', weight: '1.5kg', color: '#fb923c'},
-              brass_gears_double: {name: 'Gears Pair (2x)', weight: '2.4kg', color: '#eab308'},
+              scrap_metal_double: {name: 'Heavy Scrap 2x', weight: '0.8kg', color: '#f59e0b'},
+              copper_wire_double: {name: 'Heavy Wire 2x', weight: '1.2kg', color: '#fb923c'},
+              scrap_metal_triple: {name: 'Scrap Trio (3x)', weight: '1.2kg', color: '#f59e0b'},
+              copper_wire_triple: {name: 'Wire Spools (3x)', weight: '1.8kg', color: '#fb923c'},
+              brass_gears_double: {name: 'Gears Pair (2x)', weight: '1.6kg', color: '#eab308'},
               circuit_boards_double: {name: 'Circuits (2x)', weight: '2.0kg', color: '#34d399'},
             };
 
@@ -27842,7 +28500,7 @@ export default function App() {
             ctx.fillText(`✨ ${cTypeLabel} (${strength} Str)`, 0, 26);
 
           } else {
-            // 6. WILD SEEDLING NODE: Cozy dark earthen soil mound with two vibrant green cotyledon leaves, tiny wooden identification stake, and soft grounding petal motes
+            // 6. WILD SEEDLING NODE: Unrevealed generic wild seedling sprout (Fog of war obscures species, maturity & blooming status until interaction!)
             // Grounded soft glowing soil aura
             ctx.fillStyle = `rgba(34, 197, 94, ${auraPulse * 0.35})`;
             ctx.beginPath();
@@ -27904,13 +28562,13 @@ export default function App() {
             ctx.ellipse(5, -11, 5.5, 3.2, 0.4, 0, Math.PI * 2);
             ctx.fill();
 
-            // Center nascent bud pearl
+            // Center nascent bud pearl (unrevealed sprout)
             ctx.fillStyle = '#fef08a';
             ctx.beginPath();
             ctx.arc(0, -10, 1.5, 0, Math.PI * 2);
             ctx.fill();
 
-            // Soft grounding petal motes around seedling (grounded orbit, no vertical drift)
+            // Soft grounding motes around seedling (grounded orbit, no vertical drift)
             ctx.fillStyle = 'rgba(254, 240, 138, 0.75)';
             const spark1X = Math.sin(time * 2) * 14;
             const spark1Y = Math.cos(time * 2) * 6 + 4;
@@ -27918,26 +28576,35 @@ export default function App() {
             ctx.arc(spark1X, spark1Y, 1.5, 0, Math.PI * 2);
             ctx.fill();
 
-            ctx.fillStyle = 'rgba(250, 204, 21, 0.65)';
+            ctx.fillStyle = 'rgba(52, 211, 153, 0.65)';
             const spark2X = Math.cos(time * 1.6 + 1.2) * 12;
             const spark2Y = Math.sin(time * 1.6 + 1.2) * 5 + 5;
             ctx.beginPath();
             ctx.arc(spark2X, spark2Y, 1.3, 0, Math.PI * 2);
             ctx.fill();
 
-            // Badge below
-            ctx.fillStyle = 'rgba(6, 78, 59, 0.92)';
+            // Badge below: Unrevealed "Seedling (? kg)" or revealed species type with actual weight
+            const speciesName = getSpeciesName(node.saplingLeafType || node.saplingSpecies || (node as any).bonsai?.speciesName);
+            const isBloom = node.saplingVariant === 'blooming' || (node as any).variant === 'blooming';
+            const seedlingWeight = getBonsaiWeight(node.saplingMaturity || (node as any).bonsai?.maturityRating || node);
+            const label = node.revealed
+              ? `${isBloom ? '🌸 ' : ''}${speciesName} (${seedlingWeight.toFixed(1)}kg)`
+              : 'Seedling (? kg)';
+
+            ctx.font = 'bold 8px system-ui';
+            const pillW = Math.max(72, ctx.measureText(label).width + 16);
+
+            ctx.fillStyle = node.revealed && isBloom ? 'rgba(80, 7, 36, 0.95)' : 'rgba(6, 78, 59, 0.92)';
             ctx.beginPath();
-            ctx.roundRect(-32, 18, 64, 13, 3);
+            ctx.roundRect(-pillW / 2, 18, pillW, 14, 4);
             ctx.fill();
-            ctx.strokeStyle = '#34d399';
+            ctx.strokeStyle = node.revealed && isBloom ? '#f472b6' : '#34d399';
             ctx.lineWidth = 1;
             ctx.stroke();
 
-            ctx.fillStyle = '#6ee7b7';
-            ctx.font = 'bold 8px system-ui';
+            ctx.fillStyle = node.revealed && isBloom ? '#fbcfe8' : '#6ee7b7';
             ctx.textAlign = 'center';
-            ctx.fillText(`🌱 ${getBonsaiDisplayName(node.saplingLeafType || node.saplingSpecies)} (3.0kg)`, 0, 27);
+            ctx.fillText(label, 0, 27.5);
           }
           ctx.restore();
         });
@@ -28647,6 +29314,29 @@ export default function App() {
           const sapDef = getLeafTypeDef(dig.leafType);
           const sapColor = sapDef.color;
           const sapFlower = sapDef.accentColor;
+          const isDigBlooming = dig.variant === 'blooming';
+
+          // If Blooming, render luminous pink blossom aura & floating sakura petals in center
+          if (isDigBlooming) {
+            const pinkGlow = ctx.createRadialGradient(cx, cy - 10, 8, cx, cy - 10, 75);
+            pinkGlow.addColorStop(0, 'rgba(244, 114, 182, 0.55)');
+            pinkGlow.addColorStop(0.5, 'rgba(219, 39, 119, 0.25)');
+            pinkGlow.addColorStop(1, 'rgba(15, 23, 42, 0)');
+            ctx.fillStyle = pinkGlow;
+            ctx.beginPath();
+            ctx.arc(cx, cy - 10, 75, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Animated drifting cherry blossom petals swirling around the seedling
+            const petalTime = Date.now() * 0.003;
+            for (let p = 0; p < 6; p++) {
+              const pAng = petalTime + p * (Math.PI / 3);
+              const pDist = 32 + Math.sin(petalTime * 2 + p) * 14;
+              const px = cx + Math.cos(pAng) * pDist;
+              const py = cy - 14 + Math.sin(pAng) * (pDist * 0.65);
+              drawCherryBlossom(ctx, px, py, 4.5, sapColor, pAng);
+            }
+          }
 
           // Little seedling stem
           ctx.strokeStyle = '#78350f';
@@ -28657,10 +29347,42 @@ export default function App() {
           ctx.quadraticCurveTo(cx - 8, cy - 2, cx + 2, cy - 22);
           ctx.stroke();
 
-          // Seedling Foliage using custom leaf shape
-          drawLeafShape(ctx, cx - 10, cy - 20, 14, dig.leafType, sapColor, sapFlower);
-          drawLeafShape(ctx, cx + 12, cy - 22, 12, dig.leafType, sapColor, sapFlower);
-          drawLeafShape(ctx, cx + 2, cy - 34, 16, dig.leafType, sapColor, sapFlower);
+          // Seedling Foliage using custom leaf shape with blooming blossoms
+          drawLeafShape(ctx, cx - 10, cy - 20, 14, dig.leafType, sapColor, sapFlower, isDigBlooming);
+          drawLeafShape(ctx, cx + 12, cy - 22, 12, dig.leafType, sapColor, sapFlower, isDigBlooming);
+          drawLeafShape(ctx, cx + 2, cy - 34, 16, dig.leafType, sapColor, sapFlower, isDigBlooming);
+
+          // Extra prominent cherry blossoms on foliage if blooming
+          if (isDigBlooming) {
+            drawCherryBlossom(ctx, cx - 10, cy - 20, 6.5, sapColor, 0.4);
+            drawCherryBlossom(ctx, cx + 12, cy - 22, 6.0, sapColor, 1.2);
+            drawCherryBlossom(ctx, cx + 2, cy - 34, 7.5, sapColor, 2.0);
+
+            // Radiant blooming pill badge inside the dial center
+            ctx.save();
+            ctx.shadowColor = 'rgba(244, 114, 182, 0.8)';
+            ctx.shadowBlur = 10;
+            const bBadgeW = 140;
+            const bBadgeH = 19;
+            const bBadgeX = cx - bBadgeW / 2;
+            const bBadgeY = cy + 32;
+
+            ctx.fillStyle = 'rgba(80, 7, 36, 0.95)';
+            ctx.beginPath();
+            ctx.roundRect(bBadgeX, bBadgeY, bBadgeW, bBadgeH, 9.5);
+            ctx.fill();
+
+            ctx.strokeStyle = '#f472b6';
+            ctx.lineWidth = 1.4;
+            ctx.stroke();
+
+            ctx.fillStyle = '#fbcfe8';
+            ctx.font = 'bold 9.5px system-ui';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🌸 Blooming Specimen', cx, bBadgeY + bBadgeH / 2);
+            ctx.restore();
+          }
         }
         ctx.restore();
 
@@ -28896,7 +29618,30 @@ export default function App() {
         // 4. HEADER & SPECIES / CRYSTAL INFO
         const arcDisplay = (dig.arcDeg ?? 57.6).toFixed(1);
 
-        if (dig.isCrystal && dig.crystalItem) {
+        if (dig.isMaturing && dig.maturingBonsai) {
+          const targetMatDef = getMaturityDef(dig.maturity);
+          const speciesName = getSpeciesName(dig.leafType || dig.species);
+          ctx.fillStyle = targetMatDef.color;
+          ctx.font = 'bold 13px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillText(
+            `🌟 Maturing to Rating ${dig.targetRating} (${targetMatDef.name}) • ${dig.requiredHits} Digging Sites • Speed: ${dig.angularVelocity.toFixed(1)} rad/s • Arc: ${arcDisplay}°`,
+            cx,
+            cy - dialRadius - 70,
+          );
+
+          ctx.fillStyle = '#fef08a';
+          ctx.font = 'bold 22px system-ui';
+          ctx.fillText(`Maturing ${speciesName} Bonsai`, cx, cy - dialRadius - 46);
+
+          ctx.font = 'bold 13px system-ui';
+          ctx.fillStyle = '#34d399';
+          ctx.fillText(
+            `Sites Aligned: ${dig.currentHits} / ${dig.requiredHits} • Missed sites score 0% new GP (specimen is never lost)`,
+            cx,
+            cy - dialRadius - 24,
+          );
+        } else if (dig.isCrystal && dig.crystalItem) {
           const cType = dig.crystalItem.crystalType || 'foliage';
           const cTypeLabel =
             cType === 'foliage'
@@ -28912,7 +29657,7 @@ export default function App() {
           ctx.font = 'bold 13px system-ui';
           ctx.textAlign = 'center';
           ctx.fillText(
-            `✨ ${cTypeLabel} Crystal (${strength} Strength) • ${dig.requiredHits} Excavation Targets • Resonance Arc: ${arcDisplay}°`,
+            `✨ ${cTypeLabel} Crystal (${strength} Strength) • ${dig.requiredHits} Excavation Targets • ${dig.angularVelocity.toFixed(1)} rad/s • Resonance Arc: ${arcDisplay}°`,
             cx,
             cy - dialRadius - 70,
           );
@@ -28931,23 +29676,45 @@ export default function App() {
           );
         } else {
           const digMatDef = getMaturityDef(dig.maturity);
-          ctx.fillStyle = digMatDef.color;
-          ctx.font = 'bold 13px system-ui';
-          ctx.textAlign = 'center';
           const speciesChancePct = Math.round((dig.speciesChance ?? 0.33) * 100);
-          ctx.fillText(
-            `${digMatDef.kanji} | Rank ${digMatDef.rank} (${digMatDef.name}) • ${dig.requiredHits} Root Sites • Species Find Odds: ${speciesChancePct}% (${arcDisplay}° Arc Width)`,
-            cx,
-            cy - dialRadius - 70,
-          );
+          const isDigBlooming = dig.variant === 'blooming';
+          const speciesName = getSpeciesName(dig.leafType || dig.species);
 
-          ctx.fillStyle = '#f8fafc';
-          ctx.font = 'bold 22px system-ui';
-          ctx.fillText(`Radial Root Dig: ${getBonsaiDisplayName(dig.leafType || dig.species)}`, cx, cy - dialRadius - 46);
+          if (isDigBlooming) {
+            ctx.fillStyle = '#f472b6';
+            ctx.font = 'bold 13px system-ui';
+            ctx.textAlign = 'center';
+            ctx.fillText(
+              `🌸 Rare 2% Blooming Form • ${digMatDef.kanji} | Rating ${digMatDef.rank} (${digMatDef.name}) • ${dig.requiredHits} Root Sites • ${dig.angularVelocity.toFixed(1)} rad/s • Find Odds: ${speciesChancePct}% (${arcDisplay}° Arc)`,
+              cx,
+              cy - dialRadius - 68,
+            );
+
+            ctx.fillStyle = '#fbcfe8';
+            ctx.font = 'bold 22px system-ui';
+            ctx.fillText(
+              `🌸 Blooming ${speciesName} [Maturity Rating ${digMatDef.rank} - ${digMatDef.name}]`,
+              cx,
+              cy - dialRadius - 44,
+            );
+          } else {
+            ctx.fillStyle = digMatDef.color;
+            ctx.font = 'bold 13px system-ui';
+            ctx.textAlign = 'center';
+            ctx.fillText(
+              `${digMatDef.kanji} | Rating ${digMatDef.rank} (${digMatDef.name}) • ${dig.requiredHits} Root Sites • ${dig.angularVelocity.toFixed(1)} rad/s • Find Odds: ${speciesChancePct}% (${arcDisplay}° Arc)`,
+              cx,
+              cy - dialRadius - 70,
+            );
+
+            ctx.fillStyle = '#f8fafc';
+            ctx.font = 'bold 22px system-ui';
+            ctx.fillText(`Radial Root Dig: ${getBonsaiDisplayName(dig.leafType || dig.species)}`, cx, cy - dialRadius - 46);
+          }
 
           // 100% HIT REQUIREMENT BADGE
           ctx.font = 'bold 13px system-ui';
-          ctx.fillStyle = '#10b981';
+          ctx.fillStyle = isDigBlooming ? '#f472b6' : '#10b981';
           ctx.fillText(
             `Root Sectors Hit: ${dig.currentHits} / ${dig.requiredHits} (100% Hit Required - No Misses!)`,
             cx,
@@ -28957,7 +29724,15 @@ export default function App() {
 
         // 5. GATING PROMPT / WARNING BADGE
         const remainingStrikes = dig.maxStrikes - dig.strikesUsed;
-        if (dig.isGated) {
+        if (dig.isMaturing) {
+          ctx.fillStyle = remainingStrikes <= 1 ? '#ef4444' : '#fbbf24';
+          ctx.font = 'bold 13px system-ui';
+          ctx.fillText(
+            `Shovel Strikes Remaining: ${remainingStrikes} / ${dig.maxStrikes} • Unhit sites will count as 0% new GP`,
+            cx,
+            cy + dialRadius + 22,
+          );
+        } else if (dig.isGated) {
           ctx.fillStyle = '#ef4444';
           ctx.font = 'bold 13px system-ui';
           ctx.fillText(
@@ -29261,15 +30036,27 @@ export default function App() {
               </div>
 
               {/* 🎒 Cargo Bed */}
-              <div className="bg-slate-950/90 border border-slate-700 px-2.5 py-1 rounded-lg flex items-center gap-1 text-xs font-bold">
+              <button
+                onClick={() => {
+                  setIsCargoModalOpen((prev) => !prev);
+                  gameAudio.playCrispClick();
+                }}
+                title="Inspect Rover Cargo & Backpack [Click]"
+                className="bg-slate-950/90 hover:bg-slate-900 border border-slate-700 hover:border-slate-500 px-2.5 py-1 rounded-lg flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer shadow">
                 <Package className="w-3.5 h-3.5 text-amber-400" />
                 <span>
                   <span className={currentBackWeight >= maxBackWeight ? 'text-red-400' : 'text-amber-300'}>
-                    {currentBackWeight}
+                    {currentBackWeight.toFixed(1)}
                   </span>
-                  /{maxBackWeight}kg
+                  {' '}/ {maxBackWeight.toFixed(1)} kg
                 </span>
-              </div>
+                {backpackInventoryRef.current.saplings.some((s) => s.variant === 'blooming') && (
+                  <span className="text-[10px] bg-pink-950 text-pink-300 border border-pink-400/80 px-1.5 py-0.2 rounded-full font-bold flex items-center gap-0.5 animate-pulse">
+                    <span>🌸</span>
+                    <span className="hidden sm:inline">Blooming</span>
+                  </span>
+                )}
+              </button>
 
               {/* Return / Tow Emergency Button */}
               <button
@@ -30390,22 +31177,30 @@ export default function App() {
                         {(() => {
                           const nbMat = getMaturityDef(nearbyBonsai.maturity);
                           return (
-                            <span
-                              style={{
-                                backgroundColor: nbMat.bg,
-                                borderColor: nbMat.border,
-                                color: nbMat.color,
-                                boxShadow: `0 0 8px ${nbMat.color}30`,
-                              }}
-                              className="text-[10px] px-2 py-0.5 rounded-full font-black border flex items-center gap-1 shadow-sm">
-                              <span>{nbMat.kanji}</span>
-                              <span>{nbMat.name}</span>
-                              <span className="opacity-80 font-mono">({nbMat.multiplier}x)</span>
-                            </span>
+                            <>
+                              {nearbyBonsai.variant === 'blooming' && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-black border bg-pink-950/90 text-pink-300 border-pink-400 flex items-center gap-1 shadow-sm">
+                                  <span>🌸</span>
+                                  <span>Blooming</span>
+                                </span>
+                              )}
+                              <span
+                                style={{
+                                  backgroundColor: nbMat.bg,
+                                  borderColor: nbMat.border,
+                                  color: nbMat.color,
+                                  boxShadow: `0 0 8px ${nbMat.color}30`,
+                                }}
+                                className="text-[10px] px-2 py-0.5 rounded-full font-black border flex items-center gap-1 shadow-sm">
+                                <span>{nbMat.kanji}</span>
+                                <span>{nbMat.name}</span>
+                                <span className="opacity-80 font-mono">({nbMat.multiplier}x)</span>
+                              </span>
+                            </>
                           );
                         })()}
                         <span>
-                          {getBonsaiDisplayName(nearbyBonsai)} (Lv.{nearbyBonsai.level} • {calculateBaseAesthetic(nearbyBonsai).total.toFixed(2)} BA)
+                          {nearbyBonsai.variant === 'blooming' ? '🌸 Blooming ' : ''}{getBonsaiDisplayName(nearbyBonsai)} (Lv.{nearbyBonsai.level} • {calculateBaseAesthetic(nearbyBonsai).total.toFixed(2)} BA)
                         </span>
                         <span className="text-emerald-400 font-medium">[{getBonsaiStyleDef(nearbyBonsai.style).japanese}]</span>
                         <span className={`font-bold flex items-center gap-0.5 ${ecoMatch ? 'text-amber-300 bg-amber-950/80 border border-amber-500/70 px-2 py-0.5 rounded-full shadow-sm' : 'text-emerald-300'}`}>
@@ -30619,25 +31414,32 @@ export default function App() {
                 if (targetNode.type === 'SAPLING') {
                   const curWeight = getCargoWeight();
                   const maxWeight = getMaxRoverCargo();
-                  const canFit = curWeight + ITEM_WEIGHTS.sapling <= maxWeight;
+                  const sWeight = getBonsaiWeight(targetNode.saplingMaturity || (targetNode as any).bonsai?.maturityRating || targetNode);
+                  const canFit = curWeight + sWeight <= maxWeight;
+                  const speciesName = getSpeciesName(targetNode.saplingLeafType || targetNode.saplingSpecies || (targetNode as any).bonsai?.speciesName);
+                  const isBloom = targetNode.saplingVariant === 'blooming' || (targetNode as any).variant === 'blooming';
+                  const btnLabel = targetNode.revealed
+                    ? canFit
+                      ? `[E] Dig ${isBloom ? '🌸 ' : ''}${speciesName} (${sWeight.toFixed(1)}kg)`
+                      : `[Cargo Full! (${speciesName} ${sWeight.toFixed(1)}kg)]`
+                    : '[E] Dig Wild Seedling (? kg)';
 
                   return (
                     <button
                       onClick={() => triggerRadialDig(targetNode!)}
-                      disabled={!canFit}
-                      className={`font-bold px-3 py-1.5 rounded-xl shadow transition-transform active:scale-95 flex items-center gap-1.5 ${
-                        canFit
-                          ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 animate-pulse'
-                          : 'bg-red-900/80 text-red-200 border border-red-500/50 cursor-not-allowed'
+                      className={`font-bold px-3 py-1.5 rounded-xl shadow transition-transform active:scale-95 flex items-center gap-1.5 cursor-pointer ${
+                        targetNode.revealed && !canFit
+                          ? 'bg-red-900/80 text-red-200 border border-red-500/50'
+                          : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 animate-pulse'
                       }`}>
                       <Sprout className="w-4 h-4" />
-                      <span>{canFit ? `[E] Dig Wild Seedling (3.0 kg)` : `[Cargo Bed Full (${curWeight}/${maxWeight}kg)]`}</span>
+                      <span>{btnLabel}</span>
                     </button>
                   );
                 } else if (targetNode.type === 'CRYSTAL') {
                   const curWeight = getCargoWeight();
                   const maxWeight = getMaxRoverCargo();
-                  const cWeight = targetNode.crystalStrength === 1.0 ? 1.0 : 0.5;
+                  const cWeight = 1.0;
                   const canFit = curWeight + cWeight <= maxWeight;
                   const cType = targetNode.crystalType || 'foliage';
                   const cTypeLabel =
@@ -30663,15 +31465,26 @@ export default function App() {
                           : 'bg-red-900/80 text-red-200 border-red-500/50 cursor-not-allowed'
                       }`}>
                       <span>💎</span>
-                      <span>{canFit ? `[E] Excavate ✨ ${cTypeLabel} Crystal (${targetNode.crystalStrength} Strength)` : `[Cargo Bed Full]`}</span>
+                      <span>{canFit ? `[E] Excavate ✨ ${cTypeLabel} Crystal (1.0kg)` : `[Cargo Bed Full (${curWeight.toFixed(1)}/${maxWeight.toFixed(1)}kg)]`}</span>
                     </button>
                   );
                 } else if (targetNode.type === 'RESOURCE' && targetNode.resourceType) {
                   const rt = targetNode.resourceType;
-                  const weight = ITEM_WEIGHTS[rt] || 0.8;
+                  const yieldCount = targetNode.resourceYield || (
+                    rt === 'scrap_metal_triple' || rt === 'copper_wire_triple' ? 3 :
+                    rt === 'scrap_metal_double' || rt === 'copper_wire_double' || rt === 'brass_gears_double' || rt === 'circuit_boards_double' ? 2 : 1
+                  );
+                  const baseKey = (
+                    rt === 'scrap_metal_double' || rt === 'scrap_metal_triple' ? 'scrap_metal' :
+                    rt === 'copper_wire_double' || rt === 'copper_wire_triple' ? 'copper_wire' :
+                    rt === 'brass_gears_double' ? 'brass_gears' :
+                    rt === 'circuit_boards_double' ? 'circuit_boards' : rt
+                  ) as ResourceItemKey;
+                  const singleWeight = ITEM_WEIGHTS[baseKey] || 0.4;
+                  const totalWeight = singleWeight * yieldCount;
                   const curWeight = getCargoWeight();
                   const maxWeight = getMaxRoverCargo();
-                  const canFit = curWeight + weight <= maxWeight;
+                  const canFit = curWeight + totalWeight <= maxWeight;
 
                   const nameMap: Record<string, string> = {
                     scrap_metal: 'Scrap Metal',
@@ -30687,9 +31500,9 @@ export default function App() {
                     circuit_boards_double: 'Layered Microcircuits (2x)',
                   };
 
-                  let btnLabel = `[E] Collect ${nameMap[rt] || 'Resource'} (${weight.toFixed(1)}kg)`;
+                  let btnLabel = `[E] Collect ${nameMap[rt] || 'Resource'} (${totalWeight.toFixed(1)}kg)`;
                   if (!canFit) {
-                    btnLabel = `[Backpack Full - ${curWeight}/${maxWeight}kg]`;
+                    btnLabel = `[Backpack Full - ${curWeight.toFixed(1)}/${maxWeight.toFixed(1)}kg]`;
                   }
 
                   return (
@@ -31369,6 +32182,29 @@ export default function App() {
         onToggleFavorite={toggleBonsaiFavorite}
         onAttachAutomaton={attachAutomatonTier}
         onDetachAutomaton={detachAutomaton}
+        onMature={handleMatureBonsai}
+        onPropagate={handlePropagateBonsai}
+      />
+
+      {/* MODAL: BONSAI MATURED SUMMARY MODAL */}
+      <BonsaiMaturedModal
+        isOpen={Boolean(maturedModalData)}
+        data={maturedModalData}
+        onConfirm={handleConfirmMaturedDeposit}
+      />
+
+      {/* MODAL: OFFSHOOT PLANTING MINIGAME & BONSAI PROPAGATED MODAL */}
+      <OffshootPlantingModal
+        isOpen={Boolean(propagatingBonsai)}
+        parentBonsai={propagatingBonsai}
+        skills={zenSkillsRef.current}
+        offshootMultiplierLevel={
+          zenSkillsRef.current.offshoot_multiplier ||
+          zenSkillsRef.current.offshootMultiplier ||
+          0
+        }
+        onClose={() => setPropagatingBonsai(null)}
+        onComplete={handleCompletePropagation}
       />
 
       {/* ========================================================================= */}
@@ -31378,8 +32214,17 @@ export default function App() {
         isOpen={isBonsaiSocietyOpen}
         onClose={handleCloseBonsaiSociety}
         masterQuests={masterQuestsRef.current}
-        discoveredSpeciesCount={Object.values(bondexDiscoveryRef.current).filter((d) => d.discovered).length}
-        discoveredStylesCount={Object.values(bondexDiscoveryRef.current).reduce((acc, d) => acc + (d.stylesRaised?.length || 0), 0)}
+        discoveredSpeciesCount={
+          statsRef.current?.discoveredSpecies?.length ??
+          Object.entries(bondexDiscoveryRef.current).filter(([k, d]) => !k.includes('_') && d?.discovered).length
+        }
+        discoveredStylesCount={
+          statsRef.current?.discoveredStyles?.length ??
+          Object.entries(bondexDiscoveryRef.current).reduce(
+            (acc, [k, d]) => (!k.includes('_') ? acc + (d?.stylesRaised?.length || 0) : acc),
+            0,
+          )
+        }
         onCompleteDiscoveryTier1={handleCompleteDiscoveryTier1}
         onCompleteCompetitionTier1={handleCompleteCompetitionTier1}
         onCompleteEcoTier1={handleCompleteEcoTier1}
@@ -31457,7 +32302,7 @@ export default function App() {
               </div>
               <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
                 <div className="text-slate-400">Total Weight</div>
-                <div className="text-base font-black text-emerald-300">{excursionReport.totalWeight} kg</div>
+                <div className="text-base font-black text-emerald-300">{excursionReport.totalWeight.toFixed(1)} kg</div>
               </div>
               <div className="bg-slate-950/80 p-2.5 rounded-xl border border-emerald-500/60 shadow-[0_0_12px_rgba(52,211,153,0.25)]">
                 <div className="text-emerald-400 font-bold">XP Gained</div>
@@ -31483,14 +32328,27 @@ export default function App() {
               {excursionReport.saplings.length > 0 && (
                 <div className="pt-1">
                   <div className="text-[11px] font-bold text-amber-400 mb-1">Excavated Saplings:</div>
-                  {excursionReport.saplings.map((sap, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs py-0.5">
-                      <span className="text-slate-300">🌿 {sap.name}</span>
-                      <span className={`font-bold ${sap.retained ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {sap.retained ? '✓ Retained' : '✗ Lost in Wild'}
-                      </span>
-                    </div>
-                  ))}
+                  {excursionReport.saplings.map((sap, i) => {
+                    const isBloom = sap.variant === 'blooming';
+                    return (
+                      <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-slate-900 last:border-b-0">
+                        <span className="text-slate-200 flex items-center gap-1.5 flex-wrap">
+                          <span>{isBloom ? '🌸' : '🌿'}</span>
+                          {isBloom && (
+                            <span className="text-[9.5px] px-1.5 py-0.2 rounded font-black border bg-pink-950 text-pink-300 border-pink-500/60 shadow-sm animate-pulse">
+                              🌸 Blooming
+                            </span>
+                          )}
+                          <span className={isBloom ? 'text-pink-200 font-bold' : 'text-slate-300'}>
+                            {isBloom ? `Blooming ${getSpeciesName(sap.leafType)} Bonsai` : sap.name}
+                          </span>
+                        </span>
+                        <span className={`font-bold ${sap.retained ? (isBloom ? 'text-pink-300' : 'text-emerald-400') : 'text-rose-400'}`}>
+                          {sap.retained ? '✓ Retained' : '✗ Lost in Wild'}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -31502,6 +32360,143 @@ export default function App() {
               {excursionReport.totalExpeditionXP && excursionReport.totalExpeditionXP > 0
                 ? `Deposit Retained Loot & Claim +${excursionReport.totalExpeditionXP} XP`
                 : 'Deposit Retained Loot & Return to Sanctuary'}
+            </button>
+          </div>
+        </MenuOverlay>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: ROVER CARGO BED / BACKPACK INVENTORY */}
+      {/* ========================================================================= */}
+      {isCargoModalOpen && (
+        <MenuOverlay tone="neutral" zIndex={85}>
+          <div className="w-full max-w-lg bg-slate-900 border-2 border-amber-500 rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col text-left">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-950/80 border border-amber-500/50 flex items-center justify-center text-amber-300">
+                  <Package className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-amber-300">Rover Cargo Bed &amp; Backpack</h3>
+                  <p className="text-xs text-slate-400">Current haul collected during this expedition</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCargoModalOpen(false)}
+                className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between bg-slate-950/80 p-3 rounded-2xl border border-slate-800 mb-4 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400">Cargo Payload:</span>
+                <strong className={`font-mono text-sm ${currentBackWeight >= maxBackWeight ? 'text-red-400' : 'text-amber-300'}`}>
+                  {currentBackWeight.toFixed(1)} / {maxBackWeight.toFixed(1)} kg
+                </strong>
+              </div>
+              <span className="text-slate-400">
+                Battery: <strong className="text-sky-300 font-mono">{rover.batteryKwh} kWh</strong>
+              </span>
+            </div>
+
+            {/* Collected Saplings */}
+            <div className="space-y-2 mb-4">
+              <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Sprout className="w-4 h-4" />
+                <span>Excavated Seedlings ({backpackInventoryRef.current.saplings.length})</span>
+              </div>
+
+              {backpackInventoryRef.current.saplings.length === 0 ? (
+                <div className="p-3 text-center text-xs text-slate-500 bg-slate-950/60 rounded-xl border border-slate-800">
+                  No seedlings excavated yet. Locate wild root nodes and excavate with [E]!
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {backpackInventoryRef.current.saplings.map((sap, sIdx) => {
+                    const isBloom = sap.variant === 'blooming';
+                    const matDef = getMaturityDef(sap.maturity || 'sprout');
+                    return (
+                      <div
+                        key={sIdx}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between gap-2.5 ${
+                          isBloom
+                            ? 'bg-pink-950/50 border-pink-400 shadow-[0_0_12px_rgba(244,114,182,0.3)]'
+                            : 'bg-slate-950/80 border-slate-800'
+                        }`}>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-lg shrink-0">{isBloom ? '🌸' : '🌱'}</span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {isBloom && (
+                                <span className="text-[9.5px] px-2 py-0.5 rounded-full font-black border bg-pink-950 text-pink-300 border-pink-400 flex items-center gap-1 shadow-sm animate-pulse">
+                                  <span>🌸</span>
+                                  <span>Blooming Variant</span>
+                                </span>
+                              )}
+                              <span
+                                style={{
+                                  backgroundColor: matDef.bg,
+                                  borderColor: matDef.border,
+                                  color: matDef.color,
+                                }}
+                                className="text-[9.5px] px-2 py-0.5 rounded-full font-black border">
+                                {matDef.kanji} {matDef.name}
+                              </span>
+                              <h5 className={`font-bold text-xs truncate ${isBloom ? 'text-pink-200' : 'text-slate-100'}`}>
+                                {isBloom ? `🌸 Blooming ${getSpeciesName(sap.leafType)} Bonsai` : sap.name}
+                              </h5>
+                            </div>
+                            <span className="text-[10px] text-slate-400 block mt-0.5 font-mono">
+                              Weight: {getBonsaiWeight(sap.maturity || (sap as any).maturityRating || sap).toFixed(1)} kg • Group: {sap.group}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Collected Materials */}
+            <div className="space-y-1.5 mb-4">
+              <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Package className="w-4 h-4" />
+                <span>Harvested Resources</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <span className="text-slate-400">Scrap Metal:</span>
+                  <strong className="text-amber-300 font-mono">x{backpackInventoryRef.current.scrap_metal}</strong>
+                </div>
+                <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <span className="text-slate-400">Copper Wire:</span>
+                  <strong className="text-orange-300 font-mono">x{backpackInventoryRef.current.copper_wire}</strong>
+                </div>
+                <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <span className="text-slate-400">Brass Gears:</span>
+                  <strong className="text-yellow-300 font-mono">x{backpackInventoryRef.current.brass_gears}</strong>
+                </div>
+                <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <span className="text-slate-400">Circuits:</span>
+                  <strong className="text-emerald-300 font-mono">x{backpackInventoryRef.current.circuit_boards}</strong>
+                </div>
+                <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <span className="text-slate-400">Chips:</span>
+                  <strong className="text-purple-300 font-mono">x{backpackInventoryRef.current.electronic_chips}</strong>
+                </div>
+                <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <span className="text-slate-400">Crystals:</span>
+                  <strong className="text-cyan-300 font-mono">x{(backpackInventoryRef.current.crystals || []).length}</strong>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsCargoModalOpen(false)}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 rounded-xl transition-all shadow min-h-[40px] text-xs cursor-pointer">
+              Close [Esc / B]
             </button>
           </div>
         </MenuOverlay>
@@ -32037,10 +33032,10 @@ export default function App() {
                   <div className="bg-slate-950/60 border border-slate-800 p-3.5 rounded-2xl space-y-2">
                     <h4 className="font-bold text-slate-100 flex items-center gap-2 text-xs sm:text-sm">
                       <span className="text-amber-400">🥄</span>
-                      <span>Precision Shovel Excavation (Species-Scaled Arc & 100% Success)</span>
+                      <span>Precision Shovel Excavation (Maturity Pegged Speed & Zones)</span>
                     </h4>
                     <p className="text-slate-300 text-xs leading-relaxed">
-                      Wild saplings must be excavated through the <strong>radial shovel minigame</strong>. Time your strike to hit root targets on the dial. The <strong>angular hit arc width</strong> scales directly from the bonsai species' find probability in the current biome (50% odds = ~36°-38° arc; 100% odds = ~60° wide arc). The <strong>number of digging sites</strong> is governed by Maturity tier (Sprout: 2 sites up to Premium: 6 sites). You must achieve a 100% hit rate before shovel strikes expire!
+                      Wild saplings must be excavated through the <strong>radial shovel minigame</strong>. The <strong>number of digging sites</strong> (2 to 6) and <strong>shovel needle speed</strong> (3.2 to 6.0 rad/s) are strictly determined by the <strong>Maturity Rating</strong> of the bonsai (Rating 1: 2 zones &amp; 3.2 rad/s, Rating 2: 3 zones &amp; 3.6 rad/s, Rating 3: 4 zones &amp; 4.2 rad/s, Rating 4: 5 zones &amp; 5.0 rad/s, Rating 5: 6 zones &amp; 6.0 rad/s). The <strong>angular hit arc width</strong> is pegged directly to the bonsai's find odds (e.g. 10% odds = 44.4° arc), and shrinks by -33% (arc × 0.67) if the specimen is in bloom. Neither distance nor skills modify shovel speed!
                     </p>
                   </div>
 
@@ -32190,7 +33185,7 @@ export default function App() {
                         <span>Chapter 5: Bonsai Valuation Formula Guide</span>
                       </div>
                       <span className="text-xs bg-amber-950 text-amber-300 border border-amber-500/50 px-2.5 py-0.5 rounded-full font-mono font-bold">
-                        Max Theoretical Value: 675.00 Verdure
+                        Max Theoretical Value: 810.00 Verdure
                       </span>
                     </div>
 
@@ -32199,15 +33194,15 @@ export default function App() {
                         Universal Payout Formula:
                       </div>
                       <div className="text-slate-100 font-bold text-xs sm:text-sm bg-slate-950 p-2 rounded-lg border border-slate-800">
-                        Valuation = Baseprice × Species Find Odds × Maturity Rating × Level Factor × Attribute GP/CP
+                        Valuation = Baseprice × Species Find Odds × Maturity Rating × Level Factor × Attribute GP/CP × Look Factor
                       </div>
                       <p className="text-[11px] text-slate-400 font-sans mt-1">
-                        All donation rewards are strictly floored / truncated down to two decimal places.
+                        All donation rewards are strictly floored / truncated down to two decimal places. Plus Expert Negotiator multiplier if active.
                       </p>
                     </div>
 
-                    {/* 5 MULTIPLIER FACTORS BREAKDOWN */}
-                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs">
+                    {/* 6 MULTIPLIER FACTORS BREAKDOWN */}
+                    <div className="grid grid-cols-1 sm:grid-cols-6 gap-2 text-xs">
                       <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 space-y-1">
                         <span className="text-slate-400 font-bold block text-[10px] uppercase">1. Baseprice</span>
                         <strong className="text-slate-100 text-sm font-mono block">1.00</strong>
@@ -32247,6 +33242,14 @@ export default function App() {
                           1 + 4 GP (0-1 each) + 4 CP (0-1 each)
                         </span>
                       </div>
+
+                      <div className="bg-slate-900/80 p-2.5 rounded-xl border border-pink-500/40 space-y-1">
+                        <span className="text-pink-300 font-bold block text-[10px] uppercase">6. Look Factor</span>
+                        <strong className="text-pink-300 text-sm font-mono block">1.0x – 1.2x</strong>
+                        <span className="text-[10px] text-pink-200/80 block leading-tight">
+                          Normal: 1.0x • Blooming: 1.2x (+20% bonus!)
+                        </span>
+                      </div>
                     </div>
 
                     {/* DEEP ATTRIBUTE DIVE & MAXIMUM VALUE */}
@@ -32267,12 +33270,12 @@ export default function App() {
                         </li>
                       </ul>
                       <p className="text-slate-300 leading-relaxed text-[11px]">
-                        Summing all 8 values produces a number from <strong>0.0 to 8.0</strong>. Adding baseline 1.0 gives an attribute factor ranging from <strong>1.0x to 9.0x</strong>!
+                        Summing all 8 values produces a number from <strong>0.0 to 8.0</strong>. Adding baseline 1.0 gives an attribute factor ranging from <strong>1.0x to 9.0x</strong>! Combined with the <strong>1.2x Bonsai Look Factor</strong> for blooming specimens.
                       </p>
                       <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs font-mono">
                         <span className="text-amber-400 font-bold">Maximum Theoretical Valuation:</span>
                         <span className="text-amber-300 font-bold bg-slate-950 px-2.5 py-1 rounded-lg border border-amber-500/50">
-                          1 × 5.0 × 3.0 × 5.0 × 9.0 = 675.00 Verdure
+                          1 × 5.0 × 3.0 × 5.0 × 9.0 × 1.2 = 810.00 Verdure
                         </span>
                       </div>
                     </div>

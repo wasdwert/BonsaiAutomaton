@@ -69,8 +69,27 @@ export const SOCIETY_MILESTONES: MilestoneDef[] = [
     title: 'Species Types found',
     unit: 'Species',
     targets: [3, 6, 10, 15, 20],
-    getValue: (_stats, discoveredMap) =>
-      Object.values(discoveredMap || {}).filter((d) => d?.discovered).length,
+    getValue: (stats, discoveredMap, planted, stored) => {
+      const set = new Set<string>();
+      (stats?.discoveredSpecies || []).forEach((id) => {
+        if (id.startsWith('normal_')) set.add(id);
+      });
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && d?.discovered) {
+            set.add(`normal_${k}`);
+          } else if (k.endsWith('_normal') && d?.discovered) {
+            set.add(`normal_${k.replace('_normal', '')}`);
+          }
+        });
+      }
+      [...(planted || []), ...(stored || [])].forEach((b) => {
+        if (b.variant !== 'blooming') {
+          set.add(`normal_${b.leafType || b.species}`);
+        }
+      });
+      return Math.min(20, set.size);
+    },
   },
   {
     id: 'bondex_style_types',
@@ -78,8 +97,34 @@ export const SOCIETY_MILESTONES: MilestoneDef[] = [
     title: 'Style Types found',
     unit: 'Styles',
     targets: [15, 30, 60, 120, 200],
-    getValue: (_stats, discoveredMap) =>
-      Object.values(discoveredMap || {}).reduce((acc, d) => acc + (d?.stylesRaised?.length || 0), 0),
+    getValue: (stats, discoveredMap, planted, stored) => {
+      const set = new Set<string>();
+      (stats?.discoveredStyles || []).forEach((id) => {
+        if (id.startsWith('normal_')) set.add(id);
+      });
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && Array.isArray(d?.stylesRaised)) {
+            d.stylesRaised.forEach((st: string) => {
+              set.add(`normal_${k}_${st.toUpperCase().replace('-', '_')}`);
+            });
+          } else if (k.endsWith('_normal') && Array.isArray(d?.stylesRaised)) {
+            const base = k.replace('_normal', '');
+            d.stylesRaised.forEach((st: string) => {
+              set.add(`normal_${base}_${st.toUpperCase().replace('-', '_')}`);
+            });
+          }
+        });
+      }
+      [...(planted || []), ...(stored || [])].forEach((b) => {
+        if (b.variant !== 'blooming' && b.style) {
+          const lt = b.leafType || b.species;
+          const st = b.style.toUpperCase().replace('-', '_');
+          set.add(`normal_${lt}_${st}`);
+        }
+      });
+      return Math.min(200, set.size);
+    },
   },
   {
     id: 'bondex_blooming_species',
@@ -87,8 +132,33 @@ export const SOCIETY_MILESTONES: MilestoneDef[] = [
     title: 'Blooming Species Types found',
     unit: 'Species',
     targets: [3, 6, 10, 15, 20],
-    isNotObtainable: true,
-    getValue: () => 0,
+    getValue: (stats, discoveredMap, planted, stored, inventory) => {
+      const set = new Set<string>();
+      (stats?.discoveredBloomingSpecies || []).forEach((id) => {
+        if (id.startsWith('blooming_')) set.add(id);
+      });
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && d?.bloomingDiscovered) {
+            set.add(`blooming_${k}`);
+          } else if (k.endsWith('_blooming') && d?.discovered) {
+            const base = k.replace('_blooming', '');
+            set.add(`blooming_${base}`);
+          }
+        });
+      }
+      [...(planted || []), ...(stored || [])].forEach((b) => {
+        if (b.variant === 'blooming') {
+          set.add(`blooming_${b.leafType || b.species}`);
+        }
+      });
+      (inventory?.seedlingList || []).forEach((s) => {
+        if (s.variant === 'blooming') {
+          set.add(`blooming_${s.leafType || s.species}`);
+        }
+      });
+      return Math.min(20, set.size);
+    },
   },
   {
     id: 'bondex_blooming_styles',
@@ -96,8 +166,34 @@ export const SOCIETY_MILESTONES: MilestoneDef[] = [
     title: 'Blooming Style Types found',
     unit: 'Styles',
     targets: [15, 30, 60, 120, 200],
-    isNotObtainable: true,
-    getValue: () => 0,
+    getValue: (stats, discoveredMap, planted, stored) => {
+      const set = new Set<string>();
+      (stats?.discoveredBloomingStyles || []).forEach((id) => {
+        if (id.startsWith('blooming_')) set.add(id);
+      });
+      if (discoveredMap) {
+        Object.entries(discoveredMap).forEach(([k, d]: [string, any]) => {
+          if (!k.includes('_') && Array.isArray(d?.bloomingStylesRaised)) {
+            d.bloomingStylesRaised.forEach((st: string) => {
+              set.add(`blooming_${k}_${st.toUpperCase().replace('-', '_')}`);
+            });
+          } else if (k.endsWith('_blooming') && Array.isArray(d?.stylesRaised)) {
+            const base = k.replace('_blooming', '');
+            d.stylesRaised.forEach((st: string) => {
+              set.add(`blooming_${base}_${st.toUpperCase().replace('-', '_')}`);
+            });
+          }
+        });
+      }
+      [...(planted || []), ...(stored || [])].forEach((b) => {
+        if (b.variant === 'blooming' && b.style) {
+          const lt = b.leafType || b.species;
+          const st = b.style.toUpperCase().replace('-', '_');
+          set.add(`blooming_${lt}_${st}`);
+        }
+      });
+      return Math.min(200, set.size);
+    },
   },
 
   // 2. Category: Growing

@@ -80,6 +80,115 @@ export const ALL_BONSAI_STYLES: BonsaiStyle[] = [
   'FUKINAASHI',
 ];
 
+export interface BonsaiStyleDefinition {
+  id: BonsaiStyle;
+  name: string;
+  kanji: string;
+  japanese: string;
+  subtitle: string;
+  description: string;
+  icon: string;
+}
+
+export const BONSAI_STYLES: Record<string, BonsaiStyleDefinition> = {
+  CHOKAN: {
+    id: 'CHOKAN',
+    name: 'Formal Upright',
+    kanji: '直幹',
+    japanese: 'Chokan',
+    subtitle: 'Tapering, straight vertical trunk with symmetrical horizontal branch pads',
+    description: 'A classic towering silhouette representing strength, upright dignity, and pristine architectural balance.',
+    icon: '🌲',
+  },
+  MOYOGI: {
+    id: 'MOYOGI',
+    name: 'Informal Upright',
+    kanji: '模様木',
+    japanese: 'Moyogi',
+    subtitle: 'Elegant sinuous S-curve trunk with balanced asymmetric foliage pads',
+    description: 'Graceful undulating natural trunk curvature reflecting harmony with passing winds and gentle sunlight.',
+    icon: '🌿',
+  },
+  SHAKAN: {
+    id: 'SHAKAN',
+    name: 'Slanting Style',
+    kanji: '斜幹',
+    japanese: 'Shakan',
+    subtitle: 'Expressive windswept angled trunk (35-45°) with counterbalancing branch',
+    description: 'Dynamic slanting posture molded by mountain gales, anchored by a deep resilient counter-weight canopy.',
+    icon: '🎋',
+  },
+  HAN_KENGAI: {
+    id: 'HAN_KENGAI',
+    name: 'Semi-Cascade Style',
+    kanji: '半懸崖',
+    japanese: 'Han-Kengai',
+    subtitle: 'Trunk curving gently over pot rim with draping foliage and strong anchor roots',
+    description: 'A resilient riverbank silhouette bending gracefully over the water rim without dipping below the pot base.',
+    icon: '🌊',
+  },
+  SOKAN: {
+    id: 'SOKAN',
+    name: 'Double Trunk',
+    kanji: '双幹',
+    japanese: 'Sokan',
+    subtitle: 'Two distinct trunks sharing a unified root flare, father and child harmony',
+    description: 'Dual trunks growing from a single base in intimate harmony, sharing space, sun, and balanced foliage.',
+    icon: '🌳',
+  },
+  KENGAI: {
+    id: 'KENGAI',
+    name: 'Full Cascade Style',
+    kanji: '懸崖',
+    japanese: 'Kengai',
+    subtitle: 'Dramatic cliffside growth plunging boldly below the pot and pedestal base',
+    description: 'A breathtaking cliffhanger enduring harsh mountain ravines, anchored by deep gripping root flares.',
+    icon: '🏔️',
+  },
+  KABUDACHI: {
+    id: 'KABUDACHI',
+    name: 'Multi-Trunk Clump',
+    kanji: '株立ち',
+    japanese: 'Kabudachi',
+    subtitle: 'Clump of 3-5 slender trunks radiating outward with a unified shared canopy',
+    description: 'A natural grove silhouette born from a single root system, radiating outwards in communal harmony.',
+    icon: '🎋',
+  },
+  HOKIDACHI: {
+    id: 'HOKIDACHI',
+    name: 'Broom Style',
+    kanji: '箒立ち',
+    japanese: 'Hokidachi',
+    subtitle: 'Upright trunk branching evenly into a balanced, fan-like canopy',
+    description: 'Upright trunk branching evenly into a balanced, fan-like canopy.',
+    icon: '🧹',
+  },
+  BUNJINGI: {
+    id: 'BUNJINGI',
+    name: 'Literati Style',
+    kanji: '文人木',
+    japanese: 'Bunjingi',
+    subtitle: 'Graceful, slender, sinuous trunk with minimalist cloud pads',
+    description: 'Graceful, slender, sinuous trunk with minimalist cloud pads.',
+    icon: '🖌️',
+  },
+  FUKINAASHI: {
+    id: 'FUKINAASHI',
+    name: 'Windswept Style',
+    kanji: '吹流し',
+    japanese: 'Fukinaashi',
+    subtitle: 'Dynamic wind-sculpted posture with branches swept decisively in one direction',
+    description: 'Dynamic wind-sculpted posture with branches swept decisively in one direction.',
+    icon: '💨',
+  },
+};
+
+export function getBonsaiStyleDef(style?: string): BonsaiStyleDefinition {
+  if (!style) return BONSAI_STYLES['MOYOGI'];
+  const upper = style.toUpperCase().replace('-', '_');
+  return BONSAI_STYLES[upper] || BONSAI_STYLES['MOYOGI'];
+}
+
 export const STYLE_ATTRIBUTE_WEIGHTS: Record<
   string,
   { foliage: number; branches: number; trunk: number; roots: number }
@@ -404,6 +513,7 @@ export interface BonsaiDonationBreakdown {
   level: number;
   attributeFactor: number;
   attributeBreakdown: AttributeFactorBreakdown;
+  lookFactor: number;
   rawValue: number;
   finalValue: number;
   expertNegotiatorLvl: number;
@@ -418,6 +528,7 @@ export function getBonsaiDonationBreakdown(
     level?: number;
     findOdds?: number;
     foundOdds?: number;
+    variant?: 'normal' | 'blooming';
     basePriceBonus?: number;
     skills?: Record<string, number>;
     expertNegotiatorLvl?: number;
@@ -437,6 +548,7 @@ export function getBonsaiDonationBreakdown(
       level: 0,
       attributeFactor: 1,
       attributeBreakdown: dummyAttr,
+      lookFactor: 1.0,
       rawValue: 0.0,
       finalValue: 0.0,
       expertNegotiatorLvl: 0,
@@ -470,7 +582,14 @@ export function getBonsaiDonationBreakdown(
   const attributeBreakdown = calculateAttributeFactor(bonsai);
   const attributeFactor = attributeBreakdown.attributeFactor;
 
-  // 6. "Expert Negotiator" Skill: +10% per level to donation value
+  // 6. Bonsai Look Factor: blooming -> 1.2, normal -> 1.0
+  const isBlooming =
+    bonsai.variant === 'blooming' ||
+    (bonsai as any).saplingVariant === 'blooming' ||
+    (bonsai as any).isBlooming === true;
+  const lookFactor = isBlooming ? 1.2 : 1.0;
+
+  // 7. "Expert Negotiator" Skill: +10% per level to donation value
   const gStateSkills = (globalThis as any)?.gameState?.skills;
   const expertNegotiatorLvl =
     typeof skills === 'number'
@@ -487,8 +606,7 @@ export function getBonsaiDonationBreakdown(
 
   // Final Donation Value formula:
   // Math.floor((rawValue + 1e-9) * 100) / 100 (always truncated/rounded down to 2 decimal places)
-  // Max possible base value = 1 * 5.0 * 3.0 * 5.0 * 9.0 = 675.00 Verdure (* expertNegotiatorBonus)
-  const rawBaseValue = basePrice * speciesFindOdds * maturityRating * levelFactor * attributeFactor;
+  const rawBaseValue = basePrice * speciesFindOdds * maturityRating * levelFactor * attributeFactor * lookFactor;
   const rawValue = rawBaseValue * expertNegotiatorBonus;
   const finalValue = Math.floor((rawValue + 1e-9) * 100) / 100;
 
@@ -502,6 +620,7 @@ export function getBonsaiDonationBreakdown(
     level,
     attributeFactor,
     attributeBreakdown,
+    lookFactor,
     rawValue,
     finalValue,
     expertNegotiatorLvl,
@@ -635,7 +754,7 @@ export interface BarkPaletteEntry {
  * Enforces 100% trunk bark color consistency across all styles for each species.
  */
 export const SPECIES_BARK_COLORS: Record<BonsaiLeafType, BarkPaletteEntry> = {
-  circle: { base: '#292524', shadow: '#1c1917', highlight: '#44403c' }, // Maru: Dark rugged charcoal pine
+  circle: { base: '#8B4513', shadow: '#5C2E0B', highlight: '#A0522D' }, // Maru: Distinct rich auburn / aged cedar mahogany
   oval: { base: '#6d2e1b', shadow: '#451b0f', highlight: '#8f3e26' }, // Daen: Warm cinnamon-reddish maple
   circle_hole: { base: '#78350f', shadow: '#451a03', highlight: '#92400e' }, // Yubiwa: Fibrous warm amber juniper/cedar
   raindrop: { base: '#544738', shadow: '#382e22', highlight: '#73634f' }, // Otosu: Cool mossy bronze-brown cypress
@@ -1180,6 +1299,141 @@ export function getBonsaiGroup(type?: string): BonsaiGroup {
 }
 
 /**
+ * Renders an authentic 5-petal Sakura (Cherry Blossom) flower motif
+ * with tiny soft yellow/golden stamen center.
+ */
+export function drawCherryBlossom(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  foliageColor?: string,
+  angleOffset = 0,
+) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angleOffset);
+
+  // Gentle blossom pinks (#FFB7C5, #FFA6C9, #FFC0CB, #F8BBD0) with foliage-tint adaptations
+  let petalBase = '#FFA6C9';
+  let petalTip = '#FFE8EE';
+  let centerCore = '#FB7185';
+  const stamenColor = '#FACC15';
+
+  if (foliageColor) {
+    const col = foliageColor.toLowerCase();
+    // Warm peach-pink against autumn / golden leaves
+    if (col.includes('cc00') || col.includes('ff33') || col.includes('9900') || col.includes('cccc')) {
+      petalBase = '#FF9EAA';
+      petalTip = '#FFF0F3';
+      centerCore = '#F43F5E';
+    } else if (col.includes('00cc') || col.includes('99ff') || col.includes('00b0')) {
+      // Soft rosy pastel against deep emerald / teal foliage
+      petalBase = '#FFB7C5';
+      petalTip = '#FFF5F7';
+      centerCore = '#FB7185';
+    } else {
+      // Crisp sakura pink against dark pines / cooler leaves
+      petalBase = '#FFA6C9';
+      petalTip = '#FFEBF0';
+      centerCore = '#E11D48';
+    }
+  }
+
+  const s = Math.max(2.2, size);
+  const petals = 5;
+
+  // 5 delicate Sakura petals
+  for (let i = 0; i < petals; i++) {
+    const angle = (i * Math.PI * 2) / petals - Math.PI / 2;
+    ctx.save();
+    ctx.rotate(angle);
+
+    // Petal outer body
+    ctx.fillStyle = petalBase;
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.72, s * 0.4, s * 0.52, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Petal inner soft highlight
+    ctx.fillStyle = petalTip;
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.76, s * 0.25, s * 0.36, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Subtle petal tip notch
+    ctx.fillStyle = petalBase;
+    ctx.beginPath();
+    ctx.arc(0, -s * 1.15, s * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // Central floral disc
+  ctx.fillStyle = centerCore;
+  ctx.beginPath();
+  ctx.arc(0, 0, s * 0.32, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Golden stamen center
+  ctx.fillStyle = stamenColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, s * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 5 tiny stamen pollen anthers
+  ctx.fillStyle = '#EAB308';
+  for (let p = 0; p < 5; p++) {
+    const pAng = (p * Math.PI * 2) / 5 + 0.3;
+    ctx.beginPath();
+    ctx.arc(Math.cos(pAng) * s * 0.26, Math.sin(pAng) * s * 0.26, s * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws delicate cherry blossom flowers layered over a leaf cluster pad.
+ */
+export function drawCherryBlossomsOverPad(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  radius: number,
+  foliageColor?: string,
+) {
+  const r = Math.max(3, radius);
+  if (r < 6) {
+    drawCherryBlossom(ctx, cx, cy, r * 0.75, foliageColor, 0.2);
+    return;
+  }
+
+  // 2-3 blossoms scattered harmoniously across pad
+  const bSize1 = r * 0.48;
+  const bSize2 = r * 0.40;
+  const bSize3 = r * 0.34;
+
+  drawCherryBlossom(ctx, cx - r * 0.28, cy - r * 0.15, bSize1, foliageColor, 0.4);
+  drawCherryBlossom(ctx, cx + r * 0.32, cy + r * 0.20, bSize2, foliageColor, 1.2);
+  drawCherryBlossom(ctx, cx + r * 0.05, cy - r * 0.42, bSize3, foliageColor, 2.1);
+}
+
+/**
+ * Helper to draw cherry blossom flowers over an array of leaf cluster positions.
+ */
+export function drawCherryBlossoms(
+  ctx: CanvasRenderingContext2D,
+  leafClusters: { x: number; y: number; r: number }[],
+  foliageColor?: string,
+) {
+  leafClusters.forEach((cluster) => {
+    drawCherryBlossomsOverPad(ctx, cluster.x, cluster.y, cluster.r, foliageColor);
+  });
+}
+
+/**
  * Procedural leaf canopy drawing onto a foliage pad cluster:
  * Supports all 20 leaf types cleanly without external assets!
  */
@@ -1191,6 +1445,7 @@ export function drawLeafShape(
   leafType: BonsaiLeafType,
   color: string,
   accentColor: string,
+  isBlooming = false,
 ) {
   const r = Math.max(3, radius);
   ctx.save();
@@ -1638,6 +1893,10 @@ export function drawLeafShape(
     ctx.fill();
   }
 
+  if (isBlooming) {
+    drawCherryBlossomsOverPad(ctx, cx, cy, r, color);
+  }
+
   ctx.restore();
 }
 
@@ -1665,8 +1924,10 @@ export function drawBonsaiTrunkAndCanopy(
   foliageColor: string,
   foliageAccent: string,
   isStyleUnlogged = false,
+  variant: 'normal' | 'blooming' = 'normal',
 ) {
   const normStyle = (style || 'MOYOGI').toUpperCase().replace('-', '_');
+  const isBlooming = variant === 'blooming';
 
   // Enforce 100% bark color consistency per species across ALL styles
   const barkPalette = SPECIES_BARK_COLORS[leafType] || SPECIES_BARK_COLORS['circle'];
@@ -1717,12 +1978,12 @@ export function drawBonsaiTrunkAndCanopy(
       ctx.stroke();
 
       const padRad = (11 + (tiers - t) * 2.5) * stageScale;
-      drawLeafShape(ctx, bx - branchSpread - 1, tierY - 2, padRad, leafType, folColor, folAccent);
-      drawLeafShape(ctx, bx + branchSpread + 1, tierY - 4, padRad, leafType, folColor, folAccent);
+      drawLeafShape(ctx, bx - branchSpread - 1, tierY - 2, padRad, leafType, folColor, folAccent, isBlooming);
+      drawLeafShape(ctx, bx + branchSpread + 1, tierY - 4, padRad, leafType, folColor, folAccent, isBlooming);
     }
 
     // Apex Crown Pad
-    drawLeafShape(ctx, bx, by - 4 - trunkHeight - 2, 13 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, bx, by - 4 - trunkHeight - 2, 13 * stageScale, leafType, folColor, folAccent, isBlooming);
 
   } else if (normStyle === 'MOYOGI') {
     // 2. MOYOGI (Informal Upright): Graceful sinuous 'S'-curve trunk
@@ -1753,7 +2014,7 @@ export function drawBonsaiTrunkAndCanopy(
       { x: bx + 2 * stageScale, y: by - 4 - trunkHeight - 2, r: 14 * stageScale },
     ];
     pads.forEach((pad) => {
-      drawLeafShape(ctx, pad.x, pad.y, pad.r, leafType, folColor, folAccent);
+      drawLeafShape(ctx, pad.x, pad.y, pad.r, leafType, folColor, folAccent, isBlooming);
     });
 
   } else if (normStyle === 'SHAKAN') {
@@ -1817,11 +2078,11 @@ export function drawBonsaiTrunkAndCanopy(
     ctx.lineTo(b3EndX, b3EndY);
     ctx.stroke();
 
-    drawLeafShape(ctx, b1EndX - 3 * stageScale, b1EndY + 1, 8.5 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, b1EndX + 5 * stageScale, b1EndY - 1, 7.5 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, b2EndX, b2EndY, 8 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, b3EndX, b3EndY, 8.5 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, trunkApexX + 1, trunkApexY - 7 * stageScale, 11 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, b1EndX - 3 * stageScale, b1EndY + 1, 8.5 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, b1EndX + 5 * stageScale, b1EndY - 1, 7.5 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, b2EndX, b2EndY, 8 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, b3EndX, b3EndY, 8.5 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, trunkApexX + 1, trunkApexY - 7 * stageScale, 11 * stageScale, leafType, folColor, folAccent, isBlooming);
 
   } else if (normStyle === 'HAN_KENGAI') {
     // 4. HAN-KENGAI (Semi-Cascade): Trunk angles gracefully over the rim of the pot with foliage draping down to pot-rim level
@@ -1874,10 +2135,10 @@ export function drawBonsaiTrunkAndCanopy(
     ctx.stroke();
 
     // Draping foliage pads down to pot rim level
-    drawLeafShape(ctx, archApexX - 6 * stageScale, archApexY - 15 * stageScale, 10 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, archApexX + 19 * stageScale, archApexY + 3 * stageScale, 9.5 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, drapeX + 1 * stageScale, drapeY - 2, 11 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, drapeX - 8 * stageScale, drapeY + 4 * stageScale, 8.5 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, archApexX - 6 * stageScale, archApexY - 15 * stageScale, 10 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, archApexX + 19 * stageScale, archApexY + 3 * stageScale, 9.5 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, drapeX + 1 * stageScale, drapeY - 2, 11 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, drapeX - 8 * stageScale, drapeY + 4 * stageScale, 8.5 * stageScale, leafType, folColor, folAccent, isBlooming);
 
   } else if (normStyle === 'SOKAN') {
     // 5. SOKAN (Double Trunk): Two distinct trunks emerging from a single root base, one dominant and one secondary
@@ -1937,13 +2198,13 @@ export function drawBonsaiTrunkAndCanopy(
     ctx.stroke();
 
     // Foliage pads on primary trunk
-    drawLeafShape(ctx, bx - 25 * stageScale, by - 4 - trunkHeight * 0.59, 10 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, pApexX - 3 * stageScale, pApexY - 3 * stageScale, 13 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, pApexX + 10 * stageScale, pApexY + 8 * stageScale, 9 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, bx - 25 * stageScale, by - 4 - trunkHeight * 0.59, 10 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, pApexX - 3 * stageScale, pApexY - 3 * stageScale, 13 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, pApexX + 10 * stageScale, pApexY + 8 * stageScale, 9 * stageScale, leafType, folColor, folAccent, isBlooming);
 
     // Foliage pads on secondary trunk
-    drawLeafShape(ctx, bx + 27 * stageScale, by - 4 - trunkHeight * 0.34, 8.5 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, sApexX, sApexY - 3 * stageScale, 11 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, bx + 27 * stageScale, by - 4 - trunkHeight * 0.34, 8.5 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, sApexX, sApexY - 3 * stageScale, 11 * stageScale, leafType, folColor, folAccent, isBlooming);
 
   } else if (normStyle === 'KENGAI') {
     // 6. KENGAI (Full Cascade): Dramatic cliff-side growth where main trunk sweeps boldly downwards below pot base
@@ -1995,10 +2256,10 @@ export function drawBonsaiTrunkAndCanopy(
     ctx.stroke();
 
     // Cascading foliage pads (cliffhanger clouds)
-    drawLeafShape(ctx, crestX - 8 * stageScale, crestY - 13 * stageScale, 10 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, crestX + 23 * stageScale, by + 2 * stageScale, 9.5 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, plungeX + 2 * stageScale, plungeY - 3 * stageScale, 12 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, plungeX - 8 * stageScale, plungeY + 4 * stageScale, 9 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, crestX - 8 * stageScale, crestY - 13 * stageScale, 10 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, crestX + 23 * stageScale, by + 2 * stageScale, 9.5 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, plungeX + 2 * stageScale, plungeY - 3 * stageScale, 12 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, plungeX - 8 * stageScale, plungeY + 4 * stageScale, 9 * stageScale, leafType, folColor, folAccent, isBlooming);
 
   } else if (normStyle === 'KABUDACHI') {
     // 7. KABUDACHI (Multi-Trunk Clump): Clump of 3-5 slender trunks radiating upwards from unified flare
@@ -2030,11 +2291,11 @@ export function drawBonsaiTrunkAndCanopy(
     });
 
     // Shared crown foliage clouds atop each trunk terminal
-    drawLeafShape(ctx, trunks[0].endX, trunks[0].endY - 2, 8.5 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, trunks[1].endX, trunks[1].endY - 2, 10 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, trunks[2].endX, trunks[2].endY - 3, 12 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, trunks[3].endX, trunks[3].endY - 2, 9.5 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, trunks[4].endX, trunks[4].endY - 2, 8 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, trunks[0].endX, trunks[0].endY - 2, 8.5 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, trunks[1].endX, trunks[1].endY - 2, 10 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, trunks[2].endX, trunks[2].endY - 3, 12 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, trunks[3].endX, trunks[3].endY - 2, 9.5 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, trunks[4].endX, trunks[4].endY - 2, 8 * stageScale, leafType, folColor, folAccent, isBlooming);
 
   } else if (normStyle === 'HOKIDACHI') {
     // 8. HOKIDACHI (Broom Style / 箒立ち): Straight upright trunk dividing evenly into a balanced, fan-like canopy
@@ -2113,7 +2374,7 @@ export function drawBonsaiTrunkAndCanopy(
     ];
 
     broomPads.forEach((pad) => {
-      drawLeafShape(ctx, pad.x, pad.y, pad.r, leafType, folColor, folAccent);
+      drawLeafShape(ctx, pad.x, pad.y, pad.r, leafType, folColor, folAccent, isBlooming);
     });
 
   } else if (normStyle === 'BUNJINGI') {
@@ -2178,9 +2439,9 @@ export function drawBonsaiTrunkAndCanopy(
     ctx.stroke();
 
     // Sparse, expressive, compact cloud pads (3 pads total, minimalist aesthetic)
-    drawLeafShape(ctx, branch1EndX - 1 * stageScale, branch1EndY, 8.5 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, apexX, apexY - 4 * stageScale, 11 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, branch2EndX, branch2EndY, 8 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, branch1EndX - 1 * stageScale, branch1EndY, 8.5 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, apexX, apexY - 4 * stageScale, 11 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, branch2EndX, branch2EndY, 8 * stageScale, leafType, folColor, folAccent, isBlooming);
 
   } else if (normStyle === 'FUKINAASHI') {
     // 10. FUKINAASHI (Windswept Style / 吹流し): Strong directional lean with trunk, branches, and foliage swept dynamically in a single windward direction
@@ -2264,12 +2525,12 @@ export function drawBonsaiTrunkAndCanopy(
     ctx.stroke();
 
     // Windswept horizontally trailing foliage pads (all swept rightward in the wind stream)
-    drawLeafShape(ctx, bLowEndX, bLowEndY, 8.5 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, bMidEndX - 4 * stageScale, bMidEndY - 1, 9.5 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, bMidEndX + 7 * stageScale, bMidEndY + 1, 8 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, apexX - 2 * stageScale, apexY - 3 * stageScale, 10.5 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, bTopEndX, bTopEndY, 9 * stageScale, leafType, folColor, folAccent);
-    drawLeafShape(ctx, bTopEndX + 8 * stageScale, bTopEndY + 3 * stageScale, 7.5 * stageScale, leafType, folColor, folAccent);
+    drawLeafShape(ctx, bLowEndX, bLowEndY, 8.5 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, bMidEndX - 4 * stageScale, bMidEndY - 1, 9.5 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, bMidEndX + 7 * stageScale, bMidEndY + 1, 8 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, apexX - 2 * stageScale, apexY - 3 * stageScale, 10.5 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, bTopEndX, bTopEndY, 9 * stageScale, leafType, folColor, folAccent, isBlooming);
+    drawLeafShape(ctx, bTopEndX + 8 * stageScale, bTopEndY + 3 * stageScale, 7.5 * stageScale, leafType, folColor, folAccent, isBlooming);
 
   } else {
     // Fallback: Moyogi informal upright
@@ -2300,7 +2561,7 @@ export function drawBonsaiTrunkAndCanopy(
       { x: bx + 2 * stageScale, y: by - 4 - trunkHeight - 2, r: 14 * stageScale },
     ];
     pads.forEach((pad) => {
-      drawLeafShape(ctx, pad.x, pad.y, pad.r, leafType, folColor, folAccent);
+      drawLeafShape(ctx, pad.x, pad.y, pad.r, leafType, folColor, folAccent, isBlooming);
     });
   }
 

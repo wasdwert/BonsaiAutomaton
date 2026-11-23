@@ -154,7 +154,7 @@ export function saveGame(
   const activeTrees = data.plantedBonsais || [];
   const maxLvl = activeTrees.reduce((max, b) => Math.max(max, b.level || 0), 0);
   const inv = data.sanctuaryInventory || {};
-  const verdure = typeof inv.coins === 'number' ? inv.coins : (inv.verdure || 0);
+  const verdure = typeof inv.coins === 'number' ? inv.coins : (typeof inv.verdure === 'number' ? inv.verdure : 50);
   const pLevel = inv.player_level ?? inv.playerLevel ?? 0;
   const pExp = inv.player_exp ?? inv.playerXP ?? 0;
   const zen = inv.zen_essence ?? inv.zenPoints ?? 0;

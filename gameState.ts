@@ -73,18 +73,36 @@ export const INITIAL_RESOURCES: GameStateResources = {
   t3_fertilizer_dripper_inv: 0,
 };
 
+export const BASE_ROVER_BATTERY = 50;
+
 export const INITIAL_GAME_STATE = {
-  verdure: 12000,
-  coins: 12000,
-  battery: 500,
-  maxBattery: 500,
-  roverBattery: 500,
-  roverMaxBattery: 500,
+  verdure: 50,
+  coins: 50,
+  battery: 50,
+  maxBattery: 50,
+  baseBattery: 50,
+  extraBattery: 0,
+  roverBattery: 50,
+  roverMaxBattery: 50,
   rover: {
-    battery: 500,
-    maxBattery: 500,
-    batteryKwh: 500,
-    maxBatteryKwh: 500,
+    battery: 50,
+    maxBattery: 50,
+    baseBattery: 50,
+    extraBattery: 0,
+    batteryKwh: 50,
+    maxBatteryKwh: 50,
+    baseCargo: 3.0,
+    extraStorage: 0.0,
+    cargo: 0.0,
+    maxCargo: 3.0,
+    basePayload: 3.0,
+    extraPayload: 0.0,
+    payload: 0.0,
+    maxPayload: 3.0,
+    installedModules: [] as string[],
+    storageModule: 0.0,
+    storageModules: [] as string[],
+    batteryModule: 0,
   },
   unlockedMaps: ['area1_base'],
   player_level: 0,
@@ -98,9 +116,63 @@ export const INITIAL_GAME_STATE = {
     playerXP: 0,
     level: 0,
     xp: 0,
+    discoveredSpecies: [] as string[],
+    discoveredStyles: [] as string[],
+    discoveredBloomingSpecies: [] as string[],
+    discoveredBloomingStyles: [] as string[],
   },
+  discoveredSpecies: [] as string[],
+  discoveredStyles: [] as string[],
+  discoveredBloomingSpecies: [] as string[],
+  discoveredBloomingStyles: [] as string[],
   unlockedBlueprints: [] as string[],
+  skills: {
+    carefulTrowel: 0,
+    steady_hands: 0,
+    broadSpade: 0,
+    botanicalForaging: 0,
+    perpetuum_mobile: 0,
+    resourceProspectingArea1: 0,
+    resourceProspectingArea2: 0,
+    resourceProspectingArea3: 0,
+    botanicalDowsingArea1: 0,
+    botanicalDowsingArea2: 0,
+    botanicalDowsingArea3: 0,
+    artifactHunterArea1: 0,
+    artifactHunterArea2: 0,
+    artifactHunterArea3: 0,
+    greenThumb: 0,
+    hydrodynamicsSprinklerT1: 0,
+    hydrodynamicsSprinklerT2: 0,
+    hydrodynamicsSprinklerT3: 0,
+    hydrodynamicsIrrigationT1: 0,
+    hydrodynamicsIrrigationT2: 0,
+    hydrodynamicsIrrigationT3: 0,
+    propagation_expert: 0,
+    propagationExpert: 0,
+    offshoot_multiplier: 0,
+    offshootMultiplier: 0,
+    expertNegotiator: 0,
+    discountHunter: 0,
+    solarExpert: 0,
+    windExpert: 0,
+    efficientComposts: 0,
+    efficientFertilizers: 0,
+    efficientSpeedGrows: 0,
+    efficientWireProduction: 0,
+    efficientGearsProduction: 0,
+    efficientCircuitProduction: 0,
+    efficientChipProduction: 0,
+    experiencedPresenter: 0,
+    bigHands: 0,
+  },
   resources: INITIAL_RESOURCES,
+  storedBonsais: [] as any[],
+  inventory: {
+    storedBonsais: [] as any[],
+    seedlingList: [],
+    resources: INITIAL_RESOURCES,
+  },
   deployables: {
     t1_compost_feeder: 0,
     t2_compost_feeder: 0,
@@ -117,11 +189,154 @@ export const INITIAL_GAME_STATE = {
     t2_fertilizer_dripper: 0,
     t3_fertilizer_dripper: 0,
   },
+  extraStorage: 0.0,
+  baseCargo: 3.0,
+  maxCargo: 3.0,
+  basePayload: 3.0,
+  maxPayload: 3.0,
+  roverModules: {
+    storage_1: 0,
+    storage_2: 0,
+    storage_3: 0,
+    battery_1: 0,
+    battery_2: 0,
+    battery_3: 0,
+    radar_1: 0,
+    radar_2: 0,
+    radar_3: 0,
+  },
+  attachedRoverModules: [] as string[],
+  attached_rover_modules: [] as string[],
 };
 
 export const defaultGameState = INITIAL_GAME_STATE;
 export const initialGameState = INITIAL_GAME_STATE;
 export const DEFAULT_GAME_STATE = INITIAL_GAME_STATE;
+
+/**
+ * Calculates the rover's maximum battery capacity (in kWh).
+ * Base battery = 50 kWh.
+ * Extra module battery = 0 kWh at start of game (no battery modules pre-installed).
+ * Total battery capacity when starting a new game is strictly 50 kWh.
+ */
+export function getRoverMaxBattery(state?: any): number {
+  const base = typeof state?.rover?.baseBattery === 'number'
+    ? state.rover.baseBattery
+    : typeof state?.baseBattery === 'number'
+    ? state.baseBattery
+    : BASE_ROVER_BATTERY;
+
+  return base + getRoverExtraBattery(state);
+}
+
+/**
+ * Calculates the extra module battery capacity for the rover (in kWh).
+ * Returns strictly 0 kWh by default when no battery modules are equipped.
+ */
+export function getRoverExtraBattery(state?: any): number {
+  let extra = 0;
+  if (typeof state?.rover?.extraBattery === 'number') {
+    extra += state.rover.extraBattery;
+  } else if (typeof state?.extraBattery === 'number') {
+    extra += state.extraBattery;
+  }
+
+  if (typeof state?.rover?.batteryModule === 'number') {
+    extra += state.rover.batteryModule;
+  }
+
+  const installed = state?.rover?.installedModules || state?.attached_rover_modules || state?.attachedRoverModules || [];
+  if (Array.isArray(installed)) {
+    for (const mod of installed) {
+      const modKey = typeof mod === 'string' ? mod : mod?.id || mod?.type || '';
+      if (modKey === 'battery_1') extra += 25;
+      else if (modKey === 'battery_2') extra += 50;
+      else if (modKey === 'battery_3') extra += 75;
+      else if (typeof mod?.bonusValue === 'number' && (mod?.category === 'battery' || modKey.includes('battery'))) {
+        extra += mod.bonusValue;
+      }
+    }
+  }
+
+  return extra;
+}
+
+/**
+ * Calculates the rover's maximum cargo payload (in kg).
+ * Base payload = 3.0 kg.
+ * Extra module payload = 0.0 kg at start of game (no storage modules pre-installed).
+ * Total cargo capacity when starting a new game is strictly 3.0 kg.
+ */
+export function getRoverMaxPayload(state?: any): number {
+  const base = typeof state?.rover?.basePayload === 'number'
+    ? state.rover.basePayload
+    : typeof state?.rover?.baseCargo === 'number'
+    ? state.rover.baseCargo
+    : typeof state?.basePayload === 'number'
+    ? state.basePayload
+    : typeof state?.baseCargo === 'number'
+    ? state.baseCargo
+    : 3.0;
+
+  let extra = 0.0;
+  if (typeof state?.rover?.extraStorage === 'number') {
+    extra += state.rover.extraStorage;
+  } else if (typeof state?.extraStorage === 'number') {
+    extra += state.extraStorage;
+  }
+
+  if (typeof state?.rover?.storageModule === 'number') {
+    extra += state.rover.storageModule;
+  }
+
+  // Check attached / installed modules if present
+  const installed = state?.rover?.installedModules || state?.attached_rover_modules || state?.attachedRoverModules || [];
+  if (Array.isArray(installed)) {
+    for (const mod of installed) {
+      const modKey = typeof mod === 'string' ? mod : mod?.id || mod?.type || '';
+      if (modKey === 'storage_1') extra += 1.0;
+      else if (modKey === 'storage_2') extra += 2.0;
+      else if (modKey === 'storage_3') extra += 3.0;
+      else if (typeof mod?.bonusValue === 'number' && (mod?.category === 'storage' || modKey.includes('storage'))) {
+        extra += mod.bonusValue;
+      }
+    }
+  }
+
+  return Math.round((base + extra) * 10) / 10;
+}
+
+/**
+ * Calculates the extra module payload capacity for the rover (in kg).
+ * Returns strictly 0.0 kg by default when no storage modules are equipped.
+ */
+export function getRoverExtraStorage(state?: any): number {
+  let extra = 0.0;
+  if (typeof state?.rover?.extraStorage === 'number') {
+    extra += state.rover.extraStorage;
+  } else if (typeof state?.extraStorage === 'number') {
+    extra += state.extraStorage;
+  }
+
+  if (typeof state?.rover?.storageModule === 'number') {
+    extra += state.rover.storageModule;
+  }
+
+  const installed = state?.rover?.installedModules || state?.attached_rover_modules || state?.attachedRoverModules || [];
+  if (Array.isArray(installed)) {
+    for (const mod of installed) {
+      const modKey = typeof mod === 'string' ? mod : mod?.id || mod?.type || '';
+      if (modKey === 'storage_1') extra += 1.0;
+      else if (modKey === 'storage_2') extra += 2.0;
+      else if (modKey === 'storage_3') extra += 3.0;
+      else if (typeof mod?.bonusValue === 'number' && (mod?.category === 'storage' || modKey.includes('storage'))) {
+        extra += mod.bonusValue;
+      }
+    }
+  }
+
+  return Math.round(extra * 10) / 10;
+}
 
 /**
  * Player Level Progression Table (Levels 0 to 100).
@@ -374,11 +589,14 @@ export function addPlayerXP(
 
 /**
  * Activity 1: Manual Pruning & Care Player XP:
- * XP = 0.4 * Maturity Factor * Species Finding Odds
- * Strictly: const pruneXP = Math.round(0.4 * maturityFactor * speciesOdds);
- * When 0.4 * 1.0 * 2.8 = 1.12, Math.round(1.12) MUST evaluate strictly to 1 XP.
+ * XP = round(0.4 * Species Find Odds * Maturity Factor * Bonsai Look Factor)
+ * Bonsai Look Factor: blooming -> 1.2, normal -> 1.0
  */
-export function calculatePruningXP(maturityFactorOrRating?: any, speciesOddsOrBonsai?: any): number {
+export function calculatePruningXP(
+  maturityFactorOrRating?: any,
+  speciesOddsOrBonsai?: any,
+  variantOrLookFactor?: any,
+): number {
   let maturityFactor = 1.0;
   if (typeof maturityFactorOrRating === 'number') {
     if (maturityFactorOrRating in MATURITY_XP_FACTORS) {
@@ -403,38 +621,83 @@ export function calculatePruningXP(maturityFactorOrRating?: any, speciesOddsOrBo
     speciesOdds = getSpeciesFindingOddsForXP(maturityFactorOrRating);
   }
 
-  const pruneXP = Math.round(0.4 * maturityFactor * speciesOdds);
+  let lookFactor = 1.0;
+  if (typeof variantOrLookFactor === 'number') {
+    lookFactor = variantOrLookFactor;
+  } else if (typeof variantOrLookFactor === 'string') {
+    lookFactor = variantOrLookFactor === 'blooming' ? 1.2 : 1.0;
+  } else if (variantOrLookFactor && typeof variantOrLookFactor === 'object') {
+    lookFactor = (variantOrLookFactor.variant === 'blooming' || variantOrLookFactor.saplingVariant === 'blooming' || variantOrLookFactor.isBlooming) ? 1.2 : 1.0;
+  } else if (speciesOddsOrBonsai && typeof speciesOddsOrBonsai === 'object') {
+    lookFactor = (speciesOddsOrBonsai.variant === 'blooming' || speciesOddsOrBonsai.saplingVariant === 'blooming' || speciesOddsOrBonsai.isBlooming) ? 1.2 : 1.0;
+  } else if (maturityFactorOrRating && typeof maturityFactorOrRating === 'object') {
+    lookFactor = (maturityFactorOrRating.variant === 'blooming' || maturityFactorOrRating.saplingVariant === 'blooming' || maturityFactorOrRating.isBlooming) ? 1.2 : 1.0;
+  }
+
+  const pruneXP = Math.round(0.4 * speciesOdds * maturityFactor * lookFactor);
   return Math.max(0, pruneXP);
 }
 
 /**
  * Activity 2: Bonsai Leveling Up Player XP (Both manual & automated):
- * XP = 1.0 * Maturity Factor * Species Finding Odds * ((Growth Duration Seconds / 100) + 1)
- * Always rounded to the closest full integer: Math.max(0, Math.round(rawXP))
+ * XP = round(1.0 * Species Find Odds * Maturity Factor * ((Grow Time Level Seconds / 100) + 1) * Bonsai Look Factor)
+ * Bonsai Look Factor: blooming -> 1.2, normal -> 1.0
  */
 export function calculateBonsaiLevelUpXP(
   levelTransition: number,
   maturityOrRating?: any,
   speciesOrBonsai?: any,
+  variantOrLookFactor?: any,
 ): number {
   const mat = getMaturityXPFactor(maturityOrRating);
   const odds = getSpeciesFindingOddsForXP(speciesOrBonsai ?? maturityOrRating);
   const growthDurationSeconds = getRequiredGrowthDuration(levelTransition, maturityOrRating);
   const durationFactor = (growthDurationSeconds / 100) + 1;
-  const rawXP = 1.0 * mat * odds * durationFactor;
+
+  let lookFactor = 1.0;
+  if (typeof variantOrLookFactor === 'number') {
+    lookFactor = variantOrLookFactor;
+  } else if (typeof variantOrLookFactor === 'string') {
+    lookFactor = variantOrLookFactor === 'blooming' ? 1.2 : 1.0;
+  } else if (variantOrLookFactor && typeof variantOrLookFactor === 'object') {
+    lookFactor = (variantOrLookFactor.variant === 'blooming' || variantOrLookFactor.saplingVariant === 'blooming' || variantOrLookFactor.isBlooming) ? 1.2 : 1.0;
+  } else if (speciesOrBonsai && typeof speciesOrBonsai === 'object') {
+    lookFactor = (speciesOrBonsai.variant === 'blooming' || speciesOrBonsai.saplingVariant === 'blooming' || speciesOrBonsai.isBlooming) ? 1.2 : 1.0;
+  } else if (maturityOrRating && typeof maturityOrRating === 'object') {
+    lookFactor = (maturityOrRating.variant === 'blooming' || maturityOrRating.saplingVariant === 'blooming' || maturityOrRating.isBlooming) ? 1.2 : 1.0;
+  }
+
+  const rawXP = 1.0 * odds * mat * durationFactor * lookFactor;
   return Math.max(0, Math.round(rawXP));
 }
 
 /**
  * Activity 3: Expeditions: Finding Seedling/Bonsai Player XP:
- * XP = 5.0 * Maturity Factor * Species Finding Odds
- * Always rounded to the closest full integer: Math.max(0, Math.round(rawXP))
- * Example: 5 * 1.0 (R1) * 2.8 (23% odds) = 14 XP
+ * XP = round(5.0 * Species Find Odds * Maturity Factor * Bonsai Look Factor)
+ * Bonsai Look Factor: blooming -> 1.2, normal -> 1.0
  */
-export function calculateFindingSeedlingXP(maturityOrRating?: any, speciesOrBonsai?: any): number {
+export function calculateFindingSeedlingXP(
+  maturityOrRating?: any,
+  speciesOrBonsai?: any,
+  variantOrLookFactor?: any,
+): number {
   const mat = getMaturityXPFactor(maturityOrRating);
   const odds = getSpeciesFindingOddsForXP(speciesOrBonsai ?? maturityOrRating);
-  const rawXP = 5.0 * mat * odds;
+
+  let lookFactor = 1.0;
+  if (typeof variantOrLookFactor === 'number') {
+    lookFactor = variantOrLookFactor;
+  } else if (typeof variantOrLookFactor === 'string') {
+    lookFactor = variantOrLookFactor === 'blooming' ? 1.2 : 1.0;
+  } else if (variantOrLookFactor && typeof variantOrLookFactor === 'object') {
+    lookFactor = (variantOrLookFactor.variant === 'blooming' || variantOrLookFactor.saplingVariant === 'blooming' || variantOrLookFactor.isBlooming) ? 1.2 : 1.0;
+  } else if (speciesOrBonsai && typeof speciesOrBonsai === 'object') {
+    lookFactor = (speciesOrBonsai.variant === 'blooming' || speciesOrBonsai.saplingVariant === 'blooming' || speciesOrBonsai.isBlooming) ? 1.2 : 1.0;
+  } else if (maturityOrRating && typeof maturityOrRating === 'object') {
+    lookFactor = (maturityOrRating.variant === 'blooming' || maturityOrRating.saplingVariant === 'blooming' || maturityOrRating.isBlooming) ? 1.2 : 1.0;
+  }
+
+  const rawXP = 5.0 * odds * mat * lookFactor;
   return Math.max(0, Math.round(rawXP));
 }
 
@@ -704,3 +967,17 @@ export {
   type FullSaveState,
   type OfflineSummary,
 } from './saveManager';
+
+export {
+  ZEN_SKILLS_DATA,
+  ZEN_SKILLS_DATA as SKILLS,
+  SKILL_BY_ID,
+  type SkillDefinition,
+} from './skillsData';
+
+export {
+  startPropagation,
+  completePropagation,
+  finishPropagation,
+  onPropagate,
+} from './SanctuaryCanvas';

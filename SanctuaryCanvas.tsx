@@ -19,6 +19,49 @@ export {
 export const drawBonsai = drawBonsaiTrunkAndCanopy;
 export const drawTrunk = drawBonsaiTrunkAndCanopy;
 
+/**
+ * Propagation flow utilities:
+ * Checks Offshoot Multiplier skill for total branch cuttings,
+ * and retains parent bonsai in plot/storage with preserved Care Points (CP) and level reset.
+ */
+export function startPropagation(bonsai: any, skills?: any) {
+  const offshootMultiplierLevel = skills?.offshoot_multiplier ?? skills?.offshootMultiplier ?? 0;
+  const totalAttempts = 2 + offshootMultiplierLevel;
+  return {
+    parentBonsai: bonsai,
+    totalAttempts,
+    offshootsCount: totalAttempts,
+  };
+}
+
+export function completePropagation(
+  plot: { bonsai?: any } | any,
+  skills?: any,
+  seedlingsCount = 0,
+  seedlings: any[] = [],
+  inventory?: any,
+) {
+  const targetBonsai = plot?.bonsai || plot;
+  if (targetBonsai) {
+    const propExpertLevel = skills?.propagation_expert ?? skills?.propagationExpert ?? 0;
+    const bonusLevels = propExpertLevel * 10;
+    targetBonsai.level = bonusLevels;
+    targetBonsai.currentXP = 0;
+    targetBonsai.progressSeconds = 0;
+    targetBonsai.growthTimer = 0;
+    // Retain all accumulated Care Points (CP / cultivationPotential),
+    // Maturity Rating, Style, Variant, and Genetic Potential (GP) intact!
+  }
+  if (inventory && seedlings && seedlings.length > 0) {
+    if (!inventory.seedlingList) inventory.seedlingList = [];
+    seedlings.forEach((s) => inventory.seedlingList.push(s));
+  }
+  return targetBonsai;
+}
+
+export const finishPropagation = completePropagation;
+export const onPropagate = startPropagation;
+
 export {
   calculateWateringGrowthRate,
   calculatePruningXP,
@@ -420,6 +463,7 @@ export interface SanctuaryCanvasProps {
     level?: number;
     color?: string;
     flowerColor?: string;
+    variant?: 'normal' | 'blooming';
   };
   width?: number;
   height?: number;
@@ -486,6 +530,8 @@ export const SanctuaryCanvas: React.FC<SanctuaryCanvasProps> = ({
       bonsai.leafType,
       foliageColor,
       foliageAccent,
+      false,
+      bonsai.variant || 'normal',
     );
   }, [bonsai, width, height]);
 

@@ -458,6 +458,22 @@ export const AREA_EXCAVATION_SPEEDS = {
   OVERGROWTH: 5.8,
 } as const;
 
+export const MATURITY_SPEEDS: Record<number, number> = {
+  1: 3.2,
+  2: 3.6,
+  3: 4.2,
+  4: 5.0,
+  5: 6.0,
+};
+
+export const MATURITY_ZONE_COUNTS: Record<number, number> = {
+  1: 2,
+  2: 3,
+  3: 4,
+  4: 5,
+  5: 6,
+};
+
 export type RoverModuleType =
   | 'storage_1'
   | 'storage_2'
@@ -634,6 +650,8 @@ export interface SeedlingItem {
   id: string; // unique uuid / timestamp
   leafType: BonsaiLeafType;
   maturity: MaturityTier | number; // 1 to 5 or MaturityTier
+  maturityRating?: number;
+  variant?: 'normal' | 'blooming';
   name?: string;
   group?: BonsaiGroup;
   species?: string;
@@ -1065,6 +1083,7 @@ export interface GridPlacementPreview {
   width: number;
   height: number;
   orientation: 'horizontal' | 'vertical'; // default 'horizontal'
+  variant?: 'normal' | 'blooming';
   loaderFacing?: LoaderFacing;
   facing?: LoaderFacing;
   dispenserFacing?: LoaderFacing;
@@ -1197,6 +1216,7 @@ export interface Bonsai {
   name: string;
   level: number;
   maturity?: string | number;
+  variant?: 'normal' | 'blooming';
   leafType?: string;
   style?: string;
   group?: string;

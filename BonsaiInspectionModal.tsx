@@ -92,6 +92,8 @@ export interface BonsaiInspectionModalProps {
   onToggleFavorite?: (id: string) => void;
   onAttachAutomaton?: (id: string, tier: 1 | 2 | 3) => void;
   onDetachAutomaton?: (id: string) => void;
+  onMature?: (bonsai: PlantedBonsai | any) => void;
+  onPropagate?: (bonsai: PlantedBonsai | any) => void;
 }
 
 /**
@@ -173,6 +175,8 @@ function InspectedBonsaiCanvas({ bonsai }: { bonsai: PlantedBonsai | any }) {
       bLeafType,
       foliageColor,
       foliageAccent,
+      false,
+      bonsai.variant || 'normal',
     );
   }, [bonsai]);
 
@@ -204,10 +208,20 @@ export default function BonsaiInspectionModal({
   onFertilize,
   onPrune,
   onToggleFavorite,
+  onMature,
+  onPropagate,
 }: BonsaiInspectionModalProps) {
   // Navigation focus index for interactive buttons:
   // 0: Fertilize, 1: Compost, 2: Donate / Sell, 3: Store in Bag, 4: Favorite Toggle, 5: Close Inspection
   const [focusedBtnIdx, setFocusedBtnIdx] = useState<number>(0);
+
+  const currentRating = getBonsaiMaturityRating(bonsai);
+  const targetRating = currentRating + 1;
+  const isMaxRating = currentRating >= 5;
+  const requiredStrikes = targetRating + 1; // Target 2: 3 strikes; Target 3: 4 strikes; Target 4: 5 strikes; Target 5: 6 strikes
+  const availableStrikes = 2 + (skills?.carefulTrowel || 0);
+  const hasEnoughStrikes = availableStrikes >= requiredStrikes;
+  const canMature = Boolean(bonsai && bonsai.level >= 100 && !isMaxRating && hasEnoughStrikes);
 
   const totalCompostStock =
     (inv.compost_s || 0) + (inv.compost_m || 0) + (inv.compost_l || 0);
@@ -358,6 +372,18 @@ export default function BonsaiInspectionModal({
         } else {
           onDonate(bonsai.id);
         }
+      } else if (e.key === 'm' || e.key === 'M') {
+        if (canMature) {
+          e.preventDefault();
+          onMature?.(bonsai);
+        } else if (bonsai.level >= 100) {
+          gameAudio?.playErrorBuzz?.();
+        }
+      } else if (e.key === 'p' || e.key === 'P') {
+        if (bonsai.level >= 100 && onPropagate) {
+          e.preventDefault();
+          onPropagate(bonsai);
+        }
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -458,13 +484,19 @@ export default function BonsaiInspectionModal({
                   <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
                   <span>Base Aesthetic: <strong>{baseAesthetic.total.toFixed(2)} BA</strong></span>
                 </span>
+                {bonsai.variant === 'blooming' && (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full font-black bg-pink-950/90 border border-pink-400 text-pink-300 flex items-center gap-1 shadow-sm">
+                    <span>🌸</span>
+                    <span>Blooming Variant</span>
+                  </span>
+                )}
                 {bonsai.isFavorite && (
                   <span className="text-xs px-2.5 py-0.5 rounded-full font-black bg-amber-500 text-slate-950 border border-amber-300 flex items-center gap-1 shadow-[0_0_12px_rgba(245,158,11,0.5)]">
                     <span>⭐</span>
                     <span>Favorited (Locked from Donation)</span>
                   </span>
                 )}
-                <h3 className="text-base sm:text-lg font-black text-slate-100 truncate">{getBonsaiDisplayName(bonsai)}</h3>
+                <h3 className="text-base sm:text-lg font-black text-slate-100 truncate">{bonsai.variant === 'blooming' ? '🌸 Blooming ' : ''}{getBonsaiDisplayName(bonsai)}</h3>
                 {(() => {
                   const nat = getBonsaiNature(bonsai.nature);
                   return (
@@ -1004,6 +1036,90 @@ export default function BonsaiInspectionModal({
                 </button>
               </div>
 
+              {/* LEVEL 100 ENDGAME ACTIONS: MATURING & PROPAGATING */}
+              {bonsai.level >= 100 && (
+                <div className="bg-gradient-to-br from-amber-950/80 via-slate-900 to-purple-950/80 border-2 border-amber-400/80 rounded-2xl p-3 shadow-xl space-y-2">
+                  <div className="flex items-center justify-between border-b border-amber-500/40 pb-1.5">
+                    <div className="flex items-center gap-1.5 font-black text-amber-300 text-xs">
+                      <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                      <span>Level 100 Endgame Mechanics</span>
+                    </div>
+                    <span className="text-[9px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Mastery
+                    </span>
+                  </div>
+
+                  {/* Dual Actions: Mature & Propagate */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* MATURE BONSAI BUTTON */}
+                    <button
+                      disabled={!canMature}
+                      onClick={() => {
+                        if (!canMature) {
+                          gameAudio?.playErrorBuzz?.();
+                          return;
+                        }
+                        onMature?.(bonsai);
+                      }}
+                      title={
+                        isMaxRating
+                          ? 'Max Maturity Rating Reached'
+                          : !hasEnoughStrikes
+                          ? `Requires at least ${requiredStrikes} Shovel Strikes (Have: ${availableStrikes})`
+                          : `Launch Maturing Minigame for Rating ${targetRating}`
+                      }
+                      className={`font-black text-xs py-2 px-2 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all shadow min-h-[46px] ${
+                        isMaxRating
+                          ? 'bg-slate-950/80 text-slate-500 border border-slate-800 cursor-not-allowed opacity-70'
+                          : !hasEnoughStrikes
+                          ? 'bg-amber-950/30 text-amber-300/40 border border-amber-700/30 cursor-not-allowed opacity-60'
+                          : 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 border border-yellow-200 ring-2 ring-amber-400/60 shadow-[0_0_15px_rgba(245,158,11,0.5)] active:scale-95 cursor-pointer'
+                      }`}>
+                      <div className="flex items-center gap-1">
+                        <span>🌟</span>
+                        <span>Mature Bonsai</span>
+                      </div>
+                      <span className="text-[9px] font-normal leading-tight text-center">
+                        {isMaxRating
+                          ? 'Max Maturity Rating Reached'
+                          : !hasEnoughStrikes
+                          ? `Requires at least ${requiredStrikes} Shovel Strikes`
+                          : `Elevate to Rating ${targetRating} (${requiredStrikes} strikes)`}
+                      </span>
+                    </button>
+
+                    {/* PROPAGATE BONSAI BUTTON */}
+                    <button
+                      disabled={bonsai.level < 100}
+                      onClick={() => {
+                        if (bonsai.level < 100) {
+                          gameAudio?.playErrorBuzz?.();
+                          return;
+                        }
+                        onPropagate?.(bonsai);
+                      }}
+                      title={
+                        bonsai.level >= 100
+                          ? 'Harvest offshoot branch cuttings and launch the Offshoot Planting minigame!'
+                          : 'Requires Level 100 Mastery'
+                      }
+                      className={`font-black text-xs py-2 px-2 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all shadow min-h-[46px] ${
+                        bonsai.level < 100
+                          ? 'bg-slate-950/80 text-slate-500 border border-slate-800 cursor-not-allowed opacity-60'
+                          : 'bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 hover:from-emerald-500 hover:to-teal-400 text-white border border-emerald-300 ring-2 ring-emerald-400/60 shadow-[0_0_15px_rgba(16,185,129,0.5)] active:scale-95 cursor-pointer'
+                      }`}>
+                      <div className="flex items-center gap-1">
+                        <span>🌱</span>
+                        <span>Propagate Bonsai</span>
+                      </div>
+                      <span className="text-[9px] font-normal leading-tight text-center text-emerald-100">
+                        Take {2 + (skills?.offshoot_multiplier || skills?.offshootMultiplier || 0)} Offshoot Cuttings
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* DONATION VALUE FORMULA BREAKDOWN TELEMETRY CARD */}
               <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 text-[10px] space-y-1">
                 <div className="flex items-center justify-between text-slate-300 font-bold">
@@ -1014,12 +1130,12 @@ export default function BonsaiInspectionModal({
                   <span className="text-emerald-300 font-mono font-black">
                     +{finalDonationValue.toFixed(2)} Verdure{' '}
                     <span className="text-[9px] text-slate-500">
-                      (Max: {(675 * donationBreakdown.expertNegotiatorBonus).toFixed(2)})
+                      (Max: {(810 * donationBreakdown.expertNegotiatorBonus).toFixed(2)})
                     </span>
                   </span>
                 </div>
                 <div className="text-[9px] text-slate-400 font-mono leading-tight">
-                  1.0 (Base) × {donationBreakdown.speciesFindOdds.toFixed(1)}x (Odds) × {donationBreakdown.maturityRating.toFixed(1)}x (Rank {donationBreakdown.ratingRank}) × {donationBreakdown.levelFactor.toFixed(2)}x (Lv.{donationBreakdown.level}) × {donationBreakdown.attributeFactor.toFixed(2)}x (GP/CP)
+                  1.0 (Base) × {donationBreakdown.speciesFindOdds.toFixed(1)}x (Odds) × {donationBreakdown.maturityRating.toFixed(1)}x (Rank {donationBreakdown.ratingRank}) × {donationBreakdown.levelFactor.toFixed(2)}x (Lv.{donationBreakdown.level}) × {donationBreakdown.attributeFactor.toFixed(2)}x (GP/CP) × {donationBreakdown.lookFactor.toFixed(1)}x (Look: {bonsai.variant === 'blooming' ? 'Blooming 1.2x' : 'Normal 1.0x'})
                   {donationBreakdown.expertNegotiatorLvl > 0 && (
                     <span className="text-amber-300 font-bold">
                       {' '}× {donationBreakdown.expertNegotiatorBonus.toFixed(2)}x (+{donationBreakdown.expertNegotiatorLvl * 10}% Expert Negotiator)

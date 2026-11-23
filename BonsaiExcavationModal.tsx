@@ -30,6 +30,8 @@ import {
   getExcavationArcColor,
   TIERS,
   AREA_EXCAVATION_SPEEDS,
+  MATURITY_SPEEDS,
+  MATURITY_ZONE_COUNTS,
   CrystalItem,
   CrystalAttributeType,
 } from './types';
@@ -40,11 +42,13 @@ export {
   getExcavationArcColor,
   TIERS,
   AREA_EXCAVATION_SPEEDS,
+  MATURITY_SPEEDS,
+  MATURITY_ZONE_COUNTS,
 };
 
 export const baseSpeed = AREA_EXCAVATION_SPEEDS;
 import {gameAudio} from './utils/helper';
-import {getBonsaiGroupBadgeClass, renderUnifiedCrystalGraphic} from './App';
+import {getBonsaiGroupBadgeClass, renderUnifiedCrystalGraphic, getBonsaiWeight} from './App';
 
 export interface ExcavationResultData {
   id?: string;
@@ -52,6 +56,7 @@ export interface ExcavationResultData {
   leafType: BonsaiLeafType;
   group: BonsaiGroup;
   maturity: MaturityTier;
+  variant?: 'normal' | 'blooming';
   species?: string;
   name: string;
   rarity?: string;
@@ -175,7 +180,8 @@ export default function BonsaiExcavationModal({
       : cType === 'trunk'
       ? 'Trunk'
       : 'Root';
-  const cWeight = crystal ? (crystal.strength === 1.0 ? 1.0 : 0.5) : 3.0;
+  const cWeight = 1.0;
+  const sWeight = getBonsaiWeight(result.maturity);
 
   const attributesList: {
     key: keyof BonsaiAttributes;
@@ -213,18 +219,26 @@ export default function BonsaiExcavationModal({
             <div className={`w-10 h-10 rounded-2xl border flex items-center justify-center shadow-inner shrink-0 ${
               isCrystal
                 ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300'
+                : result.variant === 'blooming'
+                ? 'bg-pink-950/90 border-pink-500 text-pink-300 shadow-[0_0_15px_rgba(244,114,182,0.4)]'
                 : 'bg-emerald-950/80 border-emerald-500/60 text-emerald-400'
             }`}>
-              {isCrystal ? <span className="text-2xl">✨</span> : <Trophy className="w-5 h-5 text-emerald-400" />}
+              {isCrystal ? <span className="text-2xl">✨</span> : result.variant === 'blooming' ? <span className="text-2xl">🌸</span> : <Trophy className="w-5 h-5 text-emerald-400" />}
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base sm:text-lg font-black text-slate-100">
-                  {isCrystal ? 'Elemental Crystal Excavation Complete!' : 'Excavation Appraisal Complete!'}
+                  {isCrystal ? 'Elemental Crystal Excavation Complete!' : result.variant === 'blooming' ? '🌸 Blooming Bonsai Variant Excavation Complete!' : 'Excavation Appraisal Complete!'}
                 </h3>
                 <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 px-2 py-0.5 rounded-full font-black">
                   100% Success
                 </span>
+                {!isCrystal && result.variant === 'blooming' && (
+                  <span className="text-[10px] bg-pink-950/90 text-pink-300 border border-pink-400 px-2.5 py-0.5 rounded-full font-black flex items-center gap-1 shadow-[0_0_12px_rgba(244,114,182,0.4)] animate-pulse">
+                    <span>🌸</span>
+                    <span>2% Blooming Chance!</span>
+                  </span>
+                )}
                 {!isCrystal && result.wasUpgraded && (
                   <span className="text-[10px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 px-2 py-0.5 rounded-full font-black flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-yellow-400" />
@@ -235,11 +249,24 @@ export default function BonsaiExcavationModal({
               <p className="text-[11px] text-slate-400">
                 {isCrystal
                   ? 'Pristine elemental crystal extracted from deep mineral resonance'
+                  : result.variant === 'blooming'
+                  ? 'Legendary 2% Blooming Variant discovered! Delicate cherry blossoms adorn its foliage.'
                   : 'Precision digging extracted pristine root Genetic Potential'}
               </p>
             </div>
           </div>
         </div>
+
+        {/* PROMINENT RADIANT PINK BLOOMING BANNER */}
+        {!isCrystal && result.variant === 'blooming' && (
+          <div className="w-full bg-gradient-to-r from-pink-950/90 via-rose-900/90 to-pink-950/90 border-2 border-pink-400 px-4 py-2.5 rounded-2xl flex items-center justify-center gap-3 text-pink-100 shadow-[0_0_25px_rgba(244,114,182,0.4)] animate-pulse">
+            <span className="text-xl">🌸</span>
+            <span className="font-black text-xs sm:text-sm tracking-wide text-center">
+              RARE BLOOMING VARIANT ENCOUNTERED! 🌸 (2% Legendary Wild Find)
+            </span>
+            <span className="text-xl">🌸</span>
+          </div>
+        )}
 
         {/* CRYSTAL DEDICATED RESULTS CARD (Completely stripped of tree-specific breakdown) */}
         {isCrystal && crystal ? (
@@ -324,11 +351,19 @@ export default function BonsaiExcavationModal({
                         {matDef.name} (Rank {matDef.rank})
                       </span>
                     </div>
-                    <h4 className="font-bold text-sm sm:text-base text-slate-100 mt-1 truncate">
-                      {getBonsaiDisplayName(result)}
-                    </h4>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                      {result.variant === 'blooming' && (
+                        <span className="text-[10px] px-2.5 py-0.5 rounded-full font-black border-2 bg-pink-950 text-pink-200 border-pink-400 flex items-center gap-1 shadow-[0_0_12px_rgba(244,114,182,0.5)] animate-pulse">
+                          <span>🌸</span>
+                          <span>Blooming Variant (2% Rare Find!)</span>
+                        </span>
+                      )}
+                      <h4 className="font-bold text-sm sm:text-base text-slate-100 truncate">
+                        {result.variant === 'blooming' ? '🌸 Blooming ' : ''}{getBonsaiDisplayName(result)}
+                      </h4>
+                    </div>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Leaf Shape: <strong className="text-slate-200">{leafDef.leafShapeName}</strong> • Growth Rate: <strong style={{color: matDef.color}}>{matDef.growthMultiplier}x</strong>
+                      Leaf Shape: <strong className="text-slate-200">{leafDef.leafShapeName}</strong>{result.variant === 'blooming' ? ' (🌸 In Bloom)' : ''} • Growth Rate: <strong style={{color: matDef.color}}>{matDef.growthMultiplier}x</strong>
                     </p>
                   </div>
                 </div>
@@ -458,8 +493,8 @@ export default function BonsaiExcavationModal({
               <Package className="w-4 h-4" />
               <span>
                 {isCrystal
-                  ? 'Collect & Transfer to Cargo'
-                  : `Collect ${getBonsaiDisplayName(result)} [Space / X] or [E / A] (3.0 kg)`}
+                  ? `Collect ✨ ${cTypeLabel} Crystal [Space / X] or [E / A] (1.0 kg)`
+                  : `Collect ${result.variant === 'blooming' ? '🌸 Blooming ' : ''}${getBonsaiDisplayName(result)} [Space / X] or [E / A] (${sWeight.toFixed(1)} kg)`}
               </span>
               <ArrowRight className="w-4 h-4" />
             </button>

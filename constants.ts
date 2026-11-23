@@ -20,6 +20,8 @@ export const THEME = {
   fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
 };
 
+export const BASE_ROVER_BATTERY = 50;
+
 /**
  * Configuration for the game.
  */
@@ -105,13 +107,13 @@ export const CONFIG = {
     group: 'Rules',
   },
   roverBaseBattery: {
-    value: 500,
+    value: 50,
     type: 'number',
     label: 'Rover Base Battery (kWh)',
     group: 'Rules',
   },
   roverBaseCargo: {
-    value: 15.0,
+    value: 3.0,
     type: 'number',
     label: 'Rover Base Cargo Capacity (kg)',
     group: 'Rules',
@@ -227,7 +229,7 @@ export const ASSET_DOUBLE_RESOURCES = {
     shortName: 'Scrap Metal 2x',
     width: 756,
     height: 691,
-    weight: 1.6,
+    weight: 0.8,
     yield: 2,
     baseKey: 'scrap_metal',
   },
@@ -238,7 +240,7 @@ export const ASSET_DOUBLE_RESOURCES = {
     shortName: 'Copper Wire 2x',
     width: 839,
     height: 656,
-    weight: 1.0,
+    weight: 1.2,
     yield: 2,
     baseKey: 'copper_wire',
   },

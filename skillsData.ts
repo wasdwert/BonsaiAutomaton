@@ -343,46 +343,6 @@ export const ZEN_SKILLS_DATA: SkillDefinition[] = [
     getNextEffectText: (lvl) => `+${lvl + 1}s/s Sprinkler Growth Speed`,
   },
   {
-    id: 'automatonGreenThumb',
-    name: 'Automaton Green Thumb',
-    category: 'Growing',
-    description: 'Automaton pruners trim excess shoots with mechanical precision.',
-    icon: '🤖',
-    maxLevel: 5,
-    levels: [
-      { level: 1, cost: 1 },
-      { level: 2, cost: 2 },
-      { level: 3, cost: 3 },
-      { level: 4, cost: 4 },
-      { level: 5, cost: 5 },
-    ],
-    effectPerLevel: '+1s Progress per Prune each',
-    getCurrentEffectText: () => 'System in development',
-    getNextEffectText: () => 'System in development',
-    isGreyedOut: true,
-    greyedOutReason: 'System in development',
-  },
-  {
-    id: 'automatonHydrodynamics',
-    name: 'Automaton Hydrodynamics',
-    category: 'Growing',
-    description: 'Advanced fluidics routing through automaton care channels.',
-    icon: '🤖',
-    maxLevel: 5,
-    levels: [
-      { level: 1, cost: 1 },
-      { level: 2, cost: 2 },
-      { level: 3, cost: 3 },
-      { level: 4, cost: 4 },
-      { level: 5, cost: 5 },
-    ],
-    effectPerLevel: '+1s Automaton Growth Speed per Second each',
-    getCurrentEffectText: () => 'System in development',
-    getNextEffectText: () => 'System in development',
-    isGreyedOut: true,
-    greyedOutReason: 'System in development',
-  },
-  {
     id: 'hydrodynamicsIrrigationT1',
     name: 'Hydrodynamics Irrigation T1',
     category: 'Growing',
@@ -435,6 +395,40 @@ export const ZEN_SKILLS_DATA: SkillDefinition[] = [
     effectPerLevel: '+1s Irrigation System Growth Speed per Second each',
     getCurrentEffectText: (lvl) => (lvl > 0 ? `+${lvl}s/s T3 Irrigation Speed` : 'Base T3 irrigation rate'),
     getNextEffectText: (lvl) => `+${lvl + 1}s/s T3 Irrigation Speed`,
+  },
+  {
+    id: 'propagation_expert',
+    name: 'Propagation Expert',
+    category: 'Growing',
+    description: 'Increases the level to which a propagated adult bonsai is reset (+10 Levels per upgrade).',
+    icon: '🌱',
+    maxLevel: 5,
+    levels: [
+      { level: 1, cost: 1, requiredBranchRank: 1 },
+      { level: 2, cost: 2, requiredBranchRank: 1 },
+      { level: 3, cost: 3, requiredBranchRank: 2 },
+      { level: 4, cost: 4, requiredBranchRank: 2 },
+      { level: 5, cost: 5, requiredBranchRank: 3 },
+    ],
+    effectPerLevel: '+10 Levels upon propagation reset each',
+    getCurrentEffectText: (lvl) => (lvl > 0 ? `Reset to Level ${lvl * 10} (+${lvl * 10} Levels)` : 'Reset to Level 0 (no bonus)'),
+    getNextEffectText: (lvl) => `Reset to Level ${(lvl + 1) * 10} (+${(lvl + 1) * 10} Levels)`,
+  },
+  {
+    id: 'offshoot_multiplier',
+    name: 'Offshoot Multiplier',
+    category: 'Growing',
+    description: 'Grants additional offshoot branch cuttings in the Offshoot Planting minigame (+1 Offshoot per upgrade).',
+    icon: '✂️',
+    maxLevel: 3,
+    levels: [
+      { level: 1, cost: 2, requiredBranchRank: 1 },
+      { level: 2, cost: 5, requiredBranchRank: 2 },
+      { level: 3, cost: 8, requiredBranchRank: 3 },
+    ],
+    effectPerLevel: '+1 Offshoot Branch Cutting each',
+    getCurrentEffectText: (lvl) => (lvl > 0 ? `+${lvl} Offshoot Cutting${lvl > 1 ? 's' : ''} (${2 + lvl} total)` : '2 base offshoots'),
+    getNextEffectText: (lvl) => `+${lvl + 1} Offshoot Cuttings (${3 + lvl} total)`,
   },
 
   // ================= ECONOMY & ENERGY (11 SKILLS) =================
@@ -675,5 +669,10 @@ export const ZEN_SKILLS_DATA: SkillDefinition[] = [
 ];
 
 export const SKILL_BY_ID = new Map<string, SkillDefinition>(
-  ZEN_SKILLS_DATA.map((s) => [s.id, s]),
+  ZEN_SKILLS_DATA.flatMap((s) => {
+    const entries: [string, SkillDefinition][] = [[s.id, s]];
+    if (s.id === 'propagation_expert') entries.push(['propagationExpert', s]);
+    if (s.id === 'offshoot_multiplier') entries.push(['offshootMultiplier', s]);
+    return entries;
+  }),
 );

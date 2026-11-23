@@ -1,5 +1,8 @@
 {
   "title": "Bonsai Automata",
+  "language": [
+    "en"
+  ],
   "hook": "Cultivate rare automated ancient bonsais",
   "game_overview": "An idle zen simulation featuring automated power and irrigation grids to grow bonsais to level 100, combined with reaction-based wilderness excursions.",
   "artstyle": "cozy-wholesome",
@@ -23,9 +26,6 @@
   "low_end_device_support": true,
   "mobile_playable": true,
   "tv_playable": true,
-  "language": [
-    "en"
-  ],
   "content_descriptors": [],
   "controls": [
     {
@@ -52,8 +52,8 @@
   "sections": [
     {
       "title": "Core Mechanics",
-      "content": "1. Master Quest Gated Grid Expansions: The 8-phase grid territorial expansion progression enforces strict Master Quest branch rank prerequisites: Expansions I-IV (Inner Wings through Upper 8x16 Rows) are accessible from Rank 0; Expansions V & VI (Left 8x8 and Right 8x8 Wings) require completing at least one Master Quest branch to Rank 1; and Expansions VII & VIII (Southern Rows 8-15) require completing at least one branch to Rank 2. 2. Interactive Single-Phase Mini-Map Presentation: Renamed the 'Plots' market submenu to 'Grid Expansions' and transformed the interface into a single-phase presentation engine. An architectural SVG mini-map depicts the entire tri-field sanctuary (central 16x16 megagrid and elevated flanking 8x8 wings) using color telemetry: emerald green for currently active plots, pulsing amber gold for plots unlocked in the target phase, and muted slate for future locked plots. The panel details plot capacity, prerequisite Master Quest status, discounted Verdure pricing, and dynamic purchase acquisition.",
-      "summary": "Master-Quest Gated Grid Expansions, Single-Phase Focused Progression, and Sanctuary Architectural Mini-Map."
+      "content": "1. Parent Specimen Preservation on Propagation: Propagating an adult Level 100 bonsai no longer removes or destroys the parent specimen from its sanctuary grid plot. Instead, the parent bonsai is retained directly in its plot and reset to Level 0 (boosted by +10 levels per rank of the 'Propagation Expert' skill, up to Level 50), while preserving 100% of accumulated Care Points (CP), Genetic Potential (GP), Maturity Rating, Style, and Blooming Phenotype. 2. New Growing Skills in Zen Library: Added two new skills in the 'Growing' category positioned immediately after 'Hydrodynamics Irrigation T3': (a) 'Propagation Expert' (5 upgrades: Rank 1 & 2 requiring Branch Rank 1 for 1 & 2 Zen Points; Rank 3 & 4 requiring Branch Rank 2 for 3 & 4 Zen Points; Rank 5 requiring Branch Rank 3 for 5 Zen Points; granting +10 reset levels per upgrade); (b) 'Offshoot Multiplier' (3 upgrades: Rank 1 requiring Branch Rank 1 for 2 Zen Points; Rank 2 requiring Branch Rank 2 for 5 Zen Points; Rank 3 requiring Branch Rank 3 for 8 Zen Points; granting +1 extra offshoot cutting per upgrade in the Offshoot Planting minigame, scaling from 2 up to 5 total attempts). 3. Catalog Refinement: Completely removed 'Automaton Green Thumb' and 'Automaton Hydrodynamics' from the Zen Library skill registry.",
+      "summary": "Parent Specimen Preservation on Propagation, Propagation Expert & Offshoot Multiplier Skills, and Skill Catalog Refinement."
     }
   ]
 }

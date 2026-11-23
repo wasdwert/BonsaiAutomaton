@@ -345,13 +345,13 @@ export default function RoverModal({
               <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
                 <span className="text-slate-400 block text-[10px]">Max Battery:</span>
                 <strong className="text-amber-300 text-sm font-mono">{effBattery} kWh</strong>
-                <span className="text-[10px] text-slate-500 block">Base 50 + {effBattery - 50} kWh</span>
+                <span className="text-[10px] text-slate-500 block">Base 50 + {Math.max(0, effBattery - 50)} kWh</span>
               </div>
 
               <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
                 <span className="text-slate-400 block text-[10px]">Max Cargo Payload:</span>
-                <strong className="text-emerald-300 text-sm font-mono">{effCargo} kg</strong>
-                <span className="text-[10px] text-slate-500 block">Base 15.0 + {(effCargo - 15.0).toFixed(1)} kg</span>
+                <strong className="text-emerald-300 text-sm font-mono">{effCargo.toFixed(1)} kg</strong>
+                <span className="text-[10px] text-slate-500 block">Base: 3.0 kg, Extra: +{Math.max(0, effCargo - 3.0).toFixed(1)} kg (Total: {effCargo.toFixed(1)} kg)</span>
               </div>
 
               <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">

@@ -444,6 +444,12 @@ export default function InventoryModal({
                             <span className={`text-[10px] px-1.5 py-0.2 rounded font-black border ${getBonsaiGroupBadgeClass(stored.group)}`}>
                               {stored.group}
                             </span>
+                            {stored.variant === 'blooming' && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-black border bg-pink-950/90 text-pink-300 border-pink-400 flex items-center gap-1 shadow-sm shrink-0 animate-pulse">
+                                <span>🌸</span>
+                                <span>Blooming</span>
+                              </span>
+                            )}
                             <span
                               style={{
                                 backgroundColor: sMat.bg,
@@ -456,7 +462,7 @@ export default function InventoryModal({
                               <span>{sMat.name}</span>
                               <span className="opacity-80 font-mono">({sMat.multiplier}x)</span>
                             </span>
-                            <span className="truncate">{getBonsaiDisplayName(stored)} (Lv.{stored.level} • {ba.total.toFixed(2)} BA)</span>
+                            <span className="truncate">{stored.variant === 'blooming' ? '🌸 Blooming ' : ''}{getBonsaiDisplayName(stored)} (Lv.{stored.level} • {ba.total.toFixed(2)} BA)</span>
                             {stored.isFavorite && (
                               <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-amber-500 text-slate-950 border border-amber-300 flex items-center gap-1 shadow-sm shrink-0">
                                 <span>⭐</span>
@@ -588,6 +594,12 @@ export default function InventoryModal({
                           <span className={`text-[10px] px-1.5 py-0.2 rounded font-black border ${getBonsaiGroupBadgeClass((seedling.group as any) || sDef.group)}`}>
                             {seedling.group || sDef.group}
                           </span>
+                            {seedling.variant === 'blooming' && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-black border bg-pink-950/90 text-pink-300 border-pink-400 flex items-center gap-1 shadow-sm shrink-0 animate-pulse">
+                                <span>🌸</span>
+                                <span>Blooming</span>
+                              </span>
+                            )}
                             <span
                               style={{
                                 backgroundColor: sMat.bg,
@@ -600,7 +612,7 @@ export default function InventoryModal({
                               <span>{sMat.name}</span>
                               <span className="opacity-80 font-mono">({sMat.multiplier}x)</span>
                             </span>
-                            <span className="truncate">{getBonsaiDisplayName(seedling)}</span>
+                            <span className="truncate">{seedling.variant === 'blooming' ? '🌸 Blooming ' : ''}{getBonsaiDisplayName(seedling)}</span>
                             {seedling.nature && (() => {
                             const nat = getBonsaiNature(seedling.nature);
                             return (
@@ -1234,7 +1246,7 @@ export default function InventoryModal({
                 iconBg="bg-emerald-950/80"
                 iconBorder="border-emerald-500/50"
                 title="T1 Storage Module"
-                subtitle="Modular Cargo Bin (+2.5 kg Payload • 4 kW)"
+                subtitle="Modular Cargo Bin (+1.0 kg Payload • 4 kW)"
                 stockCount={inv.rover_modules.storage_1 || 0}
                 activeCount={(inv.attached_rover_modules || []).filter((m) => m === 'storage_1').length}
                 activeLabel="Attached"
@@ -1245,7 +1257,7 @@ export default function InventoryModal({
                 iconBg="bg-emerald-950/80"
                 iconBorder="border-emerald-500/50"
                 title="T2 Storage Module"
-                subtitle="Reinforced Cargo Module (+5.0 kg Payload • 7 kW)"
+                subtitle="Reinforced Cargo Module (+2.0 kg Payload • 7 kW)"
                 stockCount={inv.rover_modules.storage_2 || 0}
                 activeCount={(inv.attached_rover_modules || []).filter((m) => m === 'storage_2').length}
                 activeLabel="Attached"
@@ -1256,7 +1268,7 @@ export default function InventoryModal({
                 iconBg="bg-emerald-950/80"
                 iconBorder="border-emerald-500/50"
                 title="T3 Storage Module"
-                subtitle="Titanium Cargo Rack (+7.5 kg Payload • 10 kW)"
+                subtitle="Titanium Cargo Rack (+3.0 kg Payload • 10 kW)"
                 stockCount={inv.rover_modules.storage_3 || 0}
                 activeCount={(inv.attached_rover_modules || []).filter((m) => m === 'storage_3').length}
                 activeLabel="Attached"
